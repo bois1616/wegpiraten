@@ -36,7 +36,7 @@ columns = next(data)[1:]  # Erste Zeile als Spaltennamen, erste Spalte ignoriere
 df = pd.DataFrame((row[1:] for row in data), columns=columns)  # Daten ab zweiter Spalte
 
 #daten formatieren
-df["Start_AbrMon"] = pd.to_datetime(df["Start_AbrMon"], errors="coerce").dt.strftime("%d.%m.%Y")
+df["Start_AbrMon"] = pd.to_datetime(df["Start_AbrMon"], errors="coerce").dt.strftime("%b-%Y")
 df["End_AbrMon"] = pd.to_datetime(df["End_AbrMon"], errors="coerce").dt.strftime("%d.%m.%Y")
 df["Leistungsdatum"] = pd.to_datetime(df["Leistungsdatum"], errors="coerce").dt.strftime("%d.%m.%Y")
 df["ZD_Name2"] = df["ZD_Name2"].fillna("").replace("(Leer)", "")
@@ -57,6 +57,8 @@ template = DocxTemplate(template_path / template_name)
 for klient_id, daten in client:
     # Kopf-Daten (nehmen wir aus der ersten Zeile)
     kopf = daten.iloc[0].to_dict()
+    #TODO: Datum im Format AUG25 ausgeben
+    kopf["Rechnungsnummer"] = f"R{kopf['Start_AbrMon'].strftime("%m%Y")}_{klient_id}"
 
     # Tabellen-Daten (alle Zeilen für diese Gruppe)
     positionen = daten[["Leistungsdatum",
@@ -78,4 +80,4 @@ for klient_id, daten in client:
 
     # Rendern
     template.render(context)
-    template.save(output_path / f"serienbrief_{klient_id}.docx")
+    template.save(output_path / f"Rechnung_{klient_id}.docx")
