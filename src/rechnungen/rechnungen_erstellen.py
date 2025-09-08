@@ -9,7 +9,7 @@ from datetime import datetime
 def format_chf(value: float) -> str:
     if pd.isna(value):
         return ""
-    return f"{value:,.2f} CHF".replace(",", "’").replace(".", ",")
+    return f"{value:,.2f} CHF".replace(",", ".").replace(".", ",")
 
 # Pfade
 prj_root = Path(__file__).parent.parent.parent
@@ -40,7 +40,7 @@ df["Start_AbrMon"] = pd.to_datetime(df["Start_AbrMon"], errors="coerce").dt.strf
 df["End_AbrMon"] = pd.to_datetime(df["End_AbrMon"], errors="coerce").dt.strftime("%d.%m.%Y")
 df["Leistungsdatum"] = pd.to_datetime(df["Leistungsdatum"], errors="coerce").dt.strftime("%d.%m.%Y")
 df["ZD_Name2"] = df["ZD_Name2"].fillna("").replace("(Leer)", "")
-df["Kosten"] = df["Kosten"].apply(format_chf)
+df["KostenCHF"] = df["Kosten"].apply(format_chf)
 
 # TODO Filtern nach Abrechnungsmonat
 print(df.head())
@@ -58,7 +58,18 @@ for klient_id, daten in client:
     # Kopf-Daten (nehmen wir aus der ersten Zeile)
     kopf = daten.iloc[0].to_dict()
     #TODO: Datum im Format AUG25 ausgeben
-    kopf["Rechnungsnummer"] = f"R{kopf['Start_AbrMon'].strftime("%m%Y")}_{klient_id}"
+    abrechnungsmonat_dt = pd.to_datetime(kopf["Start_AbrMon"], format="%b-%Y", errors="coerce")
+    abrechnungsmonat_mmYY = abrechnungsmonat_dt.strftime("%m%y") if pd.notna(abrechnungsmonat_dt) else ""
+
+    re_nr = f"R{abrechnungsmonat_mmYY}_{klient_id}"
+    kopf["Rechnungsnummer"] = re_nr
+
+    # Summen üer relevante Spalten
+    kopf["Summe_Fahrtzeit"] = f"{daten['Fahrtzeit'].sum():.2f}"
+    kopf["Summe_Direkt"] = f"{daten['Direkt'].sum():.2f}"
+    kopf["Summe_Indirekt"] = f"{daten['Indirekt'].sum():.2f}"
+    kopf["Summe_Stunden"] = f"{daten['Stunden'].sum():.2f}"
+    kopf["Summe_Kosten"] = format_chf(daten['Kosten'].sum())
 
     # Tabellen-Daten (alle Zeilen für diese Gruppe)
     positionen = daten[["Leistungsdatum",
@@ -69,15 +80,21 @@ for klient_id, daten in client:
                         "Stundensatz",
                         "km_Pauschale",
                         "Stunden",
-                        "Kosten"]].to_dict(orient="records")
+                        "KostenCHF"]].copy()
+
+    # Formatieren der Zahlenwerte
+    for col in ["Fahrtzeit", "Direkt", "Indirekt", "Stunden"]:
+        positionen.loc[:, col] = positionen[col].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "")
+
+    positionen = positionen.to_dict(orient="records")
 
     # TODO: Felder (z.B. Datum) aus dem Template übernehmen
     # TODO: Summenzeile einbauen
-    # TODO: Rechnungsnummer erzeugen und zurückschreiben bzw. Tabelle erzeugen
+    # TODO: Klären, ob die erzeugte ReNr ok ist
     
     # Kontext fürs Template
     context = {**kopf, "Positionen": positionen}
 
     # Rendern
     template.render(context)
-    template.save(output_path / f"Rechnung_{klient_id}.docx")
+    template.save(output_path / f"Rechnung_{re_nr}.docx")
