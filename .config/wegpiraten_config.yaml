@@ -2,6 +2,29 @@ prj_root: /home/stephan/projects/wegpiraten
 data_path: /mnt/c/Users/micro/OneDrive/Shared/Beatus/Wegpiraten Unterlagen
 output_path: output
 template_path: vorlagen
+tmp_path: .tmp
 invoice_template_name: rechnungsvorlage.docx
 db_name: Wegpiraten Datenbank.xlsx
 sheet_name: Pivot Rechnungsdaten
+expected_columns:
+  - Leistungsbesteller
+  - Leistungsdatum
+  - ZDNR
+  - ZD_Name
+  - ZD_Name2
+  - ZD_Strasse
+  - ZD_PLZ
+  - ZD_Ort
+  - Klient-Nr.
+  - CL_Vorname
+  - CL_Nachname
+  - CL_SozVersNr
+  - Betreuungstyp
+  - Fahrtzeit
+  - Direkt
+  - Indirekt
+  - Sollstunden
+  - Stundensatz
+  - km_Pauschale
+  - Stunden
+  - Kosten

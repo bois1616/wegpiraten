@@ -11,3 +11,4 @@ wheels/
 
 # Eigene temp Dateien
 output/
+.tmp/

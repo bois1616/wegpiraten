@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -6,11 +7,16 @@ import yaml
 from docxtpl import DocxTemplate  # type: ignore
 from openpyxl import load_workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from PyPDF2 import PdfMerger  # type: ignore
 from rich import print
-from PyPDF2 import PdfMerger # type: ignore
-import subprocess
+from rich.traceback import install
+from openpyxl.styles import Font
+from icecream import ic  # type: ignore
+from zipfile import ZipFile
 
-def format_2f(value: float, currency: str = None) -> str:
+
+
+def format_2f(value: float, currency: Optional[str] = None) -> str:
     if pd.isna(value):
         return ""
     currency = currency or ""
@@ -21,21 +27,51 @@ def format_2f(value: float, currency: str = None) -> str:
     tmp_val = tmp_val.replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{tmp_val}{currency}"
 
+def clear_path(path: Path):
+    """Löscht alle Dateien im angegebenen Verzeichnis
 
-def load_data(db: Path, sheet: str) -> pd.DataFrame:
+    Args:
+        path (Path): Verzeichnis, dessen Dateien gelöscht werden sollen
+    """
+    for item in path.iterdir():
+        if item.is_file():
+            item.unlink()
+
+def zip_docs(src_dir: Path, zip_path: Path):
+    with ZipFile(zip_path, "w") as zipf:
+        for file in src_dir.glob("Rechnung_*.docx"):
+            zipf.write(file, arcname=file.name)
+
+
+def load_data(
+    db: Path,
+    sheet: Optional[str] = None,
+    abrechnungsmonat: Optional[pd.Timestamp | str] = None,
+) -> pd.DataFrame:
     """
     Lade die Aufwandsdaten aus der Excel-DB
     Achtung: Filter in der Excel-Abfrage bleiben bestehen
 
     Args:
         db (Path): Ort der Datenbank (Excel-Datei)
-        sheet (str): Name des Arbeitsblatts
+        sheet (str): Name des Arbeitsblatts. Wenn None, wird das aktive Blatt verwendet.
+        abrechnungsmonat (pd.Timestamp): Abrechnungsmonat. Wenn None, wird
 
     Returns:
-        pd.DataFrame: DataFrame mit den Aufwandsdaten
+        pd.DataFrame: DataFrame mit den Aufwandsdaten für den Abrechnungsmonat
     """
     work_book = load_workbook(db, data_only=True)
-    work_sheet = work_book[sheet]
+    work_sheet = work_book[sheet] if sheet else work_book.active
+
+    # Monat als pd.Timestamp
+    if abrechnungsmonat is None:
+        abrechnungsmonat = pd.Timestamp.now().to_period("M").to_timestamp()
+    elif isinstance(abrechnungsmonat, str):
+        abrechnungsmonat = pd.to_datetime(abrechnungsmonat, format="%Y-%m")
+    elif not isinstance(abrechnungsmonat, pd.Timestamp):
+        raise ValueError(
+            "abrechnungsmonat muss ein String im Format 'YYYY-MM' oder ein pd.Timestamp sein"
+        )
 
     # Generator für die Zeilen
     data = work_sheet.values
@@ -54,16 +90,18 @@ def load_data(db: Path, sheet: str) -> pd.DataFrame:
         columns=columns,
     )
 
-    # Todo: Prüfen, ob das notwendig ist
-    df["Leistungsdatum"] = pd.to_datetime(
-        df["Leistungsdatum"], errors="coerce", format="%d.%m.%Y"
-    )
-    df["Start_AbrMon"] = pd.to_datetime(
-        df["Start_AbrMon"], errors="coerce", format="%d.%m.%Y"
-    )
-    df["End_AbrMon"] = pd.to_datetime(
-        df["End_AbrMon"], errors="coerce", format="%d.%m.%Y"
-    )
+    # df["Leistungsdatum"] = pd.to_datetime(
+    #     df["Leistungsdatum"], errors="coerce", format="%d.%m.%Y"
+    # )
+
+    # Start und Ende des Monats bestimmen
+    monat_start: pd.Timestamp = abrechnungsmonat
+    monat_ende: pd.Timestamp = abrechnungsmonat + pd.offsets.MonthEnd(0)
+
+    # Nur Leistungen im Abrechnungsmonat übernehmen
+    df = df[
+        (df["Leistungsdatum"] >= monat_start) & (df["Leistungsdatum"] <= monat_ende)
+    ]
 
     # Fehlende Werte in ZD_Name2 mit Leerzeichen auffüllen/ersetzen
     df["ZD_Name2"] = df["ZD_Name2"].fillna("").replace("(Leer)", "")
@@ -71,8 +109,26 @@ def load_data(db: Path, sheet: str) -> pd.DataFrame:
     return df
 
 
+def check_data_consistency(df: pd.DataFrame, expected_columns: list):
+    """Überprüfe, ob alle erwarteten Spalten im DataFrame vorhanden sind
+
+    Args:
+        df (pd.DataFrame): DataFrame mit den Aufwandsdaten
+        expected_columns (list): Liste der erwarteten Spaltennamen
+
+    Raises:
+        ValueError: Wenn eine oder mehrere erwartete Spalten fehlen
+    """
+    missing_columns = set(expected_columns) - set(df.columns)
+
+    if missing_columns:
+        missing_str = "\n".join(sorted(missing_columns))
+        print(f"Fehlende Spalten: {missing_str}")
+        raise ValueError(f"Fehlende Felder in der Pivot-Tabelle: {missing_str}")
+
+
 def create_invoice_id(
-    inv_month: Optional[pd.Timestamp] = None, client_id: Optional[str] = None
+    inv_month: Optional[pd.Timestamp|str] = None, client_id: Optional[str] = None
 ) -> str:
     """Rechnungsnummer aus AbrMon und Klienten-ID generieren
 
@@ -88,10 +144,18 @@ def create_invoice_id(
 
     if inv_month is None:
         inv_month = pd.Timestamp.now()
-    if client_id is None:
-        client_id = "K000"
+    if isinstance(inv_month, str):
+        # Extract year and month, format as MMYY
+        dt = pd.to_datetime(inv_month.replace(".", "-"), format="%m-%Y", errors="coerce")
+        if dt is pd.NaT:
+            raise ValueError("inv_month muss ein String im Format 'MM-YYYY' oder ein pd.Timestamp sein")
+        month_mmYY = dt.strftime("%m%y")
+    elif isinstance(inv_month, pd.Timestamp):
+        month_mmYY = inv_month.strftime("%m%y")
+    else:
+        raise ValueError("inv_month muss ein String im Format 'YYYY-MM' oder ein pd.Timestamp sein")
+    client_id = client_id or "K000"
 
-    month_mmYY = inv_month.strftime("%m%y") if pd.notna(inv_month) else ""
     return f"R{month_mmYY}_{client_id}"
 
 
@@ -148,12 +212,14 @@ def format_invoice(
     client_details["Leistungsdatum"] = client_details["Leistungsdatum"].dt.strftime(
         "%d.%m.%Y"
     )
-    client_details["AbrMon"] = client_details["Start_AbrMon"].dt.strftime("%m.%Y")
+
+    abrechnungsmonat: str = client_details["Leistungsdatum"].iloc[0][3:]
+    client_details["Abrechnungsmonat"] = abrechnungsmonat
     client_details["Rechnungsdatum"] = pd.Timestamp.now().strftime("%d.%m.%Y")
 
     # Rechnungsnummer generieren
     invoice_id = create_invoice_id(
-        inv_month=client_details["Start_AbrMon"].iloc[0],
+        inv_month=abrechnungsmonat,
         client_id=client_details["Klient-Nr."].iloc[0],
     )
 
@@ -192,17 +258,112 @@ def format_invoice(
     invoice_template.render(context)
     return invoice_template, client_details
 
+
 def docx_to_pdf(docx_path, pdf_path):
-    subprocess.run([
-        "libreoffice",
-        "--headless",
-        "--convert-to", "pdf",
-        "--outdir", str(pdf_path.parent),
-        str(docx_path)
-    ], check=True)
+    """
+    Konvertiere eine DOCX-Datei in eine PDF-Datei mit LibreOffice
+
+    Args:
+        docx_path (str): Pfad zur DOCX-Datei
+        pdf_path (str): Pfad zur Ausgabedatei (PDF)
+    """
+
+    subprocess.run(
+        [
+            "libreoffice",
+            "--headless",
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            str(pdf_path.parent),
+            str(docx_path),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=True,
+    )
+
+def merge_pdfs(pdf_files: list, 
+               output_path: Path, 
+               zdnr: str, 
+               abrechnungsmonat: str):
+    """
+    Merge multiple PDF files into a single PDF.
+
+    Args:
+        pdf_files (list): List of paths to PDF files to be merged.
+        output_path (Path): Path to save the merged PDF.
+        zdnr (str): Identifier for the payment service provider.
+            abrechnungsmonat (str): Billing month in 'YYYY-MM' format.
+    """
+
+    merger = PdfMerger()
+
+    for pdf_file in pdf_files:
+        merger.append(pdf_file)
+
+    merged_pdf_path = output_path / f"Rechnungen_{zdnr}_{abrechnungsmonat}.pdf"
+    merger.write(merged_pdf_path)
+    merger.close()
+
+    ic("Zusammengefasste PDF gespeichert:" + str(merged_pdf_path.name))
 
 
-if __name__ == "__main__":
+def create_summary(summary_rows: list, 
+                   output_path: Path, 
+                   abrechnungsmonat: str):
+    """Erstelle eine Excel-Datei mit der Rechnungsübersicht
+
+    Args:
+        summary_rows (list): Liste der Rechnungsübersicht-Zeilen
+        output_path (Path): Pfad zum Speichern der Excel-Datei
+        abrechnungsmonat (str): Abrechnungsmonat im Format 'YYYY-MM'
+    """
+    summary_df = pd.DataFrame(summary_rows)
+    summary_file = output_path / f"Rechnungsuebersicht_{abrechnungsmonat}.xlsx"
+
+    with pd.ExcelWriter(summary_file, engine="openpyxl") as writer:
+        summary_df.to_excel(writer, index=False, sheet_name="Rechnungsübersicht")
+        worksheet = writer.sheets["Rechnungsübersicht"]
+
+        # Endspalte dynamisch bestimmen
+        end_col_idx = len(summary_df.columns)
+        end_col_letter = chr(64 + end_col_idx)  # 64 + 1 = 'A', etc.
+        table_ref = f"A1:{end_col_letter}{len(summary_df) + 1}"
+
+        tab = Table(displayName="Rechnungsübersicht", ref=table_ref)
+        tab.tableStyleInfo = TableStyleInfo(
+            name="TableStyleMedium9",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False,
+        )
+        worksheet.add_table(tab)
+
+        # Spalte "Summe_Kosten" als Währung formatieren
+        if "Summe_Kosten" in summary_df.columns:
+            kosten_col_idx = summary_df.columns.get_loc("Summe_Kosten") + 1
+            kosten_col_letter = chr(64 + kosten_col_idx)
+            for row in range(2, len(summary_df) + 2):
+                worksheet[f"{kosten_col_letter}{row}"].number_format = '#,##0.00 "CHF"'
+
+            # Ergebniszeile hinzufügen
+            total_row_idx = len(summary_df) + 2
+            worksheet[f"A{total_row_idx}"] = "Gesamt"
+            worksheet[f"{kosten_col_letter}{total_row_idx}"] = f"=SUM({kosten_col_letter}2:{kosten_col_letter}{total_row_idx - 1})"
+            worksheet[f"{kosten_col_letter}{total_row_idx}"].number_format = '#,##0.00 "CHF"'
+            # Fettdruck für die Ergebniszeile
+            bold_font = Font(bold=True)
+            for col in range(1, end_col_idx + 1):
+                worksheet.cell(row=total_row_idx, column=col).font = bold_font
+
+    ic("Rechnungsübersicht gespeichert:" + str(summary_file))
+
+
+def main():
+    # Rich Traceback für bessere Fehlermeldungen
+    install(show_locals=True)
     # Alle Konfigurationsdaten laden
     cwd = Path(__file__).parent.parent.parent / ".config"
     with open(cwd / "wegpiraten_config.yaml", "r") as f:
@@ -212,19 +373,26 @@ if __name__ == "__main__":
     data_path = Path(config["data_path"])
     output_path = prj_root / config["output_path"]
     template_path = prj_root / config["template_path"]
+    tmp_path = prj_root / config["tmp_path"]
     template_name = config["invoice_template_name"]
     invoice_template = DocxTemplate(template_path / template_name)
     db_name = config["db_name"]
     sheet_name = config["sheet_name"]
+    expected_columns = config["expected_columns"]
 
+    # tmp putzen, evtl context manager nutzen?
+    clear_path(tmp_path)
+
+    # TODO: dynamisch einlesen
     abrechnungsmonat = "2025-08"  # YYYY-MM
 
-    # Aufwandsdaten aus der DB (Excel) laden
-    # TODO Filtern nach Abrechnungsmonat
-    invoice_data = load_data(data_path / db_name, sheet_name)
+    # Aufwandsdaten für den Abrechnungsmonat aus der DB (Excel) laden
+    invoice_data = load_data(data_path / db_name, 
+                             sheet_name, 
+                             abrechnungsmonat)
 
-    # Debug only
-    print(invoice_data.head())
+    check_data_consistency(invoice_data, 
+                           expected_columns)
 
     # Rechnungsübersicht initialisieren
     summary_rows = []
@@ -233,20 +401,26 @@ if __name__ == "__main__":
     zd_grouped = invoice_data.groupby("ZDNR")
 
     for zdnr, zd_data in zd_grouped:
+        ic("Verarbeite Zahlungsdienstleister " + zd_data['ZD_Name'].iloc[0])
         # Liste für die Rechnungsdateien dieses Zahlungsdienstleisters
-        docx_files = []
+        invoice_group: list[Path] = []
 
-        # Nach Klient-Nr. gruppieren
+        # Innerhalb des ZD nach Klient-Nr. gruppieren
         client_grouped = zd_data.groupby("Klient-Nr.")
 
+        # Für jeden Klienten eine Rechnung erstellen
         for client_id, client_details in client_grouped:
             formatted_invoice, updated_data = format_invoice(
                 invoice_template, client_details
             )
-            re_nr = updated_data["Rechnungsnummer"].iloc[0]
-            docx_path = output_path / f"Rechnung_{re_nr}.docx"
+            re_nr:str = updated_data["Rechnungsnummer"].iloc[0]
+            docx_path:Path = tmp_path / f"Rechnung_{re_nr}.docx"
             formatted_invoice.save(docx_path)
-            docx_files.append(str(docx_path))
+            # DOCX zu PDF konvertieren, um später zusammenzufassen
+            # in merge_pdfs()
+            docx_to_pdf(docx_path, _ := docx_path.with_suffix(".pdf"))
+            
+            invoice_group.append(_)
 
             # Summarische Daten sammeln
             summary_rows.append(
@@ -254,61 +428,38 @@ if __name__ == "__main__":
                     "Rechnungsnummer": re_nr,
                     "Klient-Nr.": client_id,
                     "ZDNR": zdnr,
+                    "ZD_Name": updated_data["ZD_Name"].iloc[0],
                     "Summe_Kosten": updated_data["Summe_Kosten"].iloc[0],
                     "Rechnungsdatum": updated_data["Rechnungsdatum"].iloc[0],
                 }
             )
 
-        # Alle Rechnungen für diesen Zahlungsdienstleister zu einer PDF zusammenfassen
-        # (docx2pdf kann mehrere Dateien nacheinander konvertieren, aber nicht zusammenfügen)
-        # Alternativ: Mit PyPDF2 zusammenfügen
-        pdf_files = []
-        for docx_file in docx_files:
-            pdf_file = Path(docx_file).with_suffix(".pdf")
-            docx_to_pdf(Path(docx_file), pdf_file)
-            pdf_files.append(str(pdf_file))
-
-        # PDF zusammenfügen
-        
-        merger = PdfMerger()
-        for pdf_file in pdf_files:
-            merger.append(pdf_file)
-        merged_pdf_path = output_path / f"Rechnungen_{zdnr}.pdf"
-        merger.write(merged_pdf_path)
-        merger.close()
-
+        merge_pdfs(invoice_group, 
+                output_path, 
+                zdnr, 
+                abrechnungsmonat)
+        # Ende Klienten-Schleife
+    
     # Summarische Tabelle als Excel ausgeben
-    summary_df = pd.DataFrame(summary_rows)
-    summary_df.to_excel(output_path / "Rechnungsübersicht.xlsx", index=False)
-
-    # Nachträglich als Tabelle formatieren und Währungsformat setzen
-    wb = load_workbook(output_path / "Rechnungsübersicht.xlsx")
-    ws = wb.active
-
-    # Bereich der Tabelle bestimmen
-    max_row = ws.max_row
-    max_col = ws.max_column
-    table_ref = f"A1:{chr(64 + max_col)}{max_row}"
-
-    # Tabelle einfügen
-    table = Table(displayName="Rechnungsübersicht", ref=table_ref)
-    style = TableStyleInfo(name="TableStyleMedium9", showRowStripes=True)
-    table.tableStyleInfo = style
-    # Ergebniszeile aktivieren
-    table.showTotals = True  # Ergebniszeile am Tabellenende anzeigen
+    create_summary(summary_rows, 
+                   output_path, 
+                   abrechnungsmonat)
     
-    ws.add_table(table)
+    # Alle Rechnungen im Word Format in eine ZIP-Datei packen und im output
+    # Verzeichnis ablegen
+    zip_docs(tmp_path, output_path / f"Rechnungen_{abrechnungsmonat}.zip")
+   
+    # Ende Zahlungsdienstleister-Schleife
+
+
+
+if __name__ == "__main__":
+    ic.configureOutput(prefix='', outputFunction=print)
+    # ic.disable()  # Falls du die Ausgabe komplett abschalten willst
+
+    # Nur das Ergebnis ausgeben (ohne Variable, Datei, Zeilennummer etc.)
+    def ic_simple_format(*args):
+        return " ".join(str(arg) for arg in args)
+    ic.format = ic_simple_format
     
-    # Währungsformat für Summe_Kosten setzen (Schweizer Format: z.B. 1'234.56 CHF)
-    for cell in ws["D"][1:]:  # Spalte D, ab Zeile 2 (Überschrift ist Zeile 1)
-        cell.number_format = "#,##0.00 \"CHF\""
-
-    # Formel für die Ergebniszeile in Spalte D setzen
-    # Ermittle die Zeile der Ergebniszeile (letzte Zeile)
-    # total_row = ws.max_row
-    # # Bereich der Spalte D (Summe_Kosten), ab Zeile 2 bis vor die Ergebniszeile
-    # sum_range = f"D2:D{total_row-1}"
-    # ws[f"D{total_row+1}"].value = f'=TEILERGEBNIS(109;{sum_range})'
-    # ws[f"D{total_row+1}"].number_format = "#,##0.00 \"CHF\""
-
-    wb.save(output_path / "Rechnungsübersicht.xlsx")
+    main()
