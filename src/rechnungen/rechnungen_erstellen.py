@@ -1,19 +1,24 @@
 import subprocess
+from io import BytesIO
 from pathlib import Path
 from typing import Optional, Tuple
-
-import pandas as pd
-import yaml
-from docxtpl import DocxTemplate  # type: ignore
-from openpyxl import load_workbook
-from openpyxl.worksheet.table import Table, TableStyleInfo
-from PyPDF2 import PdfMerger  # type: ignore
-from rich import print
-from rich.traceback import install
-from openpyxl.styles import Font
-from icecream import ic  # type: ignore
 from zipfile import ZipFile
 
+import pandas as pd
+import qrcode
+import yaml
+from docxtpl import DocxTemplate  # type: ignore
+from icecream import ic  # type: ignore
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from PIL import Image
+from PyPDF2 import PdfMerger  # type: ignore
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm  # type: ignore
+from reportlab.pdfgen import canvas
+from rich import print
+from rich.traceback import install
 
 
 def format_2f(value: float, currency: Optional[str] = None) -> str:
@@ -360,6 +365,72 @@ def create_summary(summary_rows: list,
 
     ic("Rechnungsübersicht gespeichert:" + str(summary_file))
 
+def create_einzahlungsschein(data: dict, empfaenger: dict, output_pdf: str):
+    c = canvas.Canvas(output_pdf, pagesize=A4)
+    width, height = A4
+
+    # Linien und Layout
+    c.setLineWidth(1)
+    c.line(width/2, 40*mm, width/2, height-40*mm)
+    c.line(20*mm, height-40*mm, width-20*mm, height-40*mm)
+
+    # Empfangen-Teil
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(25*mm, height-50*mm, "Empfangsschein")
+    c.setFont("Helvetica", 10)
+    c.drawString(25*mm, height-60*mm, "Konto / Zahlbar an")
+    c.drawString(25*mm, height-65*mm, empfaenger["IBAN"])
+    c.drawString(25*mm, height-70*mm, empfaenger["Name"])
+    c.drawString(25*mm, height-75*mm, empfaenger["Strasse"])
+    c.drawString(25*mm, height-85*mm, "Zahlbar durch")
+    c.drawString(25*mm, height-90*mm, data["ZD_Name"])
+    c.drawString(25*mm, height-95*mm, data["ZD_Strasse"])
+    c.drawString(25*mm, height-105*mm, "Währung")
+    c.drawString(45*mm, height-105*mm, "Betrag")
+    c.drawString(25*mm, height-110*mm, "CHF")
+    c.drawString(45*mm, height-110*mm, f"{data['Summe_Kosten']:.2f}")
+
+    # Zahlteil
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(width/2+5*mm, height-50*mm, "Zahlteil")
+    c.setFont("Helvetica", 10)
+    c.drawString(width/2+5*mm, height-60*mm, "Konto / Zahlbar an")
+    c.drawString(width/2+5*mm, height-65*mm, empfaenger["IBAN"])
+    c.drawString(width/2+5*mm, height-70*mm, empfaenger["Name"])
+    c.drawString(width/2+5*mm, height-75*mm, empfaenger["Strasse"])
+    c.drawString(width/2+5*mm, height-85*mm, "Zusätzliche Informationen")
+    c.drawString(width/2+5*mm, height-90*mm, data['Rechnungsnummer'])
+    c.drawString(width/2+5*mm, height-95*mm, "Zahlbar durch")
+    c.drawString(width/2+5*mm, height-100*mm, data["ZD_Name"])
+    c.drawString(width/2+5*mm, height-105*mm, data["ZD_Strasse"])
+    c.drawString(width/2+5*mm, height-115*mm, "Währung")
+    c.drawString(width/2+25*mm, height-115*mm, "Betrag")
+    c.drawString(width/2+5*mm, height-120*mm, "CHF")
+    c.drawString(width/2+25*mm, height-120*mm, f"{data['Summe_Kosten']:.2f}")
+
+    # QR-Code generieren
+    qr_data = f"""SPC
+0200
+1
+{empfaenger['IBAN']}
+{empfaenger['Name']}
+{empfaenger['Strasse']}
+{data['Summe_Kosten']:.2f}
+CHF
+{data['Rechnungsnummer']}
+{data['ZD_Name']}
+{data['ZD_Strasse']}"""
+
+    qr = qrcode.make(qr_data)
+    buf = BytesIO()
+    qr.save(buf, format="PNG")
+    buf.seek(0)
+    qr_img = Image.open(buf)
+    c.drawInlineImage(qr_img, width/2+5*mm, height-170*mm, 60*mm, 60*mm)
+
+    c.showPage()
+    c.save()
+
 
 def main():
     # Rich Traceback für bessere Fehlermeldungen
@@ -416,6 +487,14 @@ def main():
             re_nr:str = updated_data["Rechnungsnummer"].iloc[0]
             docx_path:Path = tmp_path / f"Rechnung_{re_nr}.docx"
             formatted_invoice.save(docx_path)
+            create_einzahlungsschein(updated_data.iloc[0].to_dict(),
+                                    {
+                                        "IBAN": config["IBAN"],
+                                        "Name": config["Empfaenger"],
+                                        "Strasse": config["Empfaenger_Strasse"],
+                                        "Adresse": config["Empfaenger_PLZ_Ort"],
+                                    },
+                                     str(tmp_path / f"Einzahlungsschein_{re_nr}.pdf"))
             # DOCX zu PDF konvertieren, um später zusammenzufassen
             # in merge_pdfs()
             docx_to_pdf(docx_path, _ := docx_path.with_suffix(".pdf"))
@@ -450,6 +529,7 @@ def main():
     zip_docs(tmp_path, output_path / f"Rechnungen_{abrechnungsmonat}.zip")
    
     # Ende Zahlungsdienstleister-Schleife
+
 
 
 

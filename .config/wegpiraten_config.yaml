@@ -28,3 +28,9 @@ expected_columns:
   - km_Pauschale
   - Stunden
   - Kosten
+
+IBAN: CH07 0839 3053 8385 3915 1
+Empfaenger: Wegpiraten GmbH
+Empfaenger_Strasse: Alpenstraße 2
+Empfaenger_PLZ_Ort: 3800 Interlaken
+Zahlungsfrist_Tage: 30
