@@ -1,4 +1,5 @@
 import subprocess
+import tempfile
 from io import BytesIO
 from pathlib import Path
 from typing import Optional, Tuple
@@ -7,16 +8,14 @@ from zipfile import ZipFile
 import pandas as pd
 import qrcode
 import yaml
-from docxtpl import DocxTemplate  # type: ignore
+from docx.shared import Mm
+from docxtpl import DocxTemplate, InlineImage  # type: ignore
 from icecream import ic  # type: ignore
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 from openpyxl.worksheet.table import Table, TableStyleInfo
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from PyPDF2 import PdfMerger  # type: ignore
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm  # type: ignore
-from reportlab.pdfgen import canvas
 from rich import print
 from rich.traceback import install
 
@@ -46,7 +45,6 @@ def zip_docs(src_dir: Path, zip_path: Path):
     with ZipFile(zip_path, "w") as zipf:
         for file in src_dir.glob("Rechnung_*.docx"):
             zipf.write(file, arcname=file.name)
-
 
 def load_data(
     db: Path,
@@ -113,7 +111,6 @@ def load_data(
 
     return df
 
-
 def check_data_consistency(df: pd.DataFrame, expected_columns: list):
     """Überprüfe, ob alle erwarteten Spalten im DataFrame vorhanden sind
 
@@ -130,7 +127,6 @@ def check_data_consistency(df: pd.DataFrame, expected_columns: list):
         missing_str = "\n".join(sorted(missing_columns))
         print(f"Fehlende Spalten: {missing_str}")
         raise ValueError(f"Fehlende Felder in der Pivot-Tabelle: {missing_str}")
-
 
 def create_invoice_id(
     inv_month: Optional[pd.Timestamp|str] = None, client_id: Optional[str] = None
@@ -163,9 +159,89 @@ def create_invoice_id(
 
     return f"R{month_mmYY}_{client_id}"
 
+def create_einzahlungsschein_png_dynamic(context: dict, 
+                                         output_png: str, 
+                                         font_dir: str = "/usr/share/fonts/truetype/msttcorefonts/"):
+
+    width, height = 1800, 900
+    img = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(img)
+
+    # Calibri-Font laden (Pfad ggf. anpassen!)
+    try:
+        font_path = font_dir + "calibri.ttf"
+        font_path_bold = font_dir + "calibrib.ttf"
+        font = ImageFont.truetype(font_path, 36)
+        font_bold = ImageFont.truetype(font_path_bold, 48)
+        font_small = ImageFont.truetype(font_path, 28)
+    except Exception as e:
+        print("[red on white]Warnung: Calibri-Font nicht gefunden, Standardfont wird verwendet.", e)
+        font = font_bold = font_small = ImageFont.load_default()
+
+    # Linien
+    draw.line([(width//2, 60), (width//2, height-60)], fill="black", width=3)
+    draw.line([(60, 60), (width-60, 60)], fill="black", width=2)
+
+    # --- Linker Bereich: Empfangsschein ---
+    x1, y1 = 80, 100
+    draw.text((x1, y1), "Empfangsschein", font=font_bold, fill="black"); y1 += 60
+
+    draw.text((x1, y1), "Konto / Zahlbar an", font=font_small, fill="black"); y1 += 40
+    draw.text((x1, y1), context["Empf_IBAN"], font=font, fill="black"); y1 += 40
+    draw.text((x1, y1), context['Empf_Name'], font=font, fill="black"); y1 += 40
+    draw.text((x1, y1), context['Empf_Strasse'], font=font, fill="black"); y1 += 60
+
+    draw.text((x1, y1), "Zahlbar durch", font=font_small, fill="black"); y1 += 40
+    draw.text((x1, y1), context['ZD_Name'], font=font, fill="black"); y1 += 40
+    draw.text((x1, y1), context['ZD_Strasse'], font=font, fill="black"); y1 += 60
+
+    draw.text((x1, y1), "Währung", font=font_small, fill="black")
+    draw.text((x1+180, y1), "Betrag", font=font_small, fill="black"); y1 += 40
+    draw.text((x1, y1), "CHF", font=font, fill="black")
+    draw.text((x1+180, y1), context['Summe_Kosten_2f'], font=font, fill="black")
+
+    # --- Rechter Bereich: Zahlteil ---
+    x2, y2 = width//2 + 80, 100
+    draw.text((x2, y2), "Zahlteil", font=font_bold, fill="black"); y2 += 60
+
+    draw.text((x2, y2), "Konto / Zahlbar an", font=font_small, fill="black"); y2 += 40
+    draw.text((x2, y2), context["Empf_IBAN"], font=font, fill="black"); y2 += 40
+    draw.text((x2, y2), context["Empf_Name"], font=font, fill="black"); y2 += 40
+    draw.text((x2, y2), context["Empf_Strasse"], font=font, fill="black"); y2 += 40
+
+    draw.text((x2, y2), "Zusätzliche Informationen", font=font_small, fill="black"); y2 += 40
+    draw.text((x2, y2), context["Rechnungsnummer"], font=font, fill="black"); y2 += 40
+
+    draw.text((x2, y2), "Zahlbar durch", font=font_small, fill="black"); y2 += 40
+    draw.text((x2, y2), context["ZD_Name"], font=font, fill="black"); y2 += 40
+    draw.text((x2, y2), context["ZD_Strasse"], font=font, fill="black"); y2 += 60
+
+    draw.text((x2, y2), "Währung", font=font_small, fill="black")
+    draw.text((x2+180, y2), "Betrag", font=font_small, fill="black"); y2 += 40
+    draw.text((x2, y2), "CHF", font=font, fill="black")
+    draw.text((x2+180, y2), context['Summe_Kosten_2f'], font=font, fill="black")
+
+    # --- QR-Code generieren und einfügen ---
+    qr_data = f"""SPC
+0200
+1
+{context["Empf_IBAN"]}
+{context["Empf_Name"]}
+{context["Empf_Strasse"]}
+{context['Summe_Kosten_2f']}
+CHF
+{context["Rechnungsnummer"]}
+{context["ZD_Name"]}
+{context["ZD_Strasse"]}
+"""
+    qr = qrcode.make(qr_data)
+    qr = qr.resize((300, 300))
+    img.paste(qr, (width-350, height//2-150))
+
+    img.save(output_png)
 
 def format_invoice(
-    invoice_template: DocxTemplate, client_details: pd.DataFrame
+    invoice_template: DocxTemplate, client_details: pd.DataFrame, empfaenger: dict
 ) -> Tuple[DocxTemplate, pd.DataFrame]:
     """
     Erstelle eine Rechnung für einen Klienten
@@ -177,14 +253,14 @@ def format_invoice(
         invoice_template (DocxTemplate): Vorlage für die Rechnung
         invoice_id (str): Rechnungsnummer
         client_id (str): Klienten-ID
-        client_details (pd.DataFrame): Details für diesen Klienten
+        client_details (pd.DataFrame): Details für diesen Klienten, config Kontext
     Returns:
         DocxTemplate: Ausgefüllte Rechnung
     """
 
     # Summen über relevante Spalten in die Daten übernehmen
     # client_details ist eine Gruppe aus dem DataFrame
-    # (alle Zeilen für einen Klienten)
+    # (alle Zeilen für einen Klienten) + Empfängerdaten
     client_details["Summe_Fahrtzeit"] = client_details["Fahrtzeit"].sum()
     client_details["Summe_Direkt"] = client_details["Direkt"].sum()
     client_details["Summe_Indirekt"] = client_details["Indirekt"].sum()
@@ -192,6 +268,7 @@ def format_invoice(
     client_details["Summe_Kosten"] = client_details["Kosten"].sum()
 
     # Liste der numerischen Felder und optional die Währung
+    # TODO: Numerische Felder aus der Config lesen, dort markieren
     num_fields = [
         ("Fahrtzeit", None),
         ("Direkt", None),
@@ -214,10 +291,12 @@ def format_invoice(
             lambda x: format_2f(x, currency) if pd.notna(x) else ""
         )
 
+    # Datumsfelder als Strings ohne Uhrzeit formatieren
     client_details["Leistungsdatum"] = client_details["Leistungsdatum"].dt.strftime(
         "%d.%m.%Y"
     )
 
+    # Abrechnungsmonat nur als String im Format 'mm-YYYY'
     abrechnungsmonat: str = client_details["Leistungsdatum"].iloc[0][3:]
     client_details["Abrechnungsmonat"] = abrechnungsmonat
     client_details["Rechnungsdatum"] = pd.Timestamp.now().strftime("%d.%m.%Y")
@@ -235,7 +314,7 @@ def format_invoice(
     # Kopf-Daten (sind für alle Zeilen der Gruppe gleich,
     # nehmen wir die aus der ersten Zeile (Index 0))
     # Summen üer relevante Spalten in die Daten übernehmen
-    context_data = client_details.iloc[0].to_dict()
+    invoice_context = client_details.iloc[0].to_dict()
 
     # Tabellen-Daten (alle Zeilen für diese Gruppe)
     invoice_positions = client_details[
@@ -252,15 +331,28 @@ def format_invoice(
         ]
     ]
 
-    invoice_positions = invoice_positions.to_dict(orient="records")
+    invoice_details:dict = invoice_positions.to_dict(orient="records")
 
-    # Kontext fürs Template
-    # Felder im Template müssen mit den Keys im Kontext
-    # exakt übereinstimmen (inkl. Groß-/Kleinschreibung)
-    context = {**context_data, "Positionen": invoice_positions}
+    # Einzahlungsschein als PNG erstellen
+    output_png = empfaenger['tmp'] # / f"Einzahlung_{invoice_id}.png"
 
-    # Rendern
-    invoice_template.render(context)
+    # Erzeuge den Einzahlungsschein als temporäre Datei und lies diese gleich wieder ein
+    with tempfile.NamedTemporaryFile(dir=output_png, suffix=".png", delete=True) as tmp_file:
+        create_einzahlungsschein_png_dynamic(invoice_context | empfaenger, tmp_file.name)
+        # Einzahlungsschein in die Rechnung einfügen
+        einzahlungsschein_img = InlineImage(
+            invoice_template, tmp_file.name, width=Mm(200)
+        )
+      
+        # Kontext fürs Template
+        # Felder im Template müssen mit den Keys im Kontext
+        # exakt übereinstimmen (inkl. Groß-/Kleinschreibung)
+        context = {**invoice_context, 
+                "Positionen": invoice_details,
+                "Einzahlungsschein": einzahlungsschein_img}
+
+        # Rendern
+        invoice_template.render(context)
     return invoice_template, client_details
 
 
@@ -365,73 +457,6 @@ def create_summary(summary_rows: list,
 
     ic("Rechnungsübersicht gespeichert:" + str(summary_file))
 
-def create_einzahlungsschein(data: dict, empfaenger: dict, output_pdf: str):
-    c = canvas.Canvas(output_pdf, pagesize=A4)
-    width, height = A4
-
-    # Linien und Layout
-    c.setLineWidth(1)
-    c.line(width/2, 40*mm, width/2, height-40*mm)
-    c.line(20*mm, height-40*mm, width-20*mm, height-40*mm)
-
-    # Empfangen-Teil
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(25*mm, height-50*mm, "Empfangsschein")
-    c.setFont("Helvetica", 10)
-    c.drawString(25*mm, height-60*mm, "Konto / Zahlbar an")
-    c.drawString(25*mm, height-65*mm, empfaenger["IBAN"])
-    c.drawString(25*mm, height-70*mm, empfaenger["Name"])
-    c.drawString(25*mm, height-75*mm, empfaenger["Strasse"])
-    c.drawString(25*mm, height-85*mm, "Zahlbar durch")
-    c.drawString(25*mm, height-90*mm, data["ZD_Name"])
-    c.drawString(25*mm, height-95*mm, data["ZD_Strasse"])
-    c.drawString(25*mm, height-105*mm, "Währung")
-    c.drawString(45*mm, height-105*mm, "Betrag")
-    c.drawString(25*mm, height-110*mm, "CHF")
-    c.drawString(45*mm, height-110*mm, f"{data['Summe_Kosten']:.2f}")
-
-    # Zahlteil
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(width/2+5*mm, height-50*mm, "Zahlteil")
-    c.setFont("Helvetica", 10)
-    c.drawString(width/2+5*mm, height-60*mm, "Konto / Zahlbar an")
-    c.drawString(width/2+5*mm, height-65*mm, empfaenger["IBAN"])
-    c.drawString(width/2+5*mm, height-70*mm, empfaenger["Name"])
-    c.drawString(width/2+5*mm, height-75*mm, empfaenger["Strasse"])
-    c.drawString(width/2+5*mm, height-85*mm, "Zusätzliche Informationen")
-    c.drawString(width/2+5*mm, height-90*mm, data['Rechnungsnummer'])
-    c.drawString(width/2+5*mm, height-95*mm, "Zahlbar durch")
-    c.drawString(width/2+5*mm, height-100*mm, data["ZD_Name"])
-    c.drawString(width/2+5*mm, height-105*mm, data["ZD_Strasse"])
-    c.drawString(width/2+5*mm, height-115*mm, "Währung")
-    c.drawString(width/2+25*mm, height-115*mm, "Betrag")
-    c.drawString(width/2+5*mm, height-120*mm, "CHF")
-    c.drawString(width/2+25*mm, height-120*mm, f"{data['Summe_Kosten']:.2f}")
-
-    # QR-Code generieren
-    qr_data = f"""SPC
-0200
-1
-{empfaenger['IBAN']}
-{empfaenger['Name']}
-{empfaenger['Strasse']}
-{data['Summe_Kosten']:.2f}
-CHF
-{data['Rechnungsnummer']}
-{data['ZD_Name']}
-{data['ZD_Strasse']}"""
-
-    qr = qrcode.make(qr_data)
-    buf = BytesIO()
-    qr.save(buf, format="PNG")
-    buf.seek(0)
-    qr_img = Image.open(buf)
-    c.drawInlineImage(qr_img, width/2+5*mm, height-170*mm, 60*mm, 60*mm)
-
-    c.showPage()
-    c.save()
-
-
 def main():
     # Rich Traceback für bessere Fehlermeldungen
     install(show_locals=True)
@@ -450,6 +475,13 @@ def main():
     db_name = config["db_name"]
     sheet_name = config["sheet_name"]
     expected_columns = config["expected_columns"]
+    empfaenger = {
+        "Empf_IBAN": config["IBAN"],
+        "Empf_Name": config["Empfaenger"],
+        "Empf_Strasse": config["Empfaenger_Strasse"],
+        "Empf_Adresse": config.get("Empfaenger_PLZ_Ort", ""),
+        "tmp": tmp_path,
+    }
 
     # tmp putzen, evtl context manager nutzen?
     clear_path(tmp_path)
@@ -482,21 +514,12 @@ def main():
         # Für jeden Klienten eine Rechnung erstellen
         for client_id, client_details in client_grouped:
             formatted_invoice, updated_data = format_invoice(
-                invoice_template, client_details
+                invoice_template, client_details, empfaenger
             )
             re_nr:str = updated_data["Rechnungsnummer"].iloc[0]
             docx_path:Path = tmp_path / f"Rechnung_{re_nr}.docx"
             formatted_invoice.save(docx_path)
-            create_einzahlungsschein(updated_data.iloc[0].to_dict(),
-                                    {
-                                        "IBAN": config["IBAN"],
-                                        "Name": config["Empfaenger"],
-                                        "Strasse": config["Empfaenger_Strasse"],
-                                        "Adresse": config["Empfaenger_PLZ_Ort"],
-                                    },
-                                     str(tmp_path / f"Einzahlungsschein_{re_nr}.pdf"))
-            # DOCX zu PDF konvertieren, um später zusammenzufassen
-            # in merge_pdfs()
+   
             docx_to_pdf(docx_path, _ := docx_path.with_suffix(".pdf"))
             
             invoice_group.append(_)
@@ -518,7 +541,10 @@ def main():
                 zdnr, 
                 abrechnungsmonat)
         # Ende Klienten-Schleife
-    
+
+        # TODO: Wieder rausnehmen, wenn mehrere ZD unterstützt werden
+        break
+
     # Summarische Tabelle als Excel ausgeben
     create_summary(summary_rows, 
                    output_path, 
@@ -527,6 +553,8 @@ def main():
     # Alle Rechnungen im Word Format in eine ZIP-Datei packen und im output
     # Verzeichnis ablegen
     zip_docs(tmp_path, output_path / f"Rechnungen_{abrechnungsmonat}.zip")
+
+     
    
     # Ende Zahlungsdienstleister-Schleife
 

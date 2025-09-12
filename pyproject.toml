@@ -20,5 +20,6 @@ dependencies = [
     "rich>=14.1.0",
     "types-openpyxl>=3.1.5.20250822",
     "types-pyyaml>=6.0.12.20250822",
+    "types-qrcode>=8.2.0.20250506",
     "types-reportlab>=4.4.1.20250822",
 ]
