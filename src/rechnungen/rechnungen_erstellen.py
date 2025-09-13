@@ -210,18 +210,21 @@ def create_einzahlungsschein_png_dynamic(
         font = ImageFont.truetype(font_path, 36)
         font_bold = ImageFont.truetype(font_path_bold, 48)
         font_small = ImageFont.truetype(font_path, 28)
+        font_small_bold = ImageFont.truetype(font_path_bold, 28)
     except Exception as e:
         print(
             "[red on white]Warnung: Calibri-Font nicht gefunden, Standardfont wird verwendet.",
             e,
         )
-        font = font_bold = font_small = ImageFont.load_default()
+        font = font_bold = font_small = font_small_bold= ImageFont.load_default()
 
     # Empfängerdaten aus CONFIG holen und direkt verwenden
     empf_IBAN: str = CONFIG["empfaenger"]["IBAN"]
-    empf_name: str = CONFIG["empfaenger"]["name"]
-    empf_strasse: str = CONFIG["empfaenger"]["strasse"]
-    empf_adresse: str = CONFIG["empfaenger"]["plz_ort"]
+    empf_Name: str = CONFIG["empfaenger"]["name"]
+    empf_Strasse: str = CONFIG["empfaenger"]["strasse"]
+    empf_PLZ_Ort: str = CONFIG["empfaenger"]["plz_ort"]
+
+    zd_PLZ_Ort = f'{context["ZD_PLZ"]} {context["ZD_Ort"]}'
 
     # Linien
     draw.line([(width // 2, 60), (width // 2, height - 60)], fill="black", width=3)
@@ -230,26 +233,31 @@ def create_einzahlungsschein_png_dynamic(
     # --- Linker Bereich: Empfangsschein ---
     x1, y1 = 80, 100
     draw.text((x1, y1), "Empfangsschein", font=font_bold, fill="black")
-    y1 += 60
 
-    draw.text((x1, y1), "Konto / Zahlbar an", font=font_small, fill="black")
+    y1 += 80
+    draw.text((x1, y1), "Konto / Zahlbar an", font=font_small_bold, fill="black")
     y1 += 40
     draw.text((x1, y1), empf_IBAN, font=font, fill="black")
     y1 += 40
-    draw.text((x1, y1), empf_name, font=font, fill="black")
+    draw.text((x1, y1), empf_Name, font=font, fill="black")
     y1 += 40
-    draw.text((x1, y1), empf_strasse, font=font, fill="black")
-    y1 += 60
+    draw.text((x1, y1), empf_Strasse, font=font, fill="black")
+    y1 += 40
+    draw.text((x1, y1), empf_PLZ_Ort, font=font, fill="black")
 
-    draw.text((x1, y1), "Zahlbar durch", font=font_small, fill="black")
+    y1 += 60
+    draw.text((x1, y1), "Zahlbar durch", font=font_small_bold, fill="black")
     y1 += 40
     draw.text((x1, y1), context["ZD_Name"], font=font, fill="black")
     y1 += 40
     draw.text((x1, y1), context["ZD_Strasse"], font=font, fill="black")
+    y1 += 40
+    draw.text((x1, y1), zd_PLZ_Ort, font=font, fill="black")
+ 
     y1 += 60
-
-    draw.text((x1, y1), "Währung", font=font_small, fill="black")
-    draw.text((x1 + 180, y1), "Betrag", font=font_small, fill="black")
+    draw.text((x1, y1), "Währung", font=font_small_bold, fill="black")
+    draw.text((x1 + 180, y1), "Betrag", font=font_small_bold, fill="black")
+    
     y1 += 40
     draw.text((x1, y1), "CHF", font=font, fill="black")
     draw.text((x1 + 180, y1), context["Summe_Kosten_2f"], font=font, fill="black")
@@ -257,48 +265,59 @@ def create_einzahlungsschein_png_dynamic(
     # --- Rechter Bereich: Zahlteil ---
     x2, y2 = width // 2 + 80, 100
     draw.text((x2, y2), "Zahlteil", font=font_bold, fill="black")
-    y2 += 60
 
-    draw.text((x2, y2), "Konto / Zahlbar an", font=font_small, fill="black")
+    # TODO: In interne Funktion kapseln
+    y2 += 80
+    draw.text((x2, y2), "Konto / Zahlbar an", font=font_small_bold, fill="black")
     y2 += 40
     draw.text((x2, y2), empf_IBAN, font=font, fill="black")
     y2 += 40
-    draw.text((x2, y2), empf_name, font=font, fill="black")
+    draw.text((x2, y2), empf_Name, font=font, fill="black")
     y2 += 40
-    draw.text((x2, y2), empf_strasse, font=font, fill="black")
+    draw.text((x2, y2), empf_Strasse, font=font, fill="black")
     y2 += 40
-
-    draw.text((x2, y2), "Zusätzliche Informationen", font=font_small, fill="black")
+    draw.text((x2, y2), empf_PLZ_Ort, font=font, fill="black")
+    
+    y2 += 60
+    draw.text((x2, y2), "Zusätzliche Informationen", font=font_small_bold, fill="black")
     y2 += 40
     draw.text((x2, y2), context["Rechnungsnummer"], font=font, fill="black")
-    y2 += 40
-
-    draw.text((x2, y2), "Zahlbar durch", font=font_small, fill="black")
+    
+    y2 += 60
+    draw.text((x2, y2), "Zahlbar durch", font=font_small_bold, fill="black")
     y2 += 40
     draw.text((x2, y2), context["ZD_Name"], font=font, fill="black")
     y2 += 40
     draw.text((x2, y2), context["ZD_Strasse"], font=font, fill="black")
-    y2 += 60
-
-    draw.text((x2, y2), "Währung", font=font_small, fill="black")
-    draw.text((x2 + 180, y2), "Betrag", font=font_small, fill="black")
     y2 += 40
+    draw.text((x2, y2), zd_PLZ_Ort, font=font, fill="black")
+    
+    y2 += 60
+    draw.text((x2, y2), "Währung", font=font_small_bold, fill="black")
+    draw.text((x2 + 180, y2), "Betrag", font=font_small_bold, fill="black")
+    y2 += 40
+    # TODO: Währung dynamisch machen
     draw.text((x2, y2), "CHF", font=font, fill="black")
     draw.text((x2 + 180, y2), context["Summe_Kosten_2f"], font=font, fill="black")
 
-    # --- QR-Code generieren und einfügen ---
+    # --- QR-Code (Swiss Payment Code, SPC) generieren und einfügen ---
+    # TODO: Klären, ob NON korrekt ist
     qr_data = f"""SPC
 0200
 1
 {empf_IBAN}
-{empf_name}
-{empf_strasse}
+{empf_Name}
+{empf_Strasse}
+{empf_PLZ_Ort}
 {context["Summe_Kosten_2f"]}
 CHF
+NON
 {context["Rechnungsnummer"]}
 {context["ZD_Name"]}
-{context["ZD_Strasse"]}
+{context['ZD_Strasse']}
+{zd_PLZ_Ort}
 """
+
     qr = qrcode.make(qr_data)
     qr = qr.resize((300, 300))
     img.paste(qr, (width - 350, height // 2 - 150))
@@ -409,7 +428,7 @@ def format_invoice(
     # Abrechnungsmonat nur als String im Format 'mm-YYYY'. Das geht, weil die Leistungsdaten
     # nur für einen Monat vorliegen (Filter in load_data)
     abrechnungsmonat: str = client_details["Leistungsdatum"].iloc[0][3:]
-    client_details["Abrechnungsmonat"] = abrechnungsmonat
+    client_details["AbrMon"] = abrechnungsmonat
     client_details["Rechnungsdatum"] = pd.Timestamp.now().strftime("%d.%m.%Y")
 
     # Rechnungsnummer generieren
