@@ -1,36 +1,69 @@
-prj_root: /home/stephan/projects/wegpiraten
-data_path: /mnt/c/Users/micro/OneDrive/Shared/Beatus/Wegpiraten Unterlagen
-output_path: output
-template_path: vorlagen
-tmp_path: .tmp
+structure:
+  prj_root: /home/stephan/projects/wegpiraten
+  data_path: /mnt/c/Users/micro/OneDrive/Shared/Beatus/Wegpiraten Unterlagen
+  output_path: output
+  template_path: vorlagen
+  tmp_path: .tmp
 invoice_template_name: rechnungsvorlage.docx
 db_name: Wegpiraten Datenbank.xlsx
 sheet_name: Pivot Rechnungsdaten
 expected_columns:
-  - Leistungsbesteller
-  - Leistungsdatum
-  - ZDNR
-  - ZD_Name
-  - ZD_Name2
-  - ZD_Strasse
-  - ZD_PLZ
-  - ZD_Ort
-  - Klient-Nr.
-  - CL_Vorname
-  - CL_Nachname
-  - CL_SozVersNr
-  - Betreuungstyp
-  - Fahrtzeit
-  - Direkt
-  - Indirekt
-  - Sollstunden
-  - Stundensatz
-  - km_Pauschale
-  - Stunden
-  - Kosten
+  - name: Leistungsbesteller
+    type: text
+  - name: Leistungsdatum
+    type: date
+    format: "%d.%m.%Y"
+  - name: ZDNR
+    type: text
+  - name: ZD_Name
+    type: text
+  - name: ZD_Name2
+    type: text
+  - name: ZD_Strasse
+    type: text
+  - name: ZD_PLZ
+    type: text
+  - name: ZD_Ort
+    type: text
+  - name: Klient-Nr.
+    type: text
+  - name: CL_Vorname
+    type: text
+  - name: CL_Nachname
+    type: text
+  - name: CL_SozVersNr
+    type: text
+  - name: Betreuungstyp
+    type: text
+  - name: Fahrtzeit
+    type: numeric
+    decimals: 2
+  - name: Direkt
+    type: numeric
+    decimals: 2
+  - name: Indirekt
+    type: numeric
+    decimals: 2
+  - name: Sollstunden
+    type: numeric
+    decimals: 2
+  - name: Stundensatz
+    type: currency
+    currency: CHF
+    decimals: 2
+  - name: km_Pauschale
+    type: numeric
+    decimals: 2
+  - name: Stunden
+    type: numeric
+    decimals: 2
+  - name: Kosten
+    type: currency
+    currency: CHF
+    decimals: 2
 
-IBAN: CH07 0839 3053 8385 3915 1
-Empfaenger: Wegpiraten GmbH
-Empfaenger_Strasse: Alpenstraße 2
-Empfaenger_PLZ_Ort: 3800 Interlaken
-Zahlungsfrist_Tage: 30
+empfaenger:
+  IBAN: CH07 0839 3053 8385 3915 1
+  name: Wegpiraten GmbH
+  strasse: Alpenstraße 2
+  plz_ort: 3800 Interlaken
