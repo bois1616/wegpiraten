@@ -105,16 +105,21 @@ def main():
     global CONFIG
     CONFIG = Config(Path(__file__).parent.parent.parent / ".config/wegpiraten_config.yaml")
 
-    db_path = Path(CONFIG.get("structure.data_path")) / CONFIG.get("db_name")
+    data_path = CONFIG.get("structure.data_path")
+    db_name = CONFIG.get("db_name")
+    if not data_path or not db_name:
+        raise ValueError(f"Fehlende Konfigurationswerte: data_path={data_path}, db_name={db_name}. Bitte prüfe die Datei .config/wegpiraten_config.yaml.")
+    db_path = Path(data_path) / db_name
     month = "2025-08"
     invoice_data = load_data(db_path, CONFIG.get("sheet_name"), month)
 
     grouped_data = invoice_data.groupby("ZDNR")
     for provider_id, provider_data in grouped_data:
-        provider_info = provider_data.iloc[0]
-        invoice = create_invoice(db_path, provider_data, provider_info, month)
-        doc = invoice.create_document()
-        doc.save(f"Rechnung_{invoice.generate_invoice_id()}.docx")
+        provider_info = provider_data.iloc[0].to_dict()
+        for _, client_row in provider_data.iterrows():
+            invoice = create_invoice(db_path, client_row.to_dict(), provider_info, month)
+            doc = invoice.create_document()
+            doc.save(f"Rechnung_{invoice.generate_invoice_id()}.docx")
 
 if __name__ == "__main__":
     main()
