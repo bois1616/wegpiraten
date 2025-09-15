@@ -4,6 +4,7 @@ structure:
   output_path: output
   template_path: vorlagen
   tmp_path: .tmp
+  logs: .logs
 invoice_template_name: rechnungsvorlage.docx
 db_name: Wegpiraten Datenbank.xlsx
 sheet_name: Pivot Rechnungsdaten
