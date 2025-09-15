@@ -11,4 +11,5 @@ wheels/
 
 # Eigene temp Dateien
 .tmp/
-.log/
+.logs/
+output/

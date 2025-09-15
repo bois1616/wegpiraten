@@ -1,13 +1,15 @@
+import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
+
 import pandas as pd
-import tempfile
-from docxtpl import DocxTemplate, InlineImage  # Für Word-Templates und Bildintegration
-from docx.shared import Mm  # Für Maßeinheiten in Word
-from PIL import Image, ImageDraw, ImageFont  # Für Bildbearbeitung und Einzahlungsschein
 import qrcode  # Für QR-Code-Erstellung
+from docx.shared import Mm  # Für Maßeinheiten in Word
+from docxtpl import DocxTemplate, InlineImage  # Für Word-Templates und Bildintegration
 from module.config import Config  # Singleton-Konfiguration
 from module.utils import format_2f  # Hilfsfunktion für Zahlenformatierung
+from PIL import Image, ImageDraw, ImageFont  # Für Bildbearbeitung und Einzahlungsschein
+
 
 class InvoiceFactory:
     """
@@ -24,7 +26,9 @@ class InvoiceFactory:
         """
         self.config = config
 
-    def create_invoice_id(self, inv_month: Optional[pd.Timestamp | str], client_id: Optional[str]) -> str:
+    def create_invoice_id(
+        self, inv_month: Optional[pd.Timestamp | str], client_id: Optional[str]
+    ) -> str:
         """
         Erstellt eine eindeutige Rechnungsnummer aus Abrechnungsmonat und Klienten-ID.
 
@@ -38,14 +42,20 @@ class InvoiceFactory:
         if inv_month is None:
             inv_month = pd.Timestamp.now()
         if isinstance(inv_month, str):
-            dt = pd.to_datetime(inv_month.replace(".", "-"), format="%m-%Y", errors="coerce")
+            dt = pd.to_datetime(
+                inv_month.replace(".", "-"), format="%m-%Y", errors="coerce"
+            )
             if dt is pd.NaT:
-                raise ValueError("inv_month muss ein String im Format 'MM-YYYY' oder ein pd.Timestamp sein")
+                raise ValueError(
+                    "inv_month muss ein String im Format 'MM-YYYY' oder ein pd.Timestamp sein"
+                )
             month_mmYY = dt.strftime("%m%y")
         elif isinstance(inv_month, pd.Timestamp):
             month_mmYY = inv_month.strftime("%m%y")
         else:
-            raise ValueError("inv_month muss ein String im Format 'YYYY-MM' oder ein pd.Timestamp sein")
+            raise ValueError(
+                "inv_month muss ein String im Format 'YYYY-MM' oder ein pd.Timestamp sein"
+            )
         client_id = client_id or "K000"
         return f"R{month_mmYY}_{client_id}"
 
@@ -67,13 +77,34 @@ class InvoiceFactory:
                 currency = col.get("currency")
                 num_fields.append((col["name"], currency))
         for col, currency in num_fields:
-            decimals = next((c.get("decimals", 2) for c in expected_columns if isinstance(c, dict) and c["name"] == col), 2)
-            df[f"{col}_2f"] = df[col].apply(lambda x: format_2f(x, currency) if pd.notna(x) else "")
-        date_format = next((c.get("format") for c in expected_columns if isinstance(c, dict) and c["name"] == "Leistungsdatum"), "%d.%m.%Y")
+            decimals = next(
+                (
+                    c.get("decimals", 2)
+                    for c in expected_columns
+                    if isinstance(c, dict) and c["name"] == col
+                ),
+                2,
+            )
+            df[f"{col}_2f"] = df[col].apply(
+                lambda x: format_2f(x, currency) if pd.notna(x) else ""
+            )
+        date_format = next(
+            (
+                c.get("format")
+                for c in expected_columns
+                if isinstance(c, dict) and c["name"] == "Leistungsdatum"
+            ),
+            "%d.%m.%Y",
+        )
         df["Leistungsdatum"] = df["Leistungsdatum"].dt.strftime(date_format)
         return df
 
-    def create_einzahlungsschein_png(self, context: dict, output_png: str, font_dir: str = "/usr/share/fonts/truetype/msttcorefonts/"):
+    def create_einzahlungsschein_png(
+        self,
+        context: dict,
+        output_png: str,
+        font_dir: str = "/usr/share/fonts/truetype/msttcorefonts/",
+    ):
         """
         Erstellt einen Einzahlungsschein als PNG-Bild mit allen relevanten Daten und QR-Code.
 
@@ -97,7 +128,10 @@ class InvoiceFactory:
             font_small = ImageFont.truetype(font_path, 28)
             font_small_bold = ImageFont.truetype(font_path_bold, 28)
         except Exception as e:
-            print("[red on white]Warnung: Calibri-Font nicht gefunden, Standardfont wird verwendet.", e)
+            print(
+                "[red on white]Warnung: Calibri-Font nicht gefunden, Standardfont wird verwendet.",
+                e,
+            )
             font = font_bold = font_small = font_small_bold = ImageFont.load_default()
 
         # Empfängerdaten aus der Konfiguration
@@ -106,7 +140,7 @@ class InvoiceFactory:
         empf_Name = empf["name"]
         empf_Strasse = empf["strasse"]
         empf_PLZ_Ort = empf["plz_ort"]
-        zd_PLZ_Ort = f'{context.get("ZD_PLZ", "")} {context.get("ZD_Ort", "")}'
+        zd_PLZ_Ort = f"{context.get('ZD_PLZ', '')} {context.get('ZD_Ort', '')}"
 
         # Einzahlungsschein zeichnen (linker und rechter Bereich)
         # Linien
@@ -155,7 +189,9 @@ class InvoiceFactory:
         y2 += 40
         draw.text((x2, y2), empf_PLZ_Ort, font=font, fill="black")
         y2 += 60
-        draw.text((x2, y2), "Zusätzliche Informationen", font=font_small_bold, fill="black")
+        draw.text(
+            (x2, y2), "Zusätzliche Informationen", font=font_small_bold, fill="black"
+        )
         y2 += 40
         draw.text((x2, y2), context["Rechnungsnummer"], font=font, fill="black")
         y2 += 60
@@ -186,7 +222,7 @@ CHF
 NON
 {context.get("Rechnungsnummer", "")}
 {context.get("ZD_Name", "")}
-{context.get('ZD_Strasse', "")}
+{context.get("ZD_Strasse", "")}
 {zd_PLZ_Ort}
 """
         qr = qrcode.make(qr_data)
@@ -194,7 +230,9 @@ NON
         img.paste(qr, (width - 350, height // 2 - 150))
         img.save(output_png)
 
-    def format_invoice(self, client_details: pd.DataFrame) -> Tuple[DocxTemplate, pd.DataFrame]:
+    def format_invoice(
+        self, client_details: pd.DataFrame
+    ) -> Tuple[DocxTemplate, pd.DataFrame]:
         """
         Erstellt eine ausgefüllte Rechnung für einen Klienten und erzeugt den Einzahlungsschein.
 
@@ -205,9 +243,9 @@ NON
             Tuple[DocxTemplate, pd.DataFrame]: Die ausgefüllte Rechnung und die aktualisierten Daten.
         """
         invoice_template = DocxTemplate(
-            Path(self.config.data["structure"]["prj_root"]) /
-            self.config.data["structure"]["template_path"] /
-            self.config.data["invoice_template_name"]
+            Path(self.config.data["structure"]["prj_root"])
+            / self.config.data["structure"]["template_path"]
+            / self.config.data["invoice_template_name"]
         )
         # Summen berechnen und formatieren
         client_details["Summe_Fahrtzeit"] = client_details["Fahrtzeit"].sum()
@@ -215,18 +253,30 @@ NON
         client_details["Summe_Indirekt"] = client_details["Indirekt"].sum()
         client_details["Summe_Stunden"] = client_details["Stunden"].sum()
         client_details["Summe_Kosten"] = client_details["Kosten"].sum()
-        client_details["Summe_Fahrtzeit_2f"] = format_2f(client_details["Summe_Fahrtzeit"].iloc[0])
-        client_details["Summe_Direkt_2f"] = format_2f(client_details["Summe_Direkt"].iloc[0])
-        client_details["Summe_Indirekt_2f"] = format_2f(client_details["Summe_Indirekt"].iloc[0])
-        client_details["Summe_Stunden_2f"] = format_2f(client_details["Summe_Stunden"].iloc[0])
-        client_details["Summe_Kosten_2f"] = format_2f(client_details["Summe_Kosten"].iloc[0], "CHF")
+        client_details["Summe_Fahrtzeit_2f"] = format_2f(
+            client_details["Summe_Fahrtzeit"].iloc[0]
+        )
+        client_details["Summe_Direkt_2f"] = format_2f(
+            client_details["Summe_Direkt"].iloc[0]
+        )
+        client_details["Summe_Indirekt_2f"] = format_2f(
+            client_details["Summe_Indirekt"].iloc[0]
+        )
+        client_details["Summe_Stunden_2f"] = format_2f(
+            client_details["Summe_Stunden"].iloc[0]
+        )
+        client_details["Summe_Kosten_2f"] = format_2f(
+            client_details["Summe_Kosten"].iloc[0], "CHF"
+        )
         client_details = self.format_fields(client_details)
         # Abrechnungsmonat als String extrahieren
         abrechnungsmonat: str = client_details["Leistungsdatum"].iloc[0][3:]
         client_details["AbrMon"] = abrechnungsmonat
         client_details["Rechnungsdatum"] = pd.Timestamp.now().strftime("%d.%m.%Y")
         # Rechnungsnummer generieren
-        invoice_id = self.create_invoice_id(abrechnungsmonat, client_details["Klient-Nr."].iloc[0])
+        invoice_id = self.create_invoice_id(
+            abrechnungsmonat, client_details["Klient-Nr."].iloc[0]
+        )
         client_details["Rechnungsnummer"] = invoice_id
         print(f"Erstelle Rechnung {invoice_id}")
         # Kontext für das Template
@@ -248,9 +298,13 @@ NON
         invoice_details: dict = invoice_positions.to_dict(orient="records")
         # Einzahlungsschein als PNG erzeugen und einfügen
         output_png = self.config.data["structure"]["tmp_path"]
-        with tempfile.NamedTemporaryFile(dir=output_png, suffix=".png", delete=True) as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            dir=output_png, suffix=".png", delete=True
+        ) as tmp_file:
             self.create_einzahlungsschein_png(invoice_context, tmp_file.name)
-            einzahlungsschein_img = InlineImage(invoice_template, tmp_file.name, width=Mm(200))
+            einzahlungsschein_img = InlineImage(
+                invoice_template, tmp_file.name, width=Mm(200)
+            )
             context = {
                 **invoice_context,
                 "Positionen": invoice_details,
@@ -258,5 +312,3 @@ NON
             }
             invoice_template.render(context)
         return invoice_template, client_details
-
-
