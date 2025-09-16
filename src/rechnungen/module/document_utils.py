@@ -1,11 +1,10 @@
 import subprocess
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
 from loguru import logger
-from module.config import Config
+from .config import Config
 from openpyxl.styles import Font
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from PyPDF2 import PdfMerger
@@ -42,17 +41,18 @@ class DocumentUtils:
             stderr=subprocess.DEVNULL,
             check=True,
         )
-        logger.info(f"DOCX zu PDF konvertiert: {pdf_path}")
+        logger.debug(f"DOCX zu PDF konvertiert: {pdf_path}")
 
     @staticmethod
-    def merge_pdfs(pdf_files: List[Path], zdnr: str, abrechnungsmonat: str):
+    def merge_pdfs(pdf_files: List[Path], zdnr: str, start_inv_period: str, end_inv_period: str):
         """
         Führt mehrere PDF-Dateien zu einer einzigen zusammen.
 
         Args:
             pdf_files (List[Path]): Liste der PDF-Dateipfade.
             zdnr (str): Zahlungsdienstleister-Nummer.
-            abrechnungsmonat (str): Abrechnungsmonat im Format 'YYYY-MM'.
+            start_inv_period (str): Startdatum Leistungszeitraum.
+            end_inv_period (str): Enddatum Leistungszeitraum.
         """
         if not pdf_files:
             logger.warning("Keine PDF-Dateien zum Zusammenführen gefunden.")
@@ -61,24 +61,25 @@ class DocumentUtils:
         output_path = pdf_files[0].parent
         for pdf_file in pdf_files:
             merger.append(pdf_file)
-        merged_pdf_path = output_path / f"Rechnungen_{zdnr}_{abrechnungsmonat}.pdf"
+        merged_pdf_path = output_path / f"Rechnungen_{zdnr}_{start_inv_period}_bis_{end_inv_period}.pdf"
         merger.write(merged_pdf_path)
         merger.close()
         logger.info(f"Zusammengefasste PDF gespeichert: {merged_pdf_path}")
 
     @staticmethod
-    def create_summary(config: Config, summary_rows: List[Dict], abrechnungsmonat: str):
+    def create_summary(config: Config, summary_rows: List[Dict], start_inv_period: str, end_inv_period: str):
         """
         Erstellt eine Excel-Datei mit der Rechnungsübersicht.
 
         Args:
             config (Config): Konfiguration mit Pfadangaben.
             summary_rows (List[Dict]): Liste der Rechnungsübersicht-Zeilen.
-            abrechnungsmonat (str): Abrechnungsmonat im Format 'YYYY-MM'.
+            start_inv_period (str): Startdatum Leistungszeitraum.
+            end_inv_period (str): Enddatum Leistungszeitraum.
         """
         output_path: Path = Path(config.data["structure"]["output_path"])
         summary_df = pd.DataFrame(summary_rows)
-        summary_file = output_path / f"Rechnungsuebersicht_{abrechnungsmonat}.xlsx"
+        summary_file = output_path / f"Rechnungsuebersicht_{start_inv_period}_bis_{end_inv_period}.xlsx"
         with pd.ExcelWriter(summary_file, engine="openpyxl") as writer:
             summary_df.to_excel(writer, index=False, sheet_name="Rechnungsübersicht")
             worksheet = writer.sheets["Rechnungsübersicht"]
@@ -96,7 +97,7 @@ class DocumentUtils:
             worksheet.add_table(tab)
             # Formatierung und Summen für die Kosten-Spalte
             if "Summe_Kosten" in summary_df.columns:
-                kosten_col_idx = summary_df.columns.get_loc("Summe_Kosten") + 1
+                kosten_col_idx = int(summary_df.columns.get_loc("Summe_Kosten")) + 1
                 kosten_col_letter = chr(64 + kosten_col_idx) # A=1, B=2, ...
                 for row in range(2, len(summary_df) + 2):
                     worksheet[f"{kosten_col_letter}{row}"].number_format = '#,##0.00 "CHF"'
@@ -111,5 +112,5 @@ class DocumentUtils:
                     worksheet.cell(row=total_row_idx, column=col).font = bold_font
         logger.info(f"Rechnungsübersicht gespeichert: {summary_file}")
 
-# if __name__ == "__main__":
-#     print("DocumentUtils Modul. Nicht direkt ausführbar.")
+if __name__ == "__main__":
+    print("DocumentUtils Modul. Nicht direkt ausführbar.")

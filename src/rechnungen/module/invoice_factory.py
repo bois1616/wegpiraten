@@ -6,9 +6,10 @@ import pandas as pd
 import qrcode
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage
-from module.config import Config
-from module.utils import format_2f
 from PIL import Image, ImageDraw, ImageFont
+
+from .config import Config
+from .utils import format_2f
 
 
 class InvoiceFactory:
@@ -235,6 +236,6 @@ class InvoiceFactory:
             invoice_template.render(context)
         return invoice_template, client_details
 
-# if __name__ == "__main__":
-#     print("InvoiceFactory Modul. Nicht direkt ausführbar.")
+if __name__ == "__main__":
+    print("InvoiceFactory Modul. Nicht direkt ausführbar.")
 

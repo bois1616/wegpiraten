@@ -4,16 +4,15 @@ from datetime import datetime
 
 import pandas as pd  # Für Datenmanipulation
 from loguru import logger  # Zentrales Logging-System
-from module.config import Config  # Singleton-Konfiguration
-from module.data_loader import DataLoader  # Datenbank-Lader
-from module.document_utils import DocumentUtils  # PDF/Excel Hilfsfunktionen
-from module.invoice_factory import InvoiceFactory  # Rechnungserstellung
-from module.utils import (
+from .config import Config  # Singleton-Konfiguration
+from .data_loader import DataLoader  # Datenbank-Lader
+from .document_utils import DocumentUtils  # PDF/Excel Hilfsfunktionen
+from .invoice_factory import InvoiceFactory  # Rechnungserstellung
+from .utils import (
     clear_path,
-    zip_docs,
+    zip_invoices,
     temporary_docx,
     format_date,
-    parse_date,  # Import ergänzt
 )  # Hilfsfunktionen für Dateimanagement
 
 
@@ -76,6 +75,8 @@ class InvoiceProcessor:
 
         summary_rows = []
         # Gruppierung nach Zahlungsdienstleister (ZDNR)
+        all_invoices: List[Path] = []  # Liste für alle erzeugten PDFs
+
         zd_grouped = invoice_data.groupby("ZDNR")
         for zdnr, zd_data in zd_grouped:
             logger.info(
@@ -99,8 +100,9 @@ class InvoiceProcessor:
                     # DOCX in PDF konvertieren
                     pdf_path = docx_path.with_suffix(".pdf")
                     DocumentUtils.docx_to_pdf(docx_path, pdf_path)
-                    logger.debug(f"PDF erzeugt: {pdf_path}")
+                    logger.debug(f"PDF erzeugt: {re_nr}")
                     invoice_group.append(pdf_path)
+                    all_invoices.append(pdf_path)  # PDF zur Gesamtliste hinzufügen
                 # Zusammenfassungsdaten für die Excel-Übersicht sammeln
                 summary_rows.append(
                     {
@@ -115,20 +117,22 @@ class InvoiceProcessor:
                     }
                 )
             # Alle PDFs für diesen ZD zusammenführen
-            # Dateiname enthält jetzt den Leistungszeitraum
-            merged_pdf_name = f"Rechnungen_{zdnr}_{self.start_inv_period}_bis_{self.end_inv_period}.pdf"
-            DocumentUtils.merge_pdfs(invoice_group, merged_pdf_name)
+            DocumentUtils.merge_pdfs(
+                invoice_group, zdnr, format_date(self.start_inv_period), format_date(self.end_inv_period)
+            )
             logger.info(f"PDFs für ZDNR {zdnr} zusammengeführt.")
             break  # TODO: Wieder rausnehmen, wenn mehrere ZD unterstützt werden
         # Excel-Übersicht erzeugen
-        summary_file_name = f"Rechnungsuebersicht_{self.start_inv_period}_bis_{self.end_inv_period}.xlsx"
-        DocumentUtils.create_summary(self.config, summary_rows, summary_file_name)
+        DocumentUtils.create_summary(
+            self.config, summary_rows, format_date(self.start_inv_period), format_date(self.end_inv_period)
+        )
         logger.info("Rechnungsübersicht als Excel-Datei erstellt.")
-        # Alle Rechnungs-DOCX als ZIP archivieren
-        zip_docs(
-            tmp_path,
+
+        # Jetzt die persistenten PDFs archivieren
+        zip_invoices(
+            all_invoices,
             output_path
-            / f"Rechnungen_{self.start_inv_period}_bis_{self.end_inv_period}.zip",
+            / f"Rechnungen_{format_date(self.start_inv_period)}_bis_{format_date(self.end_inv_period)}.zip",
         )
         logger.success("Alle Rechnungsdokumente wurden erfolgreich archiviert.")
 

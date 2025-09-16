@@ -46,18 +46,17 @@ def clear_path(path: Path):
         if item.is_file():
             item.unlink()
 
-def zip_docs(src_dir: Path, zip_path: Path):
+def zip_invoices(pdf_files: list, zip_path: Path):
     """
-    Erstellt ein ZIP-Archiv aller Rechnungs-DOCX-Dateien im Quellverzeichnis.
-    Die Dateien werden unter ihrem Namen ins ZIP gepackt.
+    Erstellt ein ZIP-Archiv aus einer Liste von PDF-Dateien.
 
     Args:
-        src_dir (Path): Quellverzeichnis mit den DOCX-Dateien.
+        pdf_files (list): Liste von PDF-Dateipfaden.
         zip_path (Path): Zielpfad für das ZIP-Archiv.
     """
     with ZipFile(zip_path, "w") as zipf:
-        for file in src_dir.glob("Rechnung_*.docx"):
-            zipf.write(file, arcname=file.name)
+        for file in pdf_files:
+            zipf.write(file, arcname=Path(file).name)
 
 def parse_date(date_str: str) -> str:
     """

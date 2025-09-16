@@ -24,7 +24,7 @@ if __name__ == "__main__":
     prj_root = Path(config.data["structure"]["prj_root"])
     logs_dir = prj_root / config.data["structure"]["logs"]
     logs_dir.mkdir(parents=True, exist_ok=True)
-    log_file = logs_dir / "rechnung.log"
+    log_file = logs_dir / "Rechnung.log"
 
     # Loguru-Konfiguration: Logdatei im gewünschten Verzeichnis und Konsolenausgabe
     logger.add(str(log_file), rotation="10 MB", retention="10 days", level="INFO")
