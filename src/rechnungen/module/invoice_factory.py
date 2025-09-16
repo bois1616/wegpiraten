@@ -159,10 +159,11 @@ class InvoiceFactory:
             draw.text((x2, y2), value, font=font, fill="black")
             y2 += 40
 
-        # QR-Code
+        # QR-Code im SPC Format. 
+        # Siehe https://www.paymentstandards.ch/dam/downloads/ig-qr-bill-de.pdf
         qr_data = (
             f"SPC\n0200\n1\n{empf['IBAN']}\n{empf['name']}\n{empf['strasse']}\n{empf['plz_ort']}\n"
-            f"{context.get('Summe_Kosten_2f', '')}\nCHF\nNON\n{context.get('Rechnungsnummer', '')}\n"
+            f"{context.get('Summe_Kosten_2f', 0)}\nCHF\nNON\n{context.get('Rechnungsnummer', '')}\n"
             f"{context.get('ZD_Name', '')}\n{context.get('ZD_Strasse', '')}\n{zd_plz_ort}\n"
         )
         qr = qrcode.make(qr_data).resize((300, 300))
@@ -200,7 +201,6 @@ class InvoiceFactory:
             start_inv_period, client_details["Klient-Nr."].iloc[0]
         )
         client_details["Rechnungsnummer"] = invoice_id
-        print(f"Erstelle Rechnung {invoice_id}")
         # Kontext für das Template
         invoice_context = client_details.iloc[0].to_dict()
         invoice_positions = client_details[

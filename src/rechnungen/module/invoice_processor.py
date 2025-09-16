@@ -94,15 +94,19 @@ class InvoiceProcessor:
                 )
                 re_nr: str = updated_data["Rechnungsnummer"].iloc[0]
                 with temporary_docx() as docx_path:
-                    # Rechnung als DOCX speichern
+                    # Rechnung als DOCX zwischenspeichern
                     formatted_invoice.save(docx_path)
                     logger.debug(f"Temporäre Rechnung gespeichert: {docx_path}")
-                    # DOCX in PDF konvertieren
-                    pdf_path = docx_path.with_suffix(".pdf")
-                    DocumentUtils.docx_to_pdf(docx_path, pdf_path)
-                    logger.debug(f"PDF erzeugt: {re_nr}")
-                    invoice_group.append(pdf_path)
-                    all_invoices.append(pdf_path)  # PDF zur Gesamtliste hinzufügen
+                    # DOCX in PDF konvertieren und nach Vorgabe benennen
+                    named_pdf = DocumentUtils.docx_to_pdf(
+                        docx_path,
+                        docx_path.with_suffix(".pdf"),
+                        client_id=client_id,
+                        start_inv_period=format_date(self.start_inv_period),
+                        end_inv_period=format_date(self.end_inv_period),
+                    )
+                    invoice_group.append(named_pdf)
+                    all_invoices.append(named_pdf)  # PDF zur Gesamtliste hinzufügen
                 # Zusammenfassungsdaten für die Excel-Übersicht sammeln
                 summary_rows.append(
                     {
@@ -118,7 +122,8 @@ class InvoiceProcessor:
                 )
             # Alle PDFs für diesen ZD zusammenführen
             DocumentUtils.merge_pdfs(
-                invoice_group, zdnr, format_date(self.start_inv_period), format_date(self.end_inv_period)
+                invoice_group, zdnr, format_date(self.start_inv_period), format_date(self.end_inv_period),
+                output_path=output_path,
             )
             logger.info(f"PDFs für ZDNR {zdnr} zusammengeführt.")
             break  # TODO: Wieder rausnehmen, wenn mehrere ZD unterstützt werden

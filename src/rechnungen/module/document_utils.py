@@ -1,4 +1,5 @@
 import subprocess
+import os
 from pathlib import Path
 from typing import Dict, List
 
@@ -19,13 +20,16 @@ class DocumentUtils:
     """
 
     @staticmethod
-    def docx_to_pdf(docx_path: Path, pdf_path: Path):
+    def docx_to_pdf(docx_path: Path, pdf_path: Path, client_id: str = None, start_inv_period: str = None, end_inv_period: str = None):
         """
-        Konvertiert eine DOCX-Datei in eine PDF-Datei mit LibreOffice.
+        Konvertiert eine DOCX-Datei in eine PDF-Datei mit LibreOffice und benennt sie ggf. nach Vorgabe um.
 
         Args:
             docx_path (Path): Pfad zur DOCX-Datei.
             pdf_path (Path): Pfad zur Ausgabedatei (PDF).
+            client_id (str, optional): Zahlungsdienstleister-ID für den Dateinamen.
+            start_inv_period (str, optional): Startdatum Leistungszeitraum.
+            end_inv_period (str, optional): Enddatum Leistungszeitraum.
         """
         subprocess.run(
             [
@@ -41,10 +45,20 @@ class DocumentUtils:
             stderr=subprocess.DEVNULL,
             check=True,
         )
-        logger.debug(f"DOCX zu PDF konvertiert: {pdf_path}")
+        # LibreOffice erzeugt die PDF mit dem gleichen Namen wie die DOCX, nur mit .pdf-Endung
+        generated_pdf = docx_path.with_suffix(".pdf")
+        if client_id and start_inv_period and end_inv_period:
+            target_name = f"Rechnung_{client_id}_{start_inv_period}_bis_{end_inv_period}.pdf"
+            target_pdf = pdf_path.parent / target_name
+            os.rename(generated_pdf, target_pdf)
+            logger.debug(f"PDF umbenannt: {target_pdf}")
+            return target_pdf
+        else:
+            logger.info(f"Dokument erzeugt: {generated_pdf}")
+            return generated_pdf
 
     @staticmethod
-    def merge_pdfs(pdf_files: List[Path], zdnr: str, start_inv_period: str, end_inv_period: str):
+    def merge_pdfs(pdf_files: List[Path], zdnr: str, start_inv_period: str, end_inv_period: str, output_path: Path = None):
         """
         Führt mehrere PDF-Dateien zu einer einzigen zusammen.
 
@@ -53,14 +67,17 @@ class DocumentUtils:
             zdnr (str): Zahlungsdienstleister-Nummer.
             start_inv_period (str): Startdatum Leistungszeitraum.
             end_inv_period (str): Enddatum Leistungszeitraum.
+            output_path (Path, optional): Zielverzeichnis für die Sammel-PDF.
         """
         if not pdf_files:
             logger.warning("Keine PDF-Dateien zum Zusammenführen gefunden.")
             return
         merger = PdfMerger()
-        output_path = pdf_files[0].parent
         for pdf_file in pdf_files:
             merger.append(pdf_file)
+        # Zielverzeichnis bestimmen
+        if output_path is None:
+            output_path = pdf_files[0].parent
         merged_pdf_path = output_path / f"Rechnungen_{zdnr}_{start_inv_period}_bis_{end_inv_period}.pdf"
         merger.write(merged_pdf_path)
         merger.close()
