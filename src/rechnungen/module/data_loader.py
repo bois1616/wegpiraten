@@ -5,6 +5,7 @@ from openpyxl import load_workbook
 from module.config import Config
 from loguru import logger  # Zentrales Logging-System
 
+
 class DataLoader:
     """
     Klasse zum Laden und Prüfen von Daten aus einer Excel-Datenbank.
@@ -20,32 +21,28 @@ class DataLoader:
         """
         self.config = config
 
-    def load_data(self, db: Path, sheet: Optional[str], abrechnungsmonat: Optional[pd.Timestamp | str]) -> pd.DataFrame:
+    def load_data(
+        self,
+        db: Path,
+        sheet: Optional[str],
+        start_inv_period: Optional[str],
+        end_inv_period: Optional[str],
+    ) -> pd.DataFrame:
         """
-        Lädt die Daten aus einer Excel-Datei und filtert sie nach dem Abrechnungsmonat.
+        Lädt die Daten aus einer Excel-Datei und filtert sie nach Leistungszeitraum.
 
         Args:
             db (Path): Pfad zur Excel-Datenbank.
             sheet (str, optional): Name des Arbeitsblatts. Falls None, wird das aktive Blatt verwendet.
-            abrechnungsmonat (pd.Timestamp | str, optional): Abrechnungsmonat als Timestamp oder 'YYYY-MM'-String.
+            start_inv_period (str, optional): Startdatum Leistungszeitraum ('YYYY-MM-DD').
+            end_inv_period (str, optional): Enddatum Leistungszeitraum ('YYYY-MM-DD').
 
         Returns:
             pd.DataFrame: Gefilterte Daten als DataFrame.
-
-        Raises:
-            ValueError: Falls der Abrechnungsmonat nicht korrekt übergeben wird.
         """
+        # Annahme: start_inv_period und end_inv_period wurden bereits außerhalb geprüft und konvertiert ("check once and then trust")
         work_book = load_workbook(db, data_only=True)
         work_sheet = work_book[sheet] if sheet else work_book.active
-
-        # Abrechnungsmonat als Timestamp bestimmen
-        if abrechnungsmonat is None:
-            abrechnungsmonat = pd.Timestamp.now().to_period("M").to_timestamp()
-        elif isinstance(abrechnungsmonat, str):
-            abrechnungsmonat = pd.to_datetime(abrechnungsmonat, format="%Y-%m")
-        elif not isinstance(abrechnungsmonat, pd.Timestamp):
-            logger.error("Abrechnungsmonat muss ein String im Format 'YYYY-MM' oder ein pd.Timestamp sein")
-            raise ValueError("abrechnungsmonat muss ein String im Format 'YYYY-MM' oder ein pd.Timestamp sein")
 
         # Die ersten drei Zeilen sind Metadaten und werden übersprungen
         data = work_sheet.values
@@ -56,10 +53,12 @@ class DataLoader:
         # Die eigentlichen Daten ab der zweiten Spalte
         df = pd.DataFrame((row[1:] for row in data), columns=columns)
 
-        # Filter auf den Abrechnungsmonat anwenden
-        monat_start: pd.Timestamp = abrechnungsmonat
-        monat_ende: pd.Timestamp = abrechnungsmonat + pd.offsets.MonthEnd(0)
-        df = df[(df["Leistungsdatum"] >= monat_start) & (df["Leistungsdatum"] <= monat_ende)]
+        # Aufwandsdaten auf den gewählten Leistungszeitraum begrenzen
+        start_date = pd.to_datetime(start_inv_period)
+        end_date = pd.to_datetime(end_inv_period)
+        df = df[
+            (df["Leistungsdatum"] >= start_date) & (df["Leistungsdatum"] <= end_date)
+        ]
 
         # Fehlende Werte in ZD_Name2 mit Leerzeichen auffüllen/ersetzen
         if "ZD_Name2" in df.columns:
@@ -78,10 +77,16 @@ class DataLoader:
             ValueError: Falls erwartete Spalten fehlen.
         """
         # Extrahiere die erwarteten Spaltennamen aus der Konfiguration
-        expected_columns = {col["name"] if isinstance(col, dict) else col for col in self.config.data["expected_columns"]}
+        expected_columns = {
+            col["name"] if isinstance(col, dict) else col
+            for col in self.config.data["expected_columns"]
+        }
         missing_columns = expected_columns - set(df.columns)
         if missing_columns:
             missing_str = "\n".join(sorted(missing_columns))
             logger.warning(f"Fehlende Spalten: {missing_str}")
             raise ValueError(f"Fehlende Felder in der Pivot-Tabelle: {missing_str}")
         logger.info("Alle erwarteten Spalten sind vorhanden.")
+    
+# if __name__ == "__main__":
+#     print("DataLoader Modul. Nicht direkt ausführbar.")

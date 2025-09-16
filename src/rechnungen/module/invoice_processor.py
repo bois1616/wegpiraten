@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Optional
+from datetime import datetime
 
 import pandas as pd  # Für Datenmanipulation
 from loguru import logger  # Zentrales Logging-System
@@ -7,7 +8,13 @@ from module.config import Config  # Singleton-Konfiguration
 from module.data_loader import DataLoader  # Datenbank-Lader
 from module.document_utils import DocumentUtils  # PDF/Excel Hilfsfunktionen
 from module.invoice_factory import InvoiceFactory  # Rechnungserstellung
-from module.utils import clear_path, zip_docs  # Hilfsfunktionen für Dateimanagement
+from module.utils import (
+    clear_path,
+    zip_docs,
+    temporary_docx,
+    format_date,
+    parse_date,  # Import ergänzt
+)  # Hilfsfunktionen für Dateimanagement
 
 
 class InvoiceProcessor:
@@ -16,26 +23,28 @@ class InvoiceProcessor:
     Koordiniert das Laden der Daten, die Rechnungserstellung, PDF-Generierung und die Zusammenfassung.
     """
 
-    def __init__(self, config_path: Path):
+    def __init__(self, config: Config, start_inv_period: str, end_inv_period: str):
         """
-        Initialisiert den Prozessor mit dem Pfad zur Konfigurationsdatei.
+        Initialisiert den Prozessor mit der Konfiguration und dem Leistungszeitraum.
 
         Args:
-            config_path (Path): Pfad zur YAML-Konfigurationsdatei.
+            config (Config): Konfigurationsobjekt.
+            start_inv_period (str): Startdatum Leistungszeitraum (YYYY-MM-DD).
+            end_inv_period (str): Enddatum Leistungszeitraum (YYYY-MM-DD).
         """
-        self.config = Config()
-        self.config.load(config_path)
+        self.config = config
         self.data_loader = DataLoader(self.config)
         self.invoice_factory = InvoiceFactory(self.config)
+        self.start_inv_period = start_inv_period
+        self.end_inv_period = end_inv_period
 
-    def run(self, abrechnungsmonat: str = "2025-08"):
+    def run(self):
         """
-        Führt den gesamten Rechnungsprozess für einen Abrechnungsmonat aus.
-
-        Args:
-            abrechnungsmonat (str): Abrechnungsmonat im Format 'YYYY-MM'.
+        Führt den gesamten Rechnungsprozess für den angegebenen Leistungszeitraum aus.
         """
-        logger.info(f"Starte Rechnungsprozess für Abrechnungsmonat {abrechnungsmonat}.")
+        logger.info(
+            f"Starte Rechnungsprozess für Leistungszeitraum {self.start_inv_period} bis {self.end_inv_period}."
+        )
 
         # Konfigurationswerte auslesen
         env = self.config.data["structure"]
@@ -54,33 +63,44 @@ class InvoiceProcessor:
 
         # Daten aus Excel laden und prüfen
         invoice_data: pd.DataFrame = self.data_loader.load_data(
-            data_path / db_name, sheet_name, abrechnungsmonat
+            data_path / db_name, sheet_name, self.start_inv_period, self.end_inv_period
         )
         self.data_loader.check_data_consistency(invoice_data)
         logger.info("Daten erfolgreich geladen und geprüft.")
+
+        # Filter nach Leistungszeitraum
+        invoice_data = invoice_data[
+            (invoice_data["Leistungsdatum"] >= self.start_inv_period)
+            & (invoice_data["Leistungsdatum"] <= self.end_inv_period)
+        ]
 
         summary_rows = []
         # Gruppierung nach Zahlungsdienstleister (ZDNR)
         zd_grouped = invoice_data.groupby("ZDNR")
         for zdnr, zd_data in zd_grouped:
-            logger.info(f"Verarbeite Zahlungsdienstleister: {zd_data['ZD_Name'].iloc[0]}")
+            logger.info(
+                f"Verarbeite Zahlungsdienstleister: {zd_data['ZD_Name'].iloc[0]}"
+            )
             invoice_group: List[Path] = []
             # Gruppierung nach Klient
             client_grouped = zd_data.groupby("Klient-Nr.")
             for client_id, client_details in client_grouped:
                 # Rechnung und aktualisierte Daten erzeugen
                 formatted_invoice, updated_data = self.invoice_factory.format_invoice(
-                    client_details
+                    client_details,
+                    start_inv_period=format_date(self.start_inv_period),
+                    end_inv_period=format_date(self.end_inv_period),
                 )
                 re_nr: str = updated_data["Rechnungsnummer"].iloc[0]
-                docx_path: Path = tmp_path / f"Rechnung_{re_nr}.docx"
-                # Rechnung als DOCX speichern
-                formatted_invoice.save(docx_path)
-                logger.debug(f"Rechnung gespeichert: {docx_path}")
-                # DOCX in PDF konvertieren
-                DocumentUtils.docx_to_pdf(docx_path, _ := docx_path.with_suffix(".pdf"))
-                logger.debug(f"PDF erzeugt: {_}")
-                invoice_group.append(_)
+                with temporary_docx() as docx_path:
+                    # Rechnung als DOCX speichern
+                    formatted_invoice.save(docx_path)
+                    logger.debug(f"Temporäre Rechnung gespeichert: {docx_path}")
+                    # DOCX in PDF konvertieren
+                    pdf_path = docx_path.with_suffix(".pdf")
+                    DocumentUtils.docx_to_pdf(docx_path, pdf_path)
+                    logger.debug(f"PDF erzeugt: {pdf_path}")
+                    invoice_group.append(pdf_path)
                 # Zusammenfassungsdaten für die Excel-Übersicht sammeln
                 summary_rows.append(
                     {
@@ -90,15 +110,28 @@ class InvoiceProcessor:
                         "ZD_Name": updated_data["ZD_Name"].iloc[0],
                         "Summe_Kosten": updated_data["Summe_Kosten"].iloc[0],
                         "Rechnungsdatum": updated_data["Rechnungsdatum"].iloc[0],
+                        "start_inv_period": format_date(self.start_inv_period),
+                        "end_inv_period": format_date(self.end_inv_period),
                     }
                 )
             # Alle PDFs für diesen ZD zusammenführen
-            DocumentUtils.merge_pdfs(invoice_group, str(zdnr), abrechnungsmonat)
+            # Dateiname enthält jetzt den Leistungszeitraum
+            merged_pdf_name = f"Rechnungen_{zdnr}_{self.start_inv_period}_bis_{self.end_inv_period}.pdf"
+            DocumentUtils.merge_pdfs(invoice_group, merged_pdf_name)
             logger.info(f"PDFs für ZDNR {zdnr} zusammengeführt.")
             break  # TODO: Wieder rausnehmen, wenn mehrere ZD unterstützt werden
         # Excel-Übersicht erzeugen
-        DocumentUtils.create_summary(self.config, summary_rows, abrechnungsmonat)
+        summary_file_name = f"Rechnungsuebersicht_{self.start_inv_period}_bis_{self.end_inv_period}.xlsx"
+        DocumentUtils.create_summary(self.config, summary_rows, summary_file_name)
         logger.info("Rechnungsübersicht als Excel-Datei erstellt.")
         # Alle Rechnungs-DOCX als ZIP archivieren
-        zip_docs(tmp_path, output_path / f"Rechnungen_{abrechnungsmonat}.zip")
+        zip_docs(
+            tmp_path,
+            output_path
+            / f"Rechnungen_{self.start_inv_period}_bis_{self.end_inv_period}.zip",
+        )
         logger.success("Alle Rechnungsdokumente wurden erfolgreich archiviert.")
+
+
+if __name__ == "__main__":
+    print("InvoiceProcessor Modul. Nicht direkt ausführbar.")

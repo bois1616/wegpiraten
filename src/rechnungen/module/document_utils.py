@@ -1,12 +1,14 @@
+import subprocess
+from contextlib import contextmanager
 from pathlib import Path
-from typing import List, Dict
-import subprocess  # Für das Ausführen von LibreOffice zur PDF-Konvertierung
-import pandas as pd  # Für die Arbeit mit DataFrames und Excel
-from openpyxl.styles import Font  # Für Schriftformatierung in Excel
-from openpyxl.worksheet.table import Table, TableStyleInfo  # Für Tabellenformatierung in Excel
-from PyPDF2 import PdfMerger  # Für das Zusammenführen von PDF-Dateien
-from module.config import Config  # Für Zugriff auf die zentrale Konfiguration
-from loguru import logger  # Zentrales Logging-System
+from typing import Dict, List
+
+import pandas as pd
+from loguru import logger
+from module.config import Config
+from openpyxl.styles import Font
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from PyPDF2 import PdfMerger
 
 
 class DocumentUtils:
@@ -109,4 +111,5 @@ class DocumentUtils:
                     worksheet.cell(row=total_row_idx, column=col).font = bold_font
         logger.info(f"Rechnungsübersicht gespeichert: {summary_file}")
 
-
+# if __name__ == "__main__":
+#     print("DocumentUtils Modul. Nicht direkt ausführbar.")
