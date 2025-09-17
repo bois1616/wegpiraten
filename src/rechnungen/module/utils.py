@@ -8,6 +8,7 @@ from zipfile import ZipFile
 
 import pandas as pd
 from loguru import logger
+from datetime import timedelta, datetime
 
 
 # --- Utility-Funktionen ---
@@ -111,3 +112,26 @@ def temporary_docx(suffix=".docx"):
     finally:
         if tmp_path.exists():
             os.remove(tmp_path)
+
+def get_month_period(abrechnungsmonat: str) -> tuple:
+    """
+    Wandelt einen Abrechnungsmonat (MM.YYYY oder MM-YYYY) in Start- und Enddatum um.
+    Gibt die Daten im Format 'dd.mm.YYYY' zurück.
+    """
+    try:
+        # Erlaubt auch MM-YYYY
+        abrechnungsmonat = abrechnungsmonat.replace("-", ".")
+        monat, jahr = abrechnungsmonat.split(".")
+        monat = int(monat)
+        jahr = int(jahr)
+        start = datetime(jahr, monat, 1)
+        # Monatsende berechnen
+        if monat == 12:
+            end = datetime(jahr, 12, 31)
+        else:
+            end = datetime(jahr, monat + 1, 1) - timedelta(days=1)
+        start_str = start.strftime("%d.%m.%Y")
+        end_str = end.strftime("%d.%m.%Y")
+        return start_str, end_str
+    except Exception:
+        raise ValueError("Bitte den Abrechnungsmonat im Format MM.YYYY eingeben.")

@@ -2,7 +2,7 @@ structure:
   prj_root: /home/stephan/projects/wegpiraten
   data_path: /mnt/c/Users/micro/OneDrive/Shared/Beatus/Wegpiraten Unterlagen
   output_path: output
-  template_path: vorlagen
+  template_path: templates
   tmp_path: .tmp
   logs: .logs
 invoice_template_name: rechnungsvorlage.docx

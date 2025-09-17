@@ -126,7 +126,6 @@ class InvoiceProcessor:
                 output_path=output_path,
             )
             logger.info(f"PDFs für ZDNR {zdnr} zusammengeführt.")
-            break  # TODO: Wieder rausnehmen, wenn mehrere ZD unterstützt werden
         # Excel-Übersicht erzeugen
         DocumentUtils.create_summary(
             self.config, summary_rows, format_date(self.start_inv_period), format_date(self.end_inv_period)

@@ -1,18 +1,24 @@
 from pathlib import Path
+import sys
 from loguru import logger  # Zentrales Logging-System
 
 from module.invoice_processor import InvoiceProcessor
 from module.config import Config  # Für Zugriff auf die Konfiguration
-from module.utils import parse_date  # Import aus utils
+from module.utils import parse_date, get_month_period  # Import aus utils
 
 # --- Main ---
 if __name__ == "__main__":
     # Pfad zur YAML-Konfigurationsdatei bestimmen
     config_path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
 
-    # Start- und Enddatum für den Leistungsbereich abfragen (Format dd.mm.YYYY)
-    start_inv_period_input = input("Bitte Startdatum für den Leistungsbereich eingeben (dd.mm.YYYY): ") or "12.8.25"
-    end_inv_period_input = input("Bitte Enddatum für den Leistungsbereich eingeben (dd.mm.YYYY): ") or "27.8.25"
+    # Abrechnungsmonat als Argument übergeben
+    if len(sys.argv) > 1:
+        abrechnungsmonat_input = sys.argv[1]
+    else:
+        print("Bitte Abrechnungsmonat als Argument übergeben (z.B. 08.2025)")
+        sys.exit(1)
+
+    start_inv_period_input, end_inv_period_input = get_month_period(abrechnungsmonat_input)
 
     # Datumsangaben ins interne Format konvertieren
     start_inv_period = parse_date(start_inv_period_input)
