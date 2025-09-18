@@ -3,6 +3,7 @@ from typing import Optional
 import pandas as pd
 from openpyxl import load_workbook
 from module.config import Config
+from module.entity import JuristischePerson, PrivatePerson
 from loguru import logger  # Zentrales Logging-System
 
 
@@ -64,6 +65,39 @@ class DataLoader:
         if "ZD_Name2" in df.columns:
             df["ZD_Name2"] = df["ZD_Name2"].fillna("").replace("(Leer)", "")
         logger.info("Daten erfolgreich geladen und gefiltert.")
+
+        # Entitäten aus den Daten erzeugen und als neue Spalten hinzufügen
+        df["Client_entity"] = df.apply(
+            lambda row: PrivatePerson(
+                row["CL_Vorname"],
+                row["CL_Nachname"],
+                row.get("CL_Strasse", ""),
+                row.get("CL_PLZ_Ort", ""),
+                row.get("CL_Geburtsdatum")
+            ),
+            axis=1,
+        )
+        df["ZD_entity"] = df.apply(
+            lambda row: JuristischePerson(
+                row.get("ZD_Name", ""),
+                row.get("ZD_Strasse", ""),
+                row.get("ZD_PLZ_Ort", ""),
+                row.get("ZD_IBAN")
+            ),
+            axis=1,
+        )
+        # Empfänger ggf. aus Konfiguration, falls relevant:
+        empfaenger_cfg = self.config.data.get("empfaenger")
+        empfaenger_entity = None
+        if empfaenger_cfg:
+            empfaenger_entity = JuristischePerson(
+                empfaenger_cfg.get("name", ""),
+                empfaenger_cfg.get("strasse", ""),
+                empfaenger_cfg.get("plz_ort", ""),
+                empfaenger_cfg.get("IBAN")
+            )
+        df["Empfaenger_entity"] = empfaenger_entity
+
         return df
 
     def check_data_consistency(self, df: pd.DataFrame):
@@ -76,17 +110,17 @@ class DataLoader:
         Raises:
             ValueError: Falls erwartete Spalten fehlen.
         """
-        # Extrahiere die erwarteten Spaltennamen aus der Konfiguration
-        expected_columns = {
-            col["name"] if isinstance(col, dict) else col
-            for col in self.config.data["expected_columns"]
-        }
+        # Extrahiere die erwarteten Spaltennamen aus der segmentierten Konfiguration
+        zd_columns = [col["name"] for col in self.config.data["expected_columns"].get("zd", [])]
+        cl_columns = [col["name"] for col in self.config.data["expected_columns"].get("cl", [])]
+        allg_columns = [col["name"] for col in self.config.data["expected_columns"].get("allgemein", [])]
+        expected_columns = set(zd_columns + cl_columns + allg_columns)
         missing_columns = expected_columns - set(df.columns)
         if missing_columns:
             missing_str = "\n".join(sorted(missing_columns))
             logger.warning(f"Fehlende Spalten: {missing_str}")
             raise ValueError(f"Fehlende Felder in der Pivot-Tabelle: {missing_str}")
         logger.info("Alle erwarteten Spalten sind vorhanden.")
-    
-# if __name__ == "__main__":
-#     print("DataLoader Modul. Nicht direkt ausführbar.")
+
+if __name__ == "__main__":
+    print("DataLoader Modul. Nicht direkt ausführbar.")

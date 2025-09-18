@@ -9,59 +9,62 @@ invoice_template_name: rechnungsvorlage.docx
 db_name: Wegpiraten Datenbank.xlsx
 sheet_name: Pivot Rechnungsdaten
 expected_columns:
-  - name: Leistungsbesteller
-    type: text
-  - name: Leistungsdatum
-    type: date
-    format: "%d.%m.%Y"
-  - name: ZDNR
-    type: text
-  - name: ZD_Name
-    type: text
-  - name: ZD_Name2
-    type: text
-  - name: ZD_Strasse
-    type: text
-  - name: ZD_PLZ
-    type: text
-  - name: ZD_Ort
-    type: text
-  - name: Klient-Nr.
-    type: text
-  - name: CL_Vorname
-    type: text
-  - name: CL_Nachname
-    type: text
-  - name: CL_SozVersNr
-    type: text
-  - name: Betreuungstyp
-    type: text
-  - name: Fahrtzeit
-    type: numeric
-    decimals: 2
-  - name: Direkt
-    type: numeric
-    decimals: 2
-  - name: Indirekt
-    type: numeric
-    decimals: 2
-  - name: Sollstunden
-    type: numeric
-    decimals: 2
-  - name: Stundensatz
-    type: currency
-    currency: CHF
-    decimals: 2
-  - name: km_Pauschale
-    type: numeric
-    decimals: 2
-  - name: Stunden
-    type: numeric
-    decimals: 2
-  - name: Kosten
-    type: currency
-    currency: CHF
-    decimals: 2
+  zd:
+    - name: ZDNR
+      type: text
+    - name: ZD_Name
+      type: text
+    - name: ZD_Name2
+      type: text
+    - name: ZD_Strasse
+      type: text
+    - name: ZD_PLZ
+      type: text
+    - name: ZD_Ort
+      type: text
+  cl:
+    - name: Klient-Nr.
+      type: text
+    - name: CL_Vorname
+      type: text
+    - name: CL_Nachname
+      type: text
+    - name: CL_SozVersNr
+      type: text
+  allgemein:
+    - name: Leistungsbesteller
+      type: text
+    - name: Leistungsdatum
+      type: date
+      format: "%d.%m.%Y"
+    - name: Betreuungstyp
+      type: text
+    - name: Fahrtzeit
+      type: numeric
+      decimals: 2
+    - name: Direkt
+      type: numeric
+      decimals: 2
+    - name: Indirekt
+      type: numeric
+      decimals: 2
+    - name: Sollstunden
+      type: numeric
+      decimals: 2
+    - name: Stundensatz
+      type: currency
+      currency: CHF
+      decimals: 2
+    - name: km_Pauschale
+      type: numeric
+      decimals: 2
+    - name: Stunden
+      type: numeric
+      decimals: 2
+    - name: Kosten
+      type: currency
+      currency: CHF
+      decimals: 2
 
 empfaenger:
   IBAN: CH07 0839 3053 8385 3915 1

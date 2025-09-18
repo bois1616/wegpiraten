@@ -1,10 +1,11 @@
-from pathlib import Path
 import sys
-from loguru import logger  # Zentrales Logging-System
+from pathlib import Path
 
-from module.invoice_processor import InvoiceProcessor
+from loguru import logger  # Zentrales Logging-System
 from module.config import Config  # Für Zugriff auf die Konfiguration
-from module.utils import parse_date, get_month_period  # Import aus utils
+from module.invoice_processor import InvoiceProcessor
+from module.invoice_context import InvoiceContext  # InvoiceContext importieren
+from module.utils import get_month_period, parse_date  # Import aus utils
 
 # --- Main ---
 if __name__ == "__main__":
@@ -16,8 +17,10 @@ if __name__ == "__main__":
         abrechnungsmonat_input = sys.argv[1]
     else:
         print("Bitte Abrechnungsmonat als Argument übergeben (z.B. 08.2025)")
-        sys.exit(1)
+        abrechnungsmonat_input = "08.2025"
+        # sys.exit(1)
 
+    # Start- und Enddatum aus dem Abrechnungsmonat bestimmen
     start_inv_period_input, end_inv_period_input = get_month_period(abrechnungsmonat_input)
 
     # Datumsangaben ins interne Format konvertieren
@@ -37,6 +40,8 @@ if __name__ == "__main__":
     logger.info("Starte Rechnungsprozess...")
 
     try:
+        # Die Entitäten und erwarteten Spalten werden jetzt segmentiert aus der config geladen
+        # InvoiceContext wird im InvoiceProcessor genutzt
         processor = InvoiceProcessor(config, start_inv_period, end_inv_period)
         processor.run()
         logger.success("Rechnungsprozess erfolgreich abgeschlossen.")

@@ -1,15 +1,16 @@
 import os
 import tempfile
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
 import pandas as pd
 from loguru import logger
-from datetime import timedelta, datetime
 
+from module.invoice_context import InvoiceContext
+# from module.entity import JuristischePerson, PrivatePerson
 
 # --- Utility-Funktionen ---
 def format_2f(value: float, currency: Optional[str] = None) -> str:
@@ -30,7 +31,6 @@ def format_2f(value: float, currency: Optional[str] = None) -> str:
     currency = currency or ""
     if currency and not currency.startswith(" "):
         currency = " " + currency
-    # Formatierung: 1.234,56 statt 1,234.56
     tmp_val = f"{value:,.2f}"
     tmp_val = tmp_val.replace(",", "X").replace(".", ",").replace("X", ".")
     return f"{tmp_val}{currency}"
@@ -101,8 +101,7 @@ def format_date(date_str):
     except (ValueError, TypeError) as e:
         logger.error(f"Ungültiges Datumsformat: '{date_str}' ({e})")
         return date_str
-    
-    
+
 @contextmanager
 def temporary_docx(suffix=".docx"):
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -135,3 +134,6 @@ def get_month_period(abrechnungsmonat: str) -> tuple:
         return start_str, end_str
     except Exception:
         raise ValueError("Bitte den Abrechnungsmonat im Format MM.YYYY eingeben.")
+
+# Hinweis: Die Anpassung an die segmentierte config betrifft vor allem die Verwendung in anderen Modulen,
+# z.B. beim Zugriff auf Spaltennamen und deren Typen. Die Utility-Funktionen selbst bleiben unverändert.
