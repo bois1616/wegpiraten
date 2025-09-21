@@ -8,8 +8,9 @@ structure:
 invoice_template_name: rechnungsvorlage.docx
 db_name: Wegpiraten Datenbank.xlsx
 sheet_name: Pivot Rechnungsdaten
+locale: de_CH.UTF-8
 expected_columns:
-  zd:
+  payer:
     - name: ZDNR
       type: text
     - name: ZD_Name
@@ -22,7 +23,7 @@ expected_columns:
       type: text
     - name: ZD_Ort
       type: text
-  cl:
+  client:
     - name: Klient-Nr.
       type: text
     - name: CL_Vorname
@@ -31,12 +32,13 @@ expected_columns:
       type: text
     - name: CL_SozVersNr
       type: text
-  allgemein:
+  general:
     - name: Leistungsbesteller
       type: text
     - name: Leistungsdatum
       type: date
       format: "%d.%m.%Y"
+      position: true
     - name: Betreuungstyp
       type: text
     - name: Fahrtzeit
@@ -45,28 +47,35 @@ expected_columns:
     - name: Direkt
       type: numeric
       decimals: 2
+      position: true
     - name: Indirekt
       type: numeric
       decimals: 2
+      position: true
     - name: Sollstunden
       type: numeric
       decimals: 2
+      position: true
     - name: Stundensatz
       type: currency
       currency: CHF
       decimals: 2
+      position: true
     - name: km_Pauschale
       type: numeric
       decimals: 2
+      position: true
     - name: Stunden
       type: numeric
       decimals: 2
+      position: true
     - name: Kosten
       type: currency
       currency: CHF
       decimals: 2
+      position: true
 
-empfaenger:
+provider:
   IBAN: CH07 0839 3053 8385 3915 1
   name: Wegpiraten GmbH
   strasse: Alpenstraße 2

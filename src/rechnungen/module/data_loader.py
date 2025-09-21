@@ -3,7 +3,8 @@ from typing import Optional
 import pandas as pd
 from openpyxl import load_workbook
 from module.config import Config
-from module.entity import JuristischePerson, PrivatePerson
+from module.entity import LegalPerson, PrivatePerson
+from module.invoice_filter import InvoiceFilter
 from loguru import logger  # Zentrales Logging-System
 
 
@@ -13,35 +14,32 @@ class DataLoader:
     Nutzt die Konfiguration für erwartete Spalten und Filter.
     """
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, filter: InvoiceFilter):
         """
         Initialisiert den DataLoader mit einer Konfigurationsinstanz.
 
         Args:
             config (Config): Singleton-Konfiguration mit allen Einstellungen.
+            filter (InvoiceFilter): Filterobjekt mit den Filterkriterien.
         """
         self.config = config
+        self.filter = filter
 
     def load_data(
         self,
         db: Path,
-        sheet: Optional[str],
-        start_inv_period: Optional[str],
-        end_inv_period: Optional[str],
-    ) -> pd.DataFrame:
+        sheet: Optional[str], 
+        ) -> pd.DataFrame:
         """
         Lädt die Daten aus einer Excel-Datei und filtert sie nach Leistungszeitraum.
 
         Args:
             db (Path): Pfad zur Excel-Datenbank.
             sheet (str, optional): Name des Arbeitsblatts. Falls None, wird das aktive Blatt verwendet.
-            start_inv_period (str, optional): Startdatum Leistungszeitraum ('YYYY-MM-DD').
-            end_inv_period (str, optional): Enddatum Leistungszeitraum ('YYYY-MM-DD').
-
         Returns:
             pd.DataFrame: Gefilterte Daten als DataFrame.
         """
-        # Annahme: start_inv_period und end_inv_period wurden bereits außerhalb geprüft und konvertiert ("check once and then trust")
+        
         work_book = load_workbook(db, data_only=True)
         work_sheet = work_book[sheet] if sheet else work_book.active
 
@@ -54,49 +52,28 @@ class DataLoader:
         # Die eigentlichen Daten ab der zweiten Spalte
         df = pd.DataFrame((row[1:] for row in data), columns=columns)
 
-        # Aufwandsdaten auf den gewählten Leistungszeitraum begrenzen
-        start_date = pd.to_datetime(start_inv_period)
-        end_date = pd.to_datetime(end_inv_period)
-        df = df[
-            (df["Leistungsdatum"] >= start_date) & (df["Leistungsdatum"] <= end_date)
-        ]
+        # Alle Felder mit "(Leer)" durch "" ersetzen
+        df = df.replace("(Leer)", "")
 
-        # Fehlende Werte in ZD_Name2 mit Leerzeichen auffüllen/ersetzen
-        if "ZD_Name2" in df.columns:
-            df["ZD_Name2"] = df["ZD_Name2"].fillna("").replace("(Leer)", "")
-        logger.info("Daten erfolgreich geladen und gefiltert.")
-
-        # Entitäten aus den Daten erzeugen und als neue Spalten hinzufügen
-        df["Client_entity"] = df.apply(
-            lambda row: PrivatePerson(
-                row["CL_Vorname"],
-                row["CL_Nachname"],
-                row.get("CL_Strasse", ""),
-                row.get("CL_PLZ_Ort", ""),
-                row.get("CL_Geburtsdatum")
-            ),
-            axis=1,
-        )
-        df["ZD_entity"] = df.apply(
-            lambda row: JuristischePerson(
-                row.get("ZD_Name", ""),
-                row.get("ZD_Strasse", ""),
-                row.get("ZD_PLZ_Ort", ""),
-                row.get("ZD_IBAN")
-            ),
-            axis=1,
-        )
-        # Empfänger ggf. aus Konfiguration, falls relevant:
-        empfaenger_cfg = self.config.data.get("empfaenger")
-        empfaenger_entity = None
-        if empfaenger_cfg:
-            empfaenger_entity = JuristischePerson(
-                empfaenger_cfg.get("name", ""),
-                empfaenger_cfg.get("strasse", ""),
-                empfaenger_cfg.get("plz_ort", ""),
-                empfaenger_cfg.get("IBAN")
-            )
-        df["Empfaenger_entity"] = empfaenger_entity
+        # IMPORTANT: Dynamische Filterung nach allen gesetzten Feldern im Filterobjekt
+        filter_dict = self.filter.__dict__
+        for key, value in filter_dict.items():
+            if value is None:
+                continue
+            # Bereichsfilter (z.B. service_date_range)
+            if key.endswith("_range") and isinstance(value, tuple) and len(value) == 2:
+                col_name = key.replace("_range", "")
+                if col_name in df.columns:
+                    df = df[df[col_name].between(value[0], value[1])]
+            # Listenfilter (z.B. payer_list, client_list)
+            elif key.endswith("_list") and isinstance(value, (list, tuple)):
+                col_name = key.replace("_list", "")
+                if col_name in df.columns:
+                    df = df[df[col_name].isin(value)]
+            # Einzelwertfilter
+            else:
+                if key in df.columns:
+                    df = df[df[key] == value]
 
         return df
 
@@ -111,16 +88,17 @@ class DataLoader:
             ValueError: Falls erwartete Spalten fehlen.
         """
         # Extrahiere die erwarteten Spaltennamen aus der segmentierten Konfiguration
-        zd_columns = [col["name"] for col in self.config.data["expected_columns"].get("zd", [])]
-        cl_columns = [col["name"] for col in self.config.data["expected_columns"].get("cl", [])]
-        allg_columns = [col["name"] for col in self.config.data["expected_columns"].get("allgemein", [])]
-        expected_columns = set(zd_columns + cl_columns + allg_columns)
+        payer_cols = [col["name"] for col in self.config.data["expected_columns"].get("payer", [])]
+        client_cols = [col["name"] for col in self.config.data["expected_columns"].get("client", [])]
+        general_cols = [col["name"] for col in self.config.data["expected_columns"].get("general", [])]
+
+        expected_columns = set(payer_cols + client_cols + general_cols)
         missing_columns = expected_columns - set(df.columns)
         if missing_columns:
             missing_str = "\n".join(sorted(missing_columns))
             logger.warning(f"Fehlende Spalten: {missing_str}")
             raise ValueError(f"Fehlende Felder in der Pivot-Tabelle: {missing_str}")
-        logger.info("Alle erwarteten Spalten sind vorhanden.")
+        
 
 if __name__ == "__main__":
     print("DataLoader Modul. Nicht direkt ausführbar.")

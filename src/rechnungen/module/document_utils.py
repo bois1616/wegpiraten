@@ -9,7 +9,7 @@ from .config import Config
 from openpyxl.styles import Font
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from PyPDF2 import PdfMerger
-from .entity import JuristischePerson, PrivatePerson
+from .entity import LegalPerson, PrivatePerson
 from .invoice_context import InvoiceContext
 
 
@@ -48,7 +48,7 @@ class DocumentUtils:
         # LibreOffice erzeugt die PDF mit dem gleichen Namen wie die DOCX, nur mit .pdf-Endung
         generated_pdf = docx_path.with_suffix(".pdf")
         # Dateinamen mit Entitäten und Leistungszeitraum
-        zdnr = invoice_context.zahlungsdienstleister.kennung
+        zdnr = invoice_context.payer.key
         start_inv_period = invoice_context.start_inv_period
         end_inv_period = invoice_context.end_inv_period
         if zdnr and start_inv_period and end_inv_period:
@@ -58,7 +58,7 @@ class DocumentUtils:
             logger.debug(f"PDF umbenannt: {target_pdf.name}")
             return target_pdf
         else:
-            logger.info(f"Dokument erzeugt: {generated_pdf.name}")
+            logger.debug(f"Dokument erzeugt: {generated_pdf.name}")
             return generated_pdf
 
     @staticmethod
@@ -80,7 +80,7 @@ class DocumentUtils:
         # Zielverzeichnis bestimmen
         if output_path is None:
             output_path = pdf_files[0].parent
-        zd_entity = invoice_context.zahlungsdienstleister
+        zd_entity = invoice_context.payer
         start_inv_period = invoice_context.start_inv_period
         end_inv_period = invoice_context.end_inv_period
         merged_pdf_path = output_path / f"Rechnungen_{zd_entity.name}_{start_inv_period}_bis_{end_inv_period}.pdf"

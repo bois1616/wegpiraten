@@ -1,20 +1,25 @@
 class Entity:
-    def __init__(self, name, strasse, plz_ort, kennung=None):
+    def __init__(self, name, street, zip_city=None, zip=None, city=None, key=None, **kwargs):
         self.name = name
-        self.strasse = strasse
-        self.plz_ort = plz_ort
-        self.kennung = kennung or "" # z.B. ZDNR, Klient-Nr., etc.
+        self.street = street
+        if zip_city:
+            self.zip_city = zip_city
+        elif zip and city:
+            self.zip_city = f"{zip} {city}"
+        else:
+            self.zip_city = ""
+        self.key = key or ""  # z.B. ZDNR, Klient-Nr., etc.
 
-class JuristischePerson(Entity):
-    def __init__(self, name, strasse, plz_ort, iban=None, kennung=None):
-        super().__init__(name, strasse, plz_ort, kennung)
+class LegalPerson(Entity):
+    def __init__(self, name, street, zip_city=None, zip=None, city=None, iban=None, key=None, **kwargs):
+        super().__init__(name, street, zip_city=zip_city, zip=zip, city=city, key=key, **kwargs)
         self.iban = iban
 
 class PrivatePerson(Entity):
-    def __init__(self, vorname, nachname, strasse, plz_ort, geburtsdatum=None, kennung=None):
-        name = f"{vorname} {nachname}"
-        super().__init__(name, strasse, plz_ort, kennung)
-        self.vorname = vorname
-        self.nachname = nachname
-        self.geburtsdatum = geburtsdatum
+    def __init__(self, first_name, last_name, street, zip_city=None, zip=None, city=None, birth_date=None, key=None, **kwargs):
+        name = f"{last_name}, {first_name}"
+        super().__init__(name, street, zip_city=zip_city, zip=zip, city=city, key=key, **kwargs)
+        self.first_name = first_name
+        self.last_name = last_name
+        self.birth_date = birth_date
 

@@ -112,28 +112,18 @@ def temporary_docx(suffix=".docx"):
         if tmp_path.exists():
             os.remove(tmp_path)
 
-def get_month_period(abrechnungsmonat: str) -> tuple:
-    """
-    Wandelt einen Abrechnungsmonat (MM.YYYY oder MM-YYYY) in Start- und Enddatum um.
-    Gibt die Daten im Format 'dd.mm.YYYY' zurück.
-    """
-    try:
-        # Erlaubt auch MM-YYYY
-        abrechnungsmonat = abrechnungsmonat.replace("-", ".")
-        monat, jahr = abrechnungsmonat.split(".")
-        monat = int(monat)
-        jahr = int(jahr)
-        start = datetime(jahr, monat, 1)
-        # Monatsende berechnen
-        if monat == 12:
-            end = datetime(jahr, 12, 31)
-        else:
-            end = datetime(jahr, monat + 1, 1) - timedelta(days=1)
-        start_str = start.strftime("%d.%m.%Y")
-        end_str = end.strftime("%d.%m.%Y")
-        return start_str, end_str
-    except Exception:
-        raise ValueError("Bitte den Abrechnungsmonat im Format MM.YYYY eingeben.")
+def get_month_period(abrechnungsmonat: str) -> tuple[datetime, datetime]:
+    abrechnungsmonat = abrechnungsmonat.replace("-", ".")
+    monat, jahr = abrechnungsmonat.split(".")
+    monat = int(monat)
+    jahr = int(jahr)
+    start = datetime(jahr, monat, 1)
+    if monat == 12:
+        end = datetime(jahr, 12, 31)
+    else:
+        # Letzter Tag im Monat = erster Tag im nächsten Monat - 1 Tag
+        end = datetime(jahr, monat + 1, 1) - timedelta(days=1)
+    return start, end
 
 # Hinweis: Die Anpassung an die segmentierte config betrifft vor allem die Verwendung in anderen Modulen,
 # z.B. beim Zugriff auf Spaltennamen und deren Typen. Die Utility-Funktionen selbst bleiben unverändert.
