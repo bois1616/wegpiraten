@@ -3,9 +3,8 @@ from typing import Optional
 import pandas as pd
 from openpyxl import load_workbook
 from module.config import Config
-from module.entity import LegalPerson, PrivatePerson
 from module.invoice_filter import InvoiceFilter
-from loguru import logger  # Zentrales Logging-System
+from loguru import logger
 
 
 class DataLoader:
@@ -29,9 +28,9 @@ class DataLoader:
         self,
         db: Path,
         sheet: Optional[str], 
-        ) -> pd.DataFrame:
+    ) -> pd.DataFrame:
         """
-        Lädt die Daten aus einer Excel-Datei und filtert sie nach Leistungszeitraum.
+        Lädt die Daten aus einer Excel-Datei und filtert sie nach den Kriterien im Filterobjekt.
 
         Args:
             db (Path): Pfad zur Excel-Datenbank.
@@ -39,7 +38,6 @@ class DataLoader:
         Returns:
             pd.DataFrame: Gefilterte Daten als DataFrame.
         """
-        
         work_book = load_workbook(db, data_only=True)
         work_sheet = work_book[sheet] if sheet else work_book.active
 
@@ -55,9 +53,8 @@ class DataLoader:
         # Alle Felder mit "(Leer)" durch "" ersetzen
         df = df.replace("(Leer)", "")
 
-        # IMPORTANT: Dynamische Filterung nach allen gesetzten Feldern im Filterobjekt
-        filter_dict = self.filter.__dict__
-        for key, value in filter_dict.items():
+        # Dynamische Filterung nach allen gesetzten Feldern im Filterobjekt
+        for key, value in vars(self.filter).items():
             if value is None:
                 continue
             # Bereichsfilter (z.B. service_date_range)
@@ -87,18 +84,28 @@ class DataLoader:
         Raises:
             ValueError: Falls erwartete Spalten fehlen.
         """
-        # Extrahiere die erwarteten Spaltennamen aus der segmentierten Konfiguration
-        payer_cols = [col["name"] for col in self.config.data["expected_columns"].get("payer", [])]
-        client_cols = [col["name"] for col in self.config.data["expected_columns"].get("client", [])]
-        general_cols = [col["name"] for col in self.config.data["expected_columns"].get("general", [])]
-
-        expected_columns = set(payer_cols + client_cols + general_cols)
+        # Extrahiere die erwarteten Spaltennamen aus der Konfiguration
+        expected_columns = set()
+        for section in ["payer", "client", "general"]:
+            expected_columns.update(
+                col["name"] for col in self.config.get_expected_columns().get(section, [])
+            )
         missing_columns = expected_columns - set(df.columns)
         if missing_columns:
             missing_str = "\n".join(sorted(missing_columns))
             logger.warning(f"Fehlende Spalten: {missing_str}")
             raise ValueError(f"Fehlende Felder in der Pivot-Tabelle: {missing_str}")
-        
+
+        # Prüfe, ob alle Summenfelder numerisch sind
+        sum_columns = [
+            col["name"]
+            for col in self.config.get_expected_columns().get("general", [])
+            if col.get("sum", False)
+        ]
+        for col in sum_columns:
+            if col in df.columns and not pd.api.types.is_numeric_dtype(df[col]):
+                logger.warning(f"Summenfeld '{col}' ist nicht numerisch!")
+                raise TypeError(f"Summenfeld '{col}' muss numerisch sein, ist aber {df[col].dtype}.")
 
 if __name__ == "__main__":
     print("DataLoader Modul. Nicht direkt ausführbar.")

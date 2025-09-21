@@ -5,10 +5,18 @@ structure:
   template_path: templates
   tmp_path: .tmp
   logs: .logs
+
 invoice_template_name: rechnungsvorlage.docx
 db_name: Wegpiraten Datenbank.xlsx
 sheet_name: Pivot Rechnungsdaten
-locale: de_CH.UTF-8
+
+# Globale Formatierungseinstellungen für Babel/Jinja2-Filter
+locale: de_CH
+currency: CHF
+currency_format: "¤#,##0.00"      # Babel: ¤ steht für das Währungssymbol
+date_format: "dd.MM.yyyy"         # Babel: z.B. "yyyy-MM-dd" für ISO
+numeric_format: "#,##0.00"        # Standard für numerische Felder
+
 expected_columns:
   payer:
     - name: ZDNR
@@ -35,45 +43,64 @@ expected_columns:
   general:
     - name: Leistungsbesteller
       type: text
+  
     - name: Leistungsdatum
       type: date
-      format: "%d.%m.%Y"
-      position: true
+      format: "dd.MM.yyyy"
+      is_position: true           # NEU: Soll als Rechnungsposition erscheinen
+      sum: false                  # NEU: Keine Summe berechnen
+  
     - name: Betreuungstyp
       type: text
+      is_position: false
+      sum: false
+
     - name: Fahrtzeit
       type: numeric
       decimals: 2
+      is_position: true
+      sum: true                   # NEU: Summe berechnen
+
     - name: Direkt
       type: numeric
       decimals: 2
-      position: true
+      is_position: true
+      sum: true
+
     - name: Indirekt
       type: numeric
       decimals: 2
-      position: true
+      is_position: true
+      sum: true
+
     - name: Sollstunden
       type: numeric
       decimals: 2
-      position: true
+      is_position: true
+      sum: true
+
     - name: Stundensatz
       type: currency
-      currency: CHF
       decimals: 2
-      position: true
+      is_position: false
+      sum: false
+
     - name: km_Pauschale
       type: numeric
       decimals: 2
-      position: true
+      is_position: false
+      sum: true
+
     - name: Stunden
       type: numeric
       decimals: 2
-      position: true
+      is_position: true
+      sum: true
+ 
     - name: Kosten
       type: currency
-      currency: CHF
-      decimals: 2
-      position: true
+      is_position: true
+      sum: true
 
 provider:
   IBAN: CH07 0839 3053 8385 3915 1

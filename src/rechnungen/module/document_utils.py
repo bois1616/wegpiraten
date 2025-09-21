@@ -1,15 +1,15 @@
 import subprocess
 import os
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 import pandas as pd
 from loguru import logger
-from .config import Config
 from openpyxl.styles import Font
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from PyPDF2 import PdfMerger
-from .entity import LegalPerson, PrivatePerson
+from openpyxl.utils import get_column_letter
+from .config import Config
 from .invoice_context import InvoiceContext
 
 
@@ -48,11 +48,11 @@ class DocumentUtils:
         # LibreOffice erzeugt die PDF mit dem gleichen Namen wie die DOCX, nur mit .pdf-Endung
         generated_pdf = docx_path.with_suffix(".pdf")
         # Dateinamen mit Entitäten und Leistungszeitraum
-        zdnr = invoice_context.payer.key
-        start_inv_period = invoice_context.start_inv_period
-        end_inv_period = invoice_context.end_inv_period
-        if zdnr and start_inv_period and end_inv_period:
-            target_name = f"Rechnung_{zdnr}_{start_inv_period}_bis_{end_inv_period}.pdf"
+        payer_id = invoice_context.data.get("payer").key
+        start_inv_period = invoice_context.data.get("start_inv_period")
+        end_inv_period = invoice_context.data.get("end_inv_period")
+        if payer_id and start_inv_period and end_inv_period:
+            target_name = f"Rechnung_{payer_id}_{start_inv_period}_bis_{end_inv_period}.pdf"
             target_pdf = pdf_path.parent / target_name
             os.rename(generated_pdf, target_pdf)
             logger.debug(f"PDF umbenannt: {target_pdf.name}")
@@ -80,9 +80,9 @@ class DocumentUtils:
         # Zielverzeichnis bestimmen
         if output_path is None:
             output_path = pdf_files[0].parent
-        zd_entity = invoice_context.payer
-        start_inv_period = invoice_context.start_inv_period
-        end_inv_period = invoice_context.end_inv_period
+        zd_entity = invoice_context.data.get("payer")
+        start_inv_period = invoice_context.data.get("start_inv_period")
+        end_inv_period = invoice_context.data.get("end_inv_period")
         merged_pdf_path = output_path / f"Rechnungen_{zd_entity.name}_{start_inv_period}_bis_{end_inv_period}.pdf"
         merger.write(merged_pdf_path)
         merger.close()
@@ -92,25 +92,25 @@ class DocumentUtils:
     def create_summary(config: Config, summary_contexts: List[InvoiceContext], start_inv_period: str, end_inv_period: str):
         """
         Erstellt eine Excel-Datei mit der Rechnungsübersicht.
-
-        Args:
-            config (Config): Konfiguration mit Pfadangaben.
-            summary_contexts (List[InvoiceContext]): Liste der Kontextobjekte für die Rechnungsübersicht.
-            start_inv_period (str): Startdatum Leistungszeitraum.
-            end_inv_period (str): Enddatum Leistungszeitraum.
+        Es werden nur die Felder invoice_date, payer_id, client_id, invoice_month und Summe_Kosten aufgenommen.
         """
         output_path: Path = Path(config.data["structure"]["output_path"])
-        summary_rows = [ctx.as_dict() for ctx in summary_contexts]
+        # Nur die gewünschten Felder extrahieren
+        summary_rows = []
+        for ctx in summary_contexts:
+            data = ctx.as_dict()
+            summary_rows.append({
+                "invoice_date": data.get("invoice_date"),
+                "payer_id": getattr(data.get("payer"), "key", ""),
+                "client_id": getattr(data.get("client"), "key", ""),
+                "invoice_month": data.get("inv_month"),
+                "Summe_Kosten": data.get("Summe_Kosten"),
+            })
         summary_df = pd.DataFrame(summary_rows)
         summary_file = output_path / f"Rechnungsuebersicht_{start_inv_period}_bis_{end_inv_period}.xlsx"
         with pd.ExcelWriter(summary_file, engine="openpyxl") as writer:
             summary_df.to_excel(writer, index=False, sheet_name="Rechnungsübersicht")
             worksheet = writer.sheets["Rechnungsübersicht"]
-            # Spalten dynamisch aus der config holen
-            zd_columns = [col["name"] for col in config.data["expected_columns"].get("zd", [])]
-            cl_columns = [col["name"] for col in config.data["expected_columns"].get("cl", [])]
-            allg_columns = [col["name"] for col in config.data["expected_columns"].get("allgemein", [])]
-            all_columns = zd_columns + cl_columns + allg_columns
             end_col_idx = len(summary_df.columns)
             end_col_letter = chr(64 + end_col_idx)
             table_ref = f"A1:{end_col_letter}{len(summary_df) + 1}"
@@ -124,9 +124,9 @@ class DocumentUtils:
             )
             worksheet.add_table(tab)
             # Formatierung und Summen für die Kosten-Spalte
-            if "summe_kosten" in summary_df.columns:
-                kosten_col_idx = int(summary_df.columns.get_loc("summe_kosten")) + 1
-                kosten_col_letter = chr(64 + kosten_col_idx) # A=1, B=2, ...
+            if "Summe_Kosten" in summary_df.columns:
+                kosten_col_idx = int(summary_df.columns.get_loc("Summe_Kosten")) + 1
+                kosten_col_letter = get_column_letter(kosten_col_idx)
                 for row in range(2, len(summary_df) + 2):
                     worksheet[f"{kosten_col_letter}{row}"].number_format = '#,##0.00 "CHF"'
                 total_row_idx = len(summary_df) + 2

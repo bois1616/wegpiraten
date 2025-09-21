@@ -1,25 +1,60 @@
+from dataclasses import dataclass, field
+from typing import Optional
+
+@dataclass
 class Entity:
-    def __init__(self, name, street, zip_city=None, zip=None, city=None, key=None, **kwargs):
-        self.name = name
-        self.street = street
-        if zip_city:
-            self.zip_city = zip_city
-        elif zip and city:
-            self.zip_city = f"{zip} {city}"
-        else:
-            self.zip_city = ""
-        self.key = key or ""  # z.B. ZDNR, Klient-Nr., etc.
+    """
+    Basisklasse für juristische und private Personen.
+    Ermöglicht die Eingabe von PLZ und Ort entweder getrennt oder als gemeinsamen String.
+    """
+    name: str = ""
+    street: str = ""
+    zip: str = ""
+    city: str = ""
+    zip_city: str = ""
+    key: str = ""
 
+    def __post_init__(self):
+        # Falls zip_city gesetzt ist, zip und city daraus ableiten
+        if self.zip_city and (not self.zip or not self.city):
+            parts = self.zip_city.strip().split(" ", 1)
+            if len(parts) == 2:
+                self.zip, self.city = parts
+            elif len(parts) == 1:
+                self.zip = parts[0]
+                self.city = ""
+
+    def as_dict(self):
+        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+
+@dataclass
 class LegalPerson(Entity):
-    def __init__(self, name, street, zip_city=None, zip=None, city=None, iban=None, key=None, **kwargs):
-        super().__init__(name, street, zip_city=zip_city, zip=zip, city=city, key=key, **kwargs)
-        self.iban = iban
+    """
+    Juristische Person (z.B. Zahlungsdienstleister).
+    """
+    iban: Optional[str] = None
 
+@dataclass
 class PrivatePerson(Entity):
-    def __init__(self, first_name, last_name, street, zip_city=None, zip=None, city=None, birth_date=None, key=None, **kwargs):
-        name = f"{last_name}, {first_name}"
-        super().__init__(name, street, zip_city=zip_city, zip=zip, city=city, key=key, **kwargs)
-        self.first_name = first_name
-        self.last_name = last_name
-        self.birth_date = birth_date
+    """
+    Private Person (z.B. Klient).
+    """
+    first_name: str = ""
+    last_name: str = ""
+    birth_date: Optional[str] = None  # Datumsformatierung erfolgt im Template
+
+    def __post_init__(self):
+        super().__post_init__()
+        # Setze name automatisch, falls nicht explizit gesetzt
+        if not self.name:
+            self.name = f"{self.last_name}, {self.first_name}"
+
+    def as_dict(self):
+        base = super().as_dict()
+        base.update({
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "birth_date": self.birth_date,
+        })
+        return base
 

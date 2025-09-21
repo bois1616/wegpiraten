@@ -1,15 +1,18 @@
 import sys
 from pathlib import Path
+from loguru import logger
 
-from loguru import logger  # Zentrales Logging-System
-from module.config import Config  # Für Zugriff auf die Konfiguration
+from module.config import Config
 from module.invoice_processor import InvoiceProcessor
 from module.invoice_filter import InvoiceFilter
 
 
 
-# --- Main ---
-if __name__ == "__main__":
+def main():
+    """
+    Einstiegspunkt für den Rechnungsprozess.
+    Lädt die Konfiguration, initialisiert Filter und startet die Verarbeitung.
+    """
     # Pfad zur YAML-Konfigurationsdatei bestimmen
     config_path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
 
@@ -29,6 +32,7 @@ if __name__ == "__main__":
     config_obj = Config()
     config_obj.load(config_path)
 
+    # Log-Verzeichnis und Logdatei konfigurieren
     logs_dir = Path(config_obj.data["structure"]["prj_root"]) / config_obj.data["structure"]["logs"]
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_file = logs_dir / "Rechnung.log"
@@ -45,5 +49,8 @@ if __name__ == "__main__":
         logger.success("Rechnungsprozess erfolgreich abgeschlossen.")
     except Exception as e:
         logger.exception(f"Fehler im Rechnungsprozess: {e}")
+
+if __name__ == "__main__":
+    main()
 
 

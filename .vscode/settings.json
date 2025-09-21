@@ -7,6 +7,11 @@
         "msttcorefonts",
         "outdir",
         "parsen",
-        "pdfs"
+        "pdfs",
+        "Summenfeld",
+        "Summenfelder"
+    ],
+    "cSpell.ignoreWords": [
+        "positionen"
     ]
 }

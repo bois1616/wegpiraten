@@ -3,37 +3,8 @@ import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 from zipfile import ZipFile
-
-import pandas as pd
-from loguru import logger
-
-from module.invoice_context import InvoiceContext
-# from module.entity import JuristischePerson, PrivatePerson
-
-# --- Utility-Funktionen ---
-def format_2f(value: float, currency: Optional[str] = None) -> str:
-    """
-    Formatiert einen Zahlenwert mit zwei Nachkommastellen und optionalem Währungssuffix.
-    - Tausender werden mit Punkt getrennt, Dezimalstellen mit Komma.
-    - Das Währungssuffix wird mit Leerzeichen angehängt, falls angegeben.
-
-    Args:
-        value (float): Der zu formatierende Zahlenwert.
-        currency (str, optional): Das Währungssuffix (z.B. 'CHF'). Standard: None.
-
-    Returns:
-        str: Der formatierte Wert als String, z.B. '1.234,56 CHF'.
-    """
-    if pd.isna(value):
-        return ""
-    currency = currency or ""
-    if currency and not currency.startswith(" "):
-        currency = " " + currency
-    tmp_val = f"{value:,.2f}"
-    tmp_val = tmp_val.replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"{tmp_val}{currency}"
+import numpy as np
 
 def clear_path(path: Path):
     """
@@ -59,51 +30,12 @@ def zip_invoices(pdf_files: list, zip_path: Path):
         for file in pdf_files:
             zipf.write(file, arcname=Path(file).name)
 
-def parse_date(date_str: str) -> str:
-    """
-    Parst ein Datum im Format dd.mm.YYYY und gibt es als 'YYYY-MM-DD' zurück.
-    Korrigiert Eingaben wie '12.8.25' automatisch zu '12.08.2025', sofern möglich.
-    """
-    try:
-        # Versuche zuerst das korrekte Format
-        return datetime.strptime(date_str, "%d.%m.%Y").strftime("%Y-%m-%d")
-    except Exception:
-        # Versuche, fehlende Nullen und kurze Jahreszahlen zu korrigieren
-        parts = date_str.split(".")
-        if len(parts) == 3:
-            # Tag und Monat auf 2 Stellen, Jahr auf 4 Stellen bringen
-            day = parts[0].zfill(2)
-            month = parts[1].zfill(2)
-            year = parts[2]
-            # Falls Jahr nur 2 Stellen hat, ergänze '20' davor (z.B. '25' -> '2025')
-            if len(year) == 2:
-                year = "20" + year
-            elif len(year) == 1:
-                year = "200" + year
-            corrected = f"{day}.{month}.{year}"
-            try:
-                return datetime.strptime(corrected, "%d.%m.%Y").strftime("%Y-%m-%d")
-            except Exception:
-                logger.error(f"Ungültiges Datumsformat nach Korrektur: '{corrected}'. Erwartet wird dd.mm.YYYY.")
-        logger.error(f"Ungültiges Datumsformat: '{date_str}'. Erwartet wird dd.mm.YYYY.")
-        raise ValueError(
-            "Das eingegebene Datum ist leider ungültig. "
-            "Bitte geben Sie das Datum im Format TT.MM.JJJJ ein, z.B. 12.08.2025."
-        )
-
-def format_date(date_str):
-    """
-    Wandelt YYYY-MM-DD oder ähnliche Formate in dd.mm.YYYY um.
-    Gibt bei fehlerhaftem Format das Original zurück und loggt einen Fehler.
-    """
-    try:
-        return datetime.strptime(date_str, "%Y-%m-%d").strftime("%d.%m.%Y")
-    except (ValueError, TypeError) as e:
-        logger.error(f"Ungültiges Datumsformat: '{date_str}' ({e})")
-        return date_str
-
 @contextmanager
 def temporary_docx(suffix=".docx"):
+    """
+    Context-Manager für temporäre DOCX-Dateien.
+    Die Datei wird nach Verlassen des Blocks automatisch gelöscht.
+    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp_path = Path(tmp.name)
     try:
@@ -113,6 +45,9 @@ def temporary_docx(suffix=".docx"):
             os.remove(tmp_path)
 
 def get_month_period(abrechnungsmonat: str) -> tuple[datetime, datetime]:
+    """
+    Gibt den ersten und letzten Tag eines Abrechnungsmonats zurück.
+    """
     abrechnungsmonat = abrechnungsmonat.replace("-", ".")
     monat, jahr = abrechnungsmonat.split(".")
     monat = int(monat)
@@ -125,5 +60,27 @@ def get_month_period(abrechnungsmonat: str) -> tuple[datetime, datetime]:
         end = datetime(jahr, monat + 1, 1) - timedelta(days=1)
     return start, end
 
-# Hinweis: Die Anpassung an die segmentierte config betrifft vor allem die Verwendung in anderen Modulen,
-# z.B. beim Zugriff auf Spaltennamen und deren Typen. Die Utility-Funktionen selbst bleiben unverändert.
+def explode_context(context: dict) -> dict:
+    def to_dict(obj):
+        # Primitive Typen inkl. numpy-Typen direkt zurückgeben
+        if isinstance(obj, (str, int, float, bool, type(None), np.generic)):
+            return obj
+        if isinstance(obj, dict):
+            return obj
+        if hasattr(obj, "as_dict") and callable(obj.as_dict):
+            return obj.as_dict()
+        # Listen von Objekten (z.B. Positionen) als Liste von dicts
+        if isinstance(obj, list):
+            return [to_dict(item) for item in obj]
+        return {k: v for k, v in vars(obj).items() if not k.startswith("_") and not callable(v)}
+    
+    exploded = {}
+    for k, v in context.items():
+        if k == "Positionen" and isinstance(v, list):
+            exploded[k] = v
+        else:
+            exploded[k] = to_dict(v)
+    return exploded
+
+# Alle Formatierungen für Zahlen, Währungen und Datumsfelder erfolgen ausschließlich im Template
+# über Babel/Jinja2-Filter und die Konfiguration. Keine eigene Formatierungsfunktion mehr nötig.

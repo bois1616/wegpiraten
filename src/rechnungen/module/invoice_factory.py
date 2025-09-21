@@ -1,24 +1,24 @@
 import tempfile
 from pathlib import Path
-from typing import Optional, Tuple
-
 import pandas as pd
 import qrcode
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage
 from PIL import Image, ImageDraw, ImageFont
+from babel.numbers import format_currency
+from jinja2 import Environment
+from rich import print
 
 from .config import Config
 from .entity import LegalPerson
-from .utils import format_2f
 from .invoice_context import InvoiceContext
-from loguru import logger
-
+from .filters import register_filters
+from module.utils import explode_context
 
 class InvoiceFactory:
     """
     Factory-Klasse zur Erstellung von Rechnungen und Einzahlungsscheinen.
-    Nutzt die zentrale Konfiguration und stellt Methoden für die Formatierung und Dokumentenerstellung bereit.
+    Nutzt Babel/Jinja2-Filter für die Formatierung.
     """
 
     def __init__(self, config: Config):
@@ -48,49 +48,9 @@ class InvoiceFactory:
         # TODO Prüfen, ob das als Rechnungsnummer ausreicht
         return f"{invoice_month or 'mm.YYYY'}_{client_id or 'K000'}"
 
-
-    def format_fields(self, invoice_context: InvoiceContext, client_details: pd.DataFrame) -> None:
-        """
-        Formatiert numerische und Datumsfelder aus client_details und erweitert den Kontext um die entsprechenden Summen, *_2f und Datums-Strings.
-        Es werden keine neuen Spalten im DataFrame angelegt.
-        Die Werte werden als einzelne Strings im Kontext abgelegt, z.B. summe_fahrtzeit, summe_fahrtzeit_2f.
-        """
-        expected_columns = self.config.data["expected_columns"]
-        # Segmentierte Felder aus config holen
-        numeric_currency_columns = []
-        date_columns = []
-
-        # Sammle alle numerischen (ggfls mit Einheit) und Datumsfelder
-        for section in ["payer", "client", "general"]:
-            for col in expected_columns.get(section, []):
-                if isinstance(col, dict):
-                    if col.get("type") in ("numeric", "currency"):
-                        numeric_currency_columns.append(col)
-                    if col.get("type") == "date":
-                        date_columns.append(col)
-
-        # Numerische Felder als einzelne Werte und *_2f Strings im Kontext ablegen (Summe)
-        for col in numeric_currency_columns:
-            num_field = col["name"]
-            currency = col.get("currency", "")
-            if num_field in client_details.columns:
-                value = client_details[num_field].sum()
-                setattr(invoice_context, f"summe_{num_field.lower()}", value)
-                formatted: str = format_2f(value, currency) if pd.notna(value) else ""
-                setattr(invoice_context, f"summe_{num_field.lower()}_2f", formatted)
-
-        # Datumsfelder als einzelne Strings im Kontext ablegen (z.B. frühestes Datum)
-        for col in date_columns:
-            date_field = col["name"]
-            date_format = col.get("format", "%d.%m.%Y")
-            if date_field in client_details.columns:
-                value = pd.to_datetime(client_details[date_field], errors="coerce").min()
-                formatted: str = value.strftime(date_format) if pd.notna(value) else ""
-                setattr(invoice_context, f"{date_field.lower()}_short", formatted)
-
     def create_payment_part_png(
         self,
-        context: InvoiceContext,
+        invoice_context: InvoiceContext,
         output_png: str,
         font_dir: str = "/usr/share/fonts/truetype/msttcorefonts/",
     ):
@@ -111,19 +71,25 @@ class InvoiceFactory:
 
         # Service Provider nur aus Factory, im Kontext nur Referenz
         service_provider = self.provider
-        payer = context.payer
+        payer = invoice_context.data.get("payer")
 
         provider_name = getattr(service_provider, "name", "")
-        provider_street = getattr(service_provider, "strasse", "")
-        provider_zip_city = getattr(service_provider, "zip_city", getattr(service_provider, "plz_ort", ""))
+        provider_street = getattr(service_provider, "street", "")
+        provider_zip_city = getattr(service_provider, "zip_city", "")
         provider_iban = getattr(service_provider, "iban", "")
 
         payer_name = getattr(payer, "name", "")
-        payer_street = getattr(payer, "strasse", "")
-        payer_zip_city = getattr(payer, "zip_city", getattr(payer, "plz_ort", ""))
+        payer_street = getattr(payer, "street", "")
+        payer_zip_city = getattr(payer, "zip_city", "")
 
-        total_2f = getattr(context, "summe_kosten_2f", "")
-        invoice_id = getattr(context, "rechnungsnummer", "")
+        # Betragsformatierung mit Babel
+        currency = self.config.get_currency()
+        locale = self.config.get_locale()
+        currency_format = self.config.get_currency_format()
+        total = invoice_context.data.get("Summe_Kosten", 0)
+        total_str = format_currency(total, currency, locale=locale, format=currency_format)
+
+        invoice_id = invoice_context.data.get("Rechnungsnummer", "")
 
         # Linien
         draw.line([(width // 2, 60), (width // 2, height - 60)], fill="black", width=3)
@@ -141,8 +107,8 @@ class InvoiceFactory:
             ("Zahlbar durch", payer_name),
             ("", payer_street),
             ("", payer_zip_city),
-            ("Währung", "CHF"),
-            ("Betrag", total_2f),
+            ("Währung", currency),
+            ("Betrag", total_str),
         ]:
             if label:
                 y1 += 10
@@ -164,8 +130,8 @@ class InvoiceFactory:
             ("Zahlbar durch", payer_name),
             ("", payer_street),
             ("", payer_zip_city),
-            ("Währung", "CHF"),     # TODO: Währung aus config holen
-            ("Betrag", total_2f),
+            ("Währung", currency),
+            ("Betrag", total_str),
         ]:
             if label:
                 y2 += 10
@@ -177,7 +143,7 @@ class InvoiceFactory:
         # QR-Code-Daten aus Kontext
         qr_data = (
             f"SPC\n0200\n1\n{provider_iban}\n{provider_name}\n{provider_street}\n{provider_zip_city}\n"
-            f"{total_2f}\nCHF\nNON\n{invoice_id}\n"
+            f"{total_str}\n{currency}\nNON\n{invoice_id}\n"
             f"{payer_name}\n{payer_street}\n{payer_zip_city}\n"
         )
         qr_img = qrcode.make(qr_data)
@@ -185,82 +151,33 @@ class InvoiceFactory:
         img.paste(qr_img, (width - 350, height // 2 - 150))
         img.save(output_png)
 
-    def get_position_fields(self) -> list:
-        """
-        Gibt eine Liste der Feldnamen zurück, die in der config mit 'position: true' markiert sind.
-        """
-        expected_columns = self.config.data["expected_columns"]
-        position_fields = []
-        for section in ["payer", "client", "general"]:
-            for col in expected_columns.get(section, []):
-                if isinstance(col, dict) and col.get("position", False):
-                    position_fields.append(col["name"])
-        return position_fields
-
-    def get_field_type_and_format(self, key: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-        """
-        Liefert Typ ('numeric', 'currency', 'date'), Währung und Datumsformat für ein Feld aus der config.
-        """
-        expected_columns = self.config.data["expected_columns"]
-        for section in ["payer", "client", "general"]:
-            for col in expected_columns.get(section, []):
-                if isinstance(col, dict) and col["name"] == key:
-                    return col.get("type"), col.get("currency"), col.get("format", "%d.%m.%Y")
-        return None, None, None
-
-    def format_position_fields(self, client_details: pd.DataFrame) -> list[dict]:
-        """
-        Erstellt eine Liste von Dictionaries = Zeilen für die Positionen 
-        in Form formatierter *_2f Felder für numerische/currency Felder
-        und *_short Felder für Datumsfelder. 
-        Die Typen und Formate werden aus der Konfiguration entnommen.
-        """
-        position_fields = self.get_position_fields()
-        positions = []
-        for _, pos in client_details[position_fields].iterrows():
-            pos_dict = pos.to_dict()
-            for key in position_fields:
-                if key in pos_dict:
-                    field_type, currency, date_format = self.get_field_type_and_format(key)
-                    if field_type in ("numeric", "currency"):
-                        pos_dict[f"{key}_2f"] = format_2f(pos_dict[key], currency)
-                    elif field_type == "date":
-                        try:
-                            pos_dict[f"{key}_short"] = pd.to_datetime(pos_dict[key], errors="coerce").strftime(date_format)
-                        except Exception:
-                            pos_dict[f"{key}_short"] = ""
-            positions.append(pos_dict)
-        return positions
-
-
     def render_invoice(
         self,
         invoice_context: InvoiceContext,
         client_details: pd.DataFrame,
     ) -> DocxTemplate:
         """
-        Generiert ein fertig formatiertes Rechnungsdokument
-
-        Args:
-            invoice_context (InvoiceContext): _description_
-            client_details (pd.DataFrame): _description_
-
-        Returns:
-            DocxTemplate: _description_
+        Generiert ein fertig formatiertes Rechnungsdokument.
+        Die Formatierung erfolgt ausschließlich im Template via Jinja2-Filter.
         """
         template_path = (
             Path(self.config.data["structure"]["prj_root"])
             / self.config.data["structure"]["template_path"]
             / self.config.data["invoice_template_name"]
         )
+        assert template_path.exists(), f"Template nicht gefunden: {template_path}"
+        
+        jinja_env = Environment()
+        register_filters(jinja_env, self.config.data)
+
         invoice_template = DocxTemplate(template_path)
 
-        # Kontext mit formatierten Feldern (Summenwerte) ergänzen
-        self.format_fields(invoice_context, client_details)
+        # Kontext "explodieren", damit alle Objekt-Attribute als dict verfügbar sind
+        render_context: dict = explode_context(invoice_context.as_dict())
+        # Positionen als Tabelle belassen/überschreiben
+        render_context["Positionen"] = client_details.to_dict("records")
 
-        # Einzelpositionen formatieren
-        invoice_context.details_table: list[dict] = self.format_position_fields(client_details)
-
+        # Einzahlungsschein-Bild wie gehabt erzeugen
         output_png = self.config.data["structure"]["tmp_path"]
 
         # Kontextmanager für temporäre Datei, automatische Löschung nach Verwendung
@@ -275,14 +192,20 @@ class InvoiceFactory:
                 tmp_file.name,
                 width=Mm(200)
             )
+            render_context["Einzahlungsschein"] = payment_part_img
 
-            # Kontext kann jetzt vollständig zusammengesetzt werden
-            context = invoice_context.as_dict()
-            context["Positionen"] = invoice_context.details_table
-            context["Einzahlungsschein"] = payment_part_img
+            # füge hier einen check ein, welche felder im context sind
+            # vergleiche mit den feldern im template
+            
+            # template_fields = invoice_template.get_undeclared_template_variables(jinja_env=jinja_env)
+            # print(template_fields)
+            # context_fields = list(render_context.keys())
+            # print(context_fields)
+            # #gib die felder von Positions aus
+            # print(render_context["Positionen"][0].keys() if render_context["Positionen"] else "Keine Positionen")
+            # exit(0)
 
-            invoice_template.render(context)
-            # Nach Verlassen des Blocks wird die Datei automatisch gelöscht
+            invoice_template.render(render_context, jinja_env=jinja_env)
 
         return invoice_template
 
