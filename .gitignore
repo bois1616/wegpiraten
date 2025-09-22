@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv
 
+.env
 # Eigene temp Dateien
 .tmp/
 .logs/

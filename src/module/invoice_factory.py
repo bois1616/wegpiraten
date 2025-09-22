@@ -1,17 +1,17 @@
 import tempfile
 from pathlib import Path
-import pandas as pd
+
 import qrcode
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage
-from PIL import Image, ImageDraw, ImageFont
-from babel.numbers import format_currency
 from jinja2 import Environment
+from PIL import Image, ImageDraw, ImageFont
 from rich import print
 
 from .config import Config
 from .entity import LegalPerson
 from .invoice_context import InvoiceContext
+
 
 class InvoiceFactory:
     """

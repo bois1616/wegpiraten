@@ -2,9 +2,7 @@ import sys
 from pathlib import Path
 from loguru import logger
 
-from module.config import Config
-from module.invoice_processor import InvoiceProcessor
-from module.invoice_filter import InvoiceFilter
+from module import Config, InvoiceProcessor, InvoiceFilter
 
 
 

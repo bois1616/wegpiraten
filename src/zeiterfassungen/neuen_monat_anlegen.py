@@ -1,54 +1,40 @@
-import pandas as pd
-from openpyxl import load_workbook
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
-# Pfade
-prj_root = Path(__file__).parent.parent.parent
-# data_path = prj_root / "daten"
-data_path = Path("/mnt/c/Users/micro/OneDrive/Shared/Beatus/Wegpiraten Unterlagen")
-output_path = prj_root / "output"
-template_path = prj_root / "vorlagen"
+import pandas as pd
+from module.config import Config
+from module.document_utils import DocumentUtils
+from module.entity import PrivatePerson
+from openpyxl import load_workbook
 
-# Excel-Daten laden
-template_name = "zeiterfassunsboegen.xlsx"
-db_name = "Wegpiraten Datenbank.xlsx"
-table_name = "MD_Client"  # Name der Excel-Tabelle
-abrechnungsmonat = "2025-09"  # YYYY-MM
 
-# abrechnungsmonat als Datum
-# Workbook laden
-abrechnungsmonat_dt = datetime.strptime(abrechnungsmonat, "%Y-%m")
-wb = load_workbook(data_path / db_name, data_only=True)
-# Alle Sheets durchsuchen
-for ws in wb.worksheets:
-    if table_name in ws.tables:
-        table = ws.tables[table_name]
-        # Bereich der Tabelle, z.B. 'A1:D10'
-        ref = table.ref
-        # Bereich auslesen
-        data = ws[ref]
-        # Daten in eine Liste umwandeln
-        rows = [[cell.value for cell in row] for row in data]
-        # DataFrame erzeugen
-        df = pd.DataFrame(rows[1:], columns=rows[0])
-        break
+def load_client_data(config: Config, abrechnungsmonat: str) -> pd.DataFrame:
+    prj_root = Path(config.data["structure"]["prj_root"])
+    data_path = prj_root / config.data["structure"]["data_path"]
+    db_name = config.data["db_name"]
+    table_name = config.data.get("client_table", "MD_Client")
 
-df["Ende"] = pd.to_datetime(df["Ende"], format="%d.%m.%Y",errors="coerce")
+    abrechnungsmonat_dt = datetime.strptime(abrechnungsmonat, "%Y-%m")
+    wb = load_workbook(data_path / db_name, data_only=True)
+    for ws in wb.worksheets:
+        if table_name in ws.tables:
+            table = ws.tables[table_name]
+            ref = table.ref
+            data = ws[ref]
+            rows = [[cell.value for cell in row] for row in data]
+            df = pd.DataFrame(rows[1:], columns=rows[0])
+            break
+    else:
+        raise ValueError(f"Tabelle {table_name} nicht gefunden in {db_name}")
 
-# nur aktive Klienten (Ende >= Abrechnungsmonat)
-df = df[(df["Ende"].isna()) | (df["Ende"] >= abrechnungsmonat_dt)]
+    df["Ende"] = pd.to_datetime(df["Ende"], format="%d.%m.%Y", errors="coerce")
+    df = df[(df["Ende"].isna()) | (df["Ende"] >= abrechnungsmonat_dt)]
+    return df
 
-# Jetzt enthält df die Daten der Tabelle "MD_Client"
-print(df)
-
-AZ_bogen = 0
-
-for idx, row in df.iterrows():
-    AZ_bogen += 1
-    # Vorlage laden
+def create_reporting_sheet(config: Config, row: pd.Series, abrechnungsmonat_dt: datetime, output_path: Path, template_path: Path):
+    template_name = config.data.get("zeiterfassung_template", "zeiterfassunsboegen.xlsx")
     wb = load_workbook(template_path / template_name)
-    ws = wb.active # ["Arbeitszeiterfassung"]
+    ws = wb.active
 
     # Blattschutz deaktivieren
     ws.protection.sheet = False
@@ -63,15 +49,9 @@ for idx, row in df.iterrows():
     ws["c8"] = row["Kürzel"]
     ws["g8"] = row["KlientNr"]
 
-    print(f"Erstelle AZ Erfassungsbogen {AZ_bogen} für {row['Sozialpädagogin']} ({row['Kürzel']}, Ende: {row['Ende']})")
-
-    # Blattschutz wieder aktivieren
     ws.protection.sheet = True
     ws.protection.enable()
-    #ws.protection.password = None  # Falls kein Passwort
-    ws.protection.set_password("fickdich25")
-
-    # Optional: Nur gesperrte Zellen schützen, entsperrte bleiben frei
+    ws.protection.set_password(config.data.get("sheet_password", "wegpiraten"))
     ws.protection.enable_select_locked_cells = False
     ws.protection.enable_select_unlocked_cells = True
     ws.protection.format_cells = False
@@ -90,3 +70,30 @@ for idx, row in df.iterrows():
     # Neuen Z Erfassungsbogen erstellen
     dateiname = f"Aufwandserfassung_{abrechnungsmonat}_{row['Kürzel']}.xlsx"
     wb.save(output_path / dateiname)
+    return dateiname
+
+def main():
+    # Konfiguration laden
+    config_path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
+    config = Config()
+    config.load(config_path)
+
+    prj_root = Path(config.data["structure"]["prj_root"])
+    data_path = prj_root / config.data["structure"]["data_path"]
+    output_path = prj_root / config.data["structure"]["output_path"]
+    template_path = prj_root / config.data["structure"]["template_path"]
+
+    reporting_month = config.data.get("abrechnungsmonat", "2025-09")
+    abrechnungsmonat_dt = datetime.strptime(reporting_month, "%Y-%m")
+
+    df = load_client_data(config, reporting_month)
+    print(df)
+
+    for idx, row in df.iterrows():
+        dateiname = create_reporting_sheet(
+            config, row, abrechnungsmonat_dt, output_path, template_path
+        )
+        print(f"Erstelle AZ Erfassungsbogen für {row['Sozialpädagogin']} ({row['Kürzel']}, Ende: {row['Ende']}) -> {dateiname}")
+
+if __name__ == "__main__":
+    main()

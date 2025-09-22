@@ -4,16 +4,22 @@ from typing import List
 import pandas as pd
 from jinja2 import Environment
 from loguru import logger
-from module.config import Config
-from module.data_loader import DataLoader
-from module.document_utils import DocumentUtils
-from module.entity import LegalPerson, PrivatePerson
-from module.invoice_context import InvoiceContext
-from module.invoice_factory import InvoiceFactory
-from module.invoice_filter import InvoiceFilter
-from module.utils import clear_path, get_month_period, temporary_docx, zip_invoices, log_exceptions
 
+from .config import Config
+from .data_loader import DataLoader
+from .document_utils import DocumentUtils
+from .entity import LegalPerson, PrivatePerson
 from .filters import register_filters
+from .invoice_context import InvoiceContext
+from .invoice_factory import InvoiceFactory
+from .invoice_filter import InvoiceFilter
+from .utils import (
+    clear_path,
+    get_month_period,
+    log_exceptions,
+    temporary_docx,
+    zip_invoices,
+)
 
 
 class InvoiceProcessor:

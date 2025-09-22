@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, List
 from datetime import datetime
-from module.utils import get_month_period
+from .utils import get_month_period
 
 @dataclass
 class InvoiceFilter:
