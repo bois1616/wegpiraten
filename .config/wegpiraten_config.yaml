@@ -6,9 +6,12 @@ structure:
   tmp_path: .tmp
   logs: .logs
 
-invoice_template_name: rechnungsvorlage.docx
 db_name: Wegpiraten Datenbank.xlsx
+
+invoice_template_name: rechnungsvorlage.docx
 sheet_name: Pivot Rechnungsdaten
+client_sheet_name: MD_Klienten
+reporting_template: zeiterfassungsboegen.xlsx
 
 # Globale Formatierungseinstellungen für Babel/Jinja2-Filter
 locale: de_CH

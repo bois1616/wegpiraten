@@ -2,8 +2,7 @@ import sys
 from pathlib import Path
 from loguru import logger
 
-from module import Config, InvoiceProcessor, InvoiceFilter
-
+from module import Config, InvoiceProcessor, InvoiceFilter  # ignore: F401
 
 
 def main():
