@@ -13,7 +13,7 @@ sheet_name: Pivot Rechnungsdaten
 # Globale Formatierungseinstellungen für Babel/Jinja2-Filter
 locale: de_CH
 currency: CHF
-currency_format: "¤#,##0.00"      # Babel: ¤ steht für das Währungssymbol
+currency_format: "#,##0.00 ¤"      # Babel: ¤ steht für das Währungssymbol
 date_format: "dd.MM.yyyy"         # Babel: z.B. "yyyy-MM-dd" für ISO
 numeric_format: "#,##0.00"        # Standard für numerische Felder
 

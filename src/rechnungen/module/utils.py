@@ -4,31 +4,19 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from zipfile import ZipFile
-import numpy as np
 
-def clear_path(path: Path):
-    """
-    Löscht alle Dateien im angegebenen Verzeichnis.
-    Unterverzeichnisse bleiben erhalten.
+from loguru import logger
 
-    Args:
-        path (Path): Das Verzeichnis, dessen Dateien gelöscht werden sollen.
-    """
-    for item in path.iterdir():
-        if item.is_file():
-            item.unlink()
 
-def zip_invoices(pdf_files: list, zip_path: Path):
-    """
-    Erstellt ein ZIP-Archiv aus einer Liste von PDF-Dateien.
+@contextmanager
+def log_exceptions(msg, continue_on_error=True):
+    try:
+        yield
+    except Exception as e:
+        logger.error(f"{msg}: {e}")
+        if not continue_on_error:
+            raise
 
-    Args:
-        pdf_files (list): Liste von PDF-Dateipfaden.
-        zip_path (Path): Zielpfad für das ZIP-Archiv.
-    """
-    with ZipFile(zip_path, "w") as zipf:
-        for file in pdf_files:
-            zipf.write(file, arcname=Path(file).name)
 
 @contextmanager
 def temporary_docx(suffix=".docx"):
@@ -43,6 +31,7 @@ def temporary_docx(suffix=".docx"):
     finally:
         if tmp_path.exists():
             os.remove(tmp_path)
+
 
 def get_month_period(abrechnungsmonat: str) -> tuple[datetime, datetime]:
     """
@@ -60,27 +49,32 @@ def get_month_period(abrechnungsmonat: str) -> tuple[datetime, datetime]:
         end = datetime(jahr, monat + 1, 1) - timedelta(days=1)
     return start, end
 
-def explode_context(context: dict) -> dict:
-    def to_dict(obj):
-        # Primitive Typen inkl. numpy-Typen direkt zurückgeben
-        if isinstance(obj, (str, int, float, bool, type(None), np.generic)):
-            return obj
-        if isinstance(obj, dict):
-            return obj
-        if hasattr(obj, "as_dict") and callable(obj.as_dict):
-            return obj.as_dict()
-        # Listen von Objekten (z.B. Positionen) als Liste von dicts
-        if isinstance(obj, list):
-            return [to_dict(item) for item in obj]
-        return {k: v for k, v in vars(obj).items() if not k.startswith("_") and not callable(v)}
-    
-    exploded = {}
-    for k, v in context.items():
-        if k == "Positionen" and isinstance(v, list):
-            exploded[k] = v
-        else:
-            exploded[k] = to_dict(v)
-    return exploded
+
+def clear_path(path: Path):
+    """
+    Löscht alle Dateien im angegebenen Verzeichnis.
+    Unterverzeichnisse bleiben erhalten.
+
+    Args:
+        path (Path): Das Verzeichnis, dessen Dateien gelöscht werden sollen.
+    """
+    for item in path.iterdir():
+        if item.is_file():
+            item.unlink()
+
+
+def zip_invoices(pdf_files: list, zip_path: Path):
+    """
+    Erstellt ein ZIP-Archiv aus einer Liste von PDF-Dateien.
+
+    Args:
+        pdf_files (list): Liste von PDF-Dateipfaden.
+        zip_path (Path): Zielpfad für das ZIP-Archiv.
+    """
+    with ZipFile(zip_path, "w") as zipf:
+        for file in pdf_files:
+            zipf.write(file, arcname=Path(file).name)
+
 
 # Alle Formatierungen für Zahlen, Währungen und Datumsfelder erfolgen ausschließlich im Template
 # über Babel/Jinja2-Filter und die Konfiguration. Keine eigene Formatierungsfunktion mehr nötig.

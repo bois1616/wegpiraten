@@ -12,8 +12,6 @@ from rich import print
 from .config import Config
 from .entity import LegalPerson
 from .invoice_context import InvoiceContext
-from .filters import register_filters
-from module.utils import explode_context
 
 class InvoiceFactory:
     """
@@ -84,12 +82,8 @@ class InvoiceFactory:
 
         # Betragsformatierung mit Babel
         currency = self.config.get_currency()
-        locale = self.config.get_locale()
-        currency_format = self.config.get_currency_format()
-        total = invoice_context.data.get("Summe_Kosten", 0)
-        total_str = format_currency(total, currency, locale=locale, format=currency_format)
-
-        invoice_id = invoice_context.data.get("Rechnungsnummer", "")
+        total_str = f'{invoice_context.data.get("summe_kosten", -999):.2f}'
+        invoice_id = invoice_context.data.get("invoice_id", "-ReNr-")
 
         # Linien
         draw.line([(width // 2, 60), (width // 2, height - 60)], fill="black", width=3)
@@ -154,11 +148,18 @@ class InvoiceFactory:
     def render_invoice(
         self,
         invoice_context: InvoiceContext,
-        client_details: pd.DataFrame,
+        jinja_env: Environment = None,
     ) -> DocxTemplate:
         """
         Generiert ein fertig formatiertes Rechnungsdokument.
         Die Formatierung erfolgt ausschließlich im Template via Jinja2-Filter.
+
+        Args:
+            invoice_context (InvoiceContext): Kontext mit Rechnungsdaten.
+            jinja_env (Environment, optional): Jinja2-Environment mit registrierten Filtern.
+        
+        Returns:
+            DocxTemplate: Gerendertes Dokument.
         """
         template_path = (
             Path(self.config.data["structure"]["prj_root"])
@@ -166,16 +167,8 @@ class InvoiceFactory:
             / self.config.data["invoice_template_name"]
         )
         assert template_path.exists(), f"Template nicht gefunden: {template_path}"
-        
-        jinja_env = Environment()
-        register_filters(jinja_env, self.config.data)
 
         invoice_template = DocxTemplate(template_path)
-
-        # Kontext "explodieren", damit alle Objekt-Attribute als dict verfügbar sind
-        render_context: dict = explode_context(invoice_context.as_dict())
-        # Positionen als Tabelle belassen/überschreiben
-        render_context["Positionen"] = client_details.to_dict("records")
 
         # Einzahlungsschein-Bild wie gehabt erzeugen
         output_png = self.config.data["structure"]["tmp_path"]
@@ -192,20 +185,21 @@ class InvoiceFactory:
                 tmp_file.name,
                 width=Mm(200)
             )
-            render_context["Einzahlungsschein"] = payment_part_img
+            invoice_context["payment_part"] = payment_part_img
 
             # füge hier einen check ein, welche felder im context sind
             # vergleiche mit den feldern im template
             
             # template_fields = invoice_template.get_undeclared_template_variables(jinja_env=jinja_env)
-            # print(template_fields)
-            # context_fields = list(render_context.keys())
-            # print(context_fields)
+            # print('Template (ist):\n', template_fields)
+            # context_fields = list(invoice_context.as_dict().keys())
+            # print('Kontext (Soll)\n', context_fields)
             # #gib die felder von Positions aus
-            # print(render_context["Positionen"][0].keys() if render_context["Positionen"] else "Keine Positionen")
+            # print('Positionen-Felder:')
+            # print(invoice_context["positions"][0] if invoice_context["positions"] else "Keine Positionen")
             # exit(0)
 
-            invoice_template.render(render_context, jinja_env=jinja_env)
+            invoice_template.render(invoice_context.as_dict(), jinja_env=jinja_env)
 
         return invoice_template
 
