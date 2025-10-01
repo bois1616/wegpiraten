@@ -16,9 +16,11 @@ class Entity(BaseModel):
     key: str = ""
 
     @field_validator("zip_city", mode="after")
-    def split_zip_city(cls, v, values):
+    def split_zip_city(cls, v: str, values: dict) -> str:
         """
         Validiert und setzt zip und city anhand von zip_city, falls vorhanden.
+        Wenn zip_city gesetzt ist, werden zip und city daraus extrahiert.
+        Wenn zip_city leer ist, wird es aus zip und city zusammengesetzt.
         """
         if v:
             parts = v.strip().split(" ", 1)
@@ -36,7 +38,7 @@ class Entity(BaseModel):
         return v
 
     @field_validator("name_2", mode="after")
-    def empty_name_2(cls, v):
+    def empty_name_2(cls, v: str) -> str:
         """
         Setzt name_2 auf "" falls "(leer)" eingetragen ist.
         """
@@ -51,12 +53,14 @@ class Entity(BaseModel):
 class LegalPerson(Entity):
     """
     Juristische Person (z.B. Zahlungsdienstleister).
+    Nutzt Pydantic für Typsicherheit und Validierung.
     """
     iban: Optional[str] = None
 
 class PrivatePerson(Entity):
     """
     Private Person (z.B. Klient).
+    Nutzt Pydantic für Typsicherheit und Validierung.
     """
     first_name: str = ""
     last_name: str = ""
@@ -64,9 +68,10 @@ class PrivatePerson(Entity):
     social_security_number: str = ""  # Sozialversicherungsnummer
 
     @field_validator("name", mode="after")
-    def set_name_if_empty(cls, v, values):
+    def set_name_if_empty(cls, v: str, values: dict) -> str:
         """
         Setzt name automatisch, falls nicht explizit gesetzt.
+        Nutzt last_name und first_name, falls name leer ist.
         """
         if not v:
             last_name = values.get("last_name", "")

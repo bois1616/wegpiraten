@@ -9,7 +9,7 @@ from .config import Config
 from .data_loader import DataLoader
 from .document_utils import DocumentUtils
 from .entity import LegalPerson, PrivatePerson
-from .filters import register_filters
+from .filters import register_filters, FilterConfig
 from .invoice_context import InvoiceContext
 from .invoice_factory import InvoiceFactory
 from .invoice_filter import InvoiceFilter
@@ -28,27 +28,40 @@ class InvoiceProcessor:
     - Daten laden und prüfen
     - Rechnungen und PDFs erzeugen
     - Zusammenfassungen und ZIP-Archiv erstellen
+    Nutzt konsequent Pydantic-Modelle für Konfiguration und Filter.
     """
 
     def __init__(self, config: Config, filter: InvoiceFilter):
-        self.config = config
-        self.filter = filter
-        self.data_loader = DataLoader(config, filter)
-        self.invoice_factory = InvoiceFactory(config)
+        """
+        Initialisiert den InvoiceProcessor mit Pydantic-basierter Konfiguration und Filter.
+        Args:
+            config (Config): Singleton-Konfiguration mit Pydantic-Modell.
+            filter (InvoiceFilter): Pydantic-Modell mit den Filterkriterien.
+        """
+        self.config: Config = config
+        self.filter: InvoiceFilter = filter
+        self.data_loader: DataLoader = DataLoader(config, filter)
+        self.invoice_factory: InvoiceFactory = InvoiceFactory(config)
 
-    def run(self):
+    def run(self) -> None:
+        """
+        Führt den gesamten Rechnungsprozess aus.
+        Nutzt ausschließlich typisierte und validierte Pydantic-Modelle.
+        """
         logger.info(f"Starte Rechnungsprozess mit Filter: {self.filter}")
 
-        env = self.config.data["structure"]
-        project_root = Path(env["prj_root"])
-        tmp_path = project_root / env["tmp_path"]
-        output_path = project_root / env["output_path"]
+        # Zugriff auf die Struktur-Konfiguration über das Pydantic-Modell
+        structure = self.config.get_structure()
+        project_root = Path(structure.prj_root)
+        tmp_path = project_root / structure.tmp_path
+        output_path = project_root / structure.output_path
 
         clear_path(tmp_path)
         logger.debug(f"Temporäres Verzeichnis {tmp_path} geleert.")
 
-        source = project_root / env["data_path"] / self.config.data["db_name"]
-        sheet_name = self.config.data.get("sheet_name")
+        # Datenquelle und Blattname typisiert aus der Konfiguration
+        source = project_root / structure.data_path / self.config.data.db_name
+        sheet_name = getattr(self.config.data, "sheet_name", None)
         logger.debug(f"Lade Daten aus {source}, Blatt: {sheet_name or 'aktiv'}")
 
         invoice_data = self.data_loader.load_data(source, sheet_name)
@@ -57,34 +70,42 @@ class InvoiceProcessor:
         self.data_loader.check_data_consistency(invoice_data)
         logger.info("Daten erfolgreich geladen und geprüft.")
 
-        service_provider_obj = self.invoice_factory.provider
+        service_provider_obj: LegalPerson = self.invoice_factory.provider
         logger.debug(f"Empfänger der Rechnungen: {service_provider_obj}")
 
         # Zeitraum für den gesamten Rechnungsprozess einmal berechnen
-        # TODO: Prüfen, ob das überhaupt sinnvoll ist. Es wird nur der Monat für die Rechnung benötigt
-        start_period, end_period = get_month_period(self.filter.invoice_month)
-        start_inv_period = start_period.strftime("%d.%m.%Y")
-        end_inv_period = end_period.strftime("%d.%m.%Y")
+        period = get_month_period(self.filter.invoice_month)
+        start_inv_period = period.start.strftime("%d.%m.%Y")
+        end_inv_period = period.end.strftime("%d.%m.%Y")
 
-        invoice_list = []
+        invoice_list: List[InvoiceContext] = []
         all_invoices: List[Path] = []
 
-        # Wird nur beim Rendern der Rechnungstemplates genutzt
+        # Jinja2-Environment mit typisierter Filter-Konfiguration initialisieren
+        filter_config = FilterConfig(
+            locale=self.config.data.locale,
+            currency=self.config.data.currency,
+            currency_format=self.config.data.currency_format,
+            date_format=self.config.data.date_format,
+            numeric_format=self.config.data.numeric_format,
+        )
         jinja_env = Environment()
-        register_filters(jinja_env, self.config.data)
+        register_filters(jinja_env, filter_config)
 
-        # Positionsspalten aus der Config auslesen
+        # Positionsspalten und Summenfelder typisiert aus der Konfiguration extrahieren
+        expected_columns = self.config.get_expected_columns()
+        # expected_columns ist ein Pydantic-Modell mit Attributen payer, client, general (jeweils Liste von ColumnConfig)
         position_columns = [
-            col["name"]
-            for section in self.config.get_expected_columns()
-            for col in self.config.get_expected_columns()[section]
-            if col.get("is_position", False)
+            col.name
+            for section in [expected_columns.payer, expected_columns.client, expected_columns.general]
+            for col in section
+            if getattr(col, "is_position", False)
         ]
         sum_columns = [
-            col["name"]
-            for section in self.config.get_expected_columns()
-            for col in self.config.get_expected_columns()[section]
-            if col.get("is_position", False) and col.get("sum", False)
+            col.name
+            for section in [expected_columns.payer, expected_columns.client, expected_columns.general]
+            for col in section
+            if getattr(col, "is_position", False) and getattr(col, "sum", False)
         ]
 
         # Gruppierung nach Zahlungsdienstleister (ZDNR)
@@ -93,6 +114,7 @@ class InvoiceProcessor:
 
             invoices_for_payer: List[Path] = []
 
+            # LegalPerson wird mit typisierten Feldern aus der DataFrame-Zeile erstellt
             payer_obj = LegalPerson(
                 name=payer_row.get("ZD_Name", ""),
                 name_2=payer_row.get("ZD_Name2", ""),
@@ -120,6 +142,7 @@ class InvoiceProcessor:
             for client_id, client_details in payer_data.groupby("Klient-Nr."):
                 client_row = client_details.iloc[0]
 
+                # PrivatePerson wird mit typisierten Feldern aus der DataFrame-Zeile erstellt
                 client_obj = PrivatePerson(
                     first_name=client_row.get("CL_Vorname", ""),
                     last_name=client_row.get("CL_Nachname", ""),
@@ -143,21 +166,9 @@ class InvoiceProcessor:
                 )
 
                 # Nur Felder mit is_position=True aus der Config
-                position_columns = [
-                    col["name"]
-                    for section in self.config.get_expected_columns()
-                    for col in self.config.get_expected_columns()[section]
-                    if col.get("is_position", False)
-                ]
                 positions = client_details[position_columns].to_dict("records")
 
                 # Summenfelder: Nur Felder, die sowohl is_position=True als auch sum=True haben
-                sum_columns = [
-                    col["name"]
-                    for section in self.config.get_expected_columns()
-                    for col in self.config.get_expected_columns()[section]
-                    if col.get("is_position", False) and col.get("sum", False)
-                ]
                 totals = {
                     f"summe_{col.lower()}": client_details[col].sum()
                     for col in sum_columns
@@ -176,7 +187,6 @@ class InvoiceProcessor:
                         "payer": payer_obj,
                         "service_provider": service_provider_obj,
                         "client": client_obj,
-                        # "config": self.config,
                         "positions": positions,
                         **totals,
                     }

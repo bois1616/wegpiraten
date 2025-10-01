@@ -1,7 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 from loguru import logger
@@ -21,6 +21,7 @@ class DocumentUtils:
     - DOCX nach PDF konvertieren
     - PDFs zusammenführen
     - Rechnungsübersicht als Excel-Tabelle erstellen
+    Nutzt konsequent Pydantic-Modelle für Konfiguration und Kontextdaten.
     """
 
     @staticmethod
@@ -58,8 +59,10 @@ class DocumentUtils:
 
         generated_pdf = docx_path.with_suffix(".pdf")
         # Dateinamen mit Entitäten und Leistungszeitraum
-        payer_id = invoice_context.data.get("payer").key
-        client_id = invoice_context.data.get("client").key
+        payer = invoice_context.data.get("payer")
+        client = invoice_context.data.get("client")
+        payer_id = getattr(payer, "key", "n.a") if payer else "n.a"
+        client_id = getattr(client, "key", "n.a") if client else "n.a"
         invoice_month = invoice_context.data.get("invoice_month", "unbekannt")
         target_name = f"Rechnung_{payer_id}_{client_id}_{invoice_month}.pdf"
         target_pdf = pdf_path.parent / target_name
@@ -73,7 +76,7 @@ class DocumentUtils:
 
     @staticmethod
     def merge_pdfs(
-        pdf_files: List[Path], payer_context: InvoiceContext, output_path: Path = None
+        pdf_files: List[Path], payer_context: InvoiceContext, output_path: Optional[Path] = None
     ) -> Path:
         """
         Führt mehrere PDF-Dateien zu einer einzigen zusammen.
@@ -101,7 +104,8 @@ class DocumentUtils:
             output_path = pdf_files[0].parent
         payer = payer_context.data.get("payer")
         invoice_month = payer_context.data.get("invoice_month", "unbekannt")
-        merged_pdf_path = output_path / f"Rechnungen_{payer.key}_{invoice_month}.pdf"
+        payer_id = getattr(payer, "key", "n.a") if payer else "n.a"
+        merged_pdf_path = output_path / f"Rechnungen_{payer_id}_{invoice_month}.pdf"
         try:
             merger.write(merged_pdf_path)
             merger.close()
@@ -135,18 +139,20 @@ class DocumentUtils:
 
         # Die Pfade und Formate werden typisiert aus dem Pydantic-Modell gelesen
         output_path: Path = Path(config_data.structure.output_path)
-        kosten_format = config_data.currency_format
-        datum_format = config_data.date_format
+        kosten_format: str = config_data.currency_format
+        datum_format: str = config_data.date_format
 
         # Nur die gewünschten Felder extrahieren
         summary_rows = []
         for invoice in invoice_list:
             data = invoice.as_dict()
+            payer = data.get("payer")
+            client = data.get("client")
             summary_rows.append(
                 {
                     "Rechnungsdatum": data.get("invoice_date"),
-                    "ZD-Nr": getattr(data.get("payer"), "key", "n.a"),
-                    "Klienten-Nr": getattr(data.get("client"), "key", "n.a"),
+                    "ZD-Nr": getattr(payer, "key", "n.a") if payer else "n.a",
+                    "Klienten-Nr": getattr(client, "key", "n.a") if client else "n.a",
                     "Abrechnungsmonat": data.get("invoice_month", "unbekannt"),
                     "Rechnungsbetrag": data.get("summe_kosten", -999),
                 }

@@ -5,7 +5,7 @@ import pandas as pd
 from loguru import logger
 from openpyxl import load_workbook
 
-from .config import Config
+from .config import Config, ExpectedColumnsConfig, ColumnConfig
 from .invoice_filter import InvoiceFilter
 from pydantic import ValidationError
 
@@ -23,8 +23,8 @@ class DataLoader:
             config (Config): Singleton-Konfiguration mit Pydantic-Modell.
             filter (InvoiceFilter): Pydantic-Modell mit den Filterkriterien.
         """
-        self.config = config
-        self.filter = filter
+        self.config: Config = config
+        self.filter: InvoiceFilter = filter
 
     def load_data(
         self,
@@ -75,7 +75,7 @@ class DataLoader:
 
         return df
 
-    def check_data_consistency(self, df: pd.DataFrame):
+    def check_data_consistency(self, df: pd.DataFrame) -> None:
         """
         Prüft, ob alle erwarteten Spalten im DataFrame vorhanden sind.
         Nutzt die Pydantic-basierte Konfiguration für die Spaltendefinitionen.
@@ -86,10 +86,11 @@ class DataLoader:
             TypeError: Falls Summenfelder nicht numerisch sind.
         """
         # Extrahiere die erwarteten Spaltennamen aus der Pydantic-Konfiguration
+        expected_columns_model: ExpectedColumnsConfig = self.config.get_expected_columns()
         expected_columns = set()
         for section in ["payer", "client", "general"]:
             # Die Konfiguration liefert jetzt Pydantic-Modelle, daher Zugriff über Attribute
-            col_list = getattr(self.config.get_expected_columns(), section, [])
+            col_list = getattr(expected_columns_model, section, [])
             expected_columns.update(col.name for col in col_list)
         missing_columns = expected_columns - set(df.columns)
         if missing_columns:
@@ -100,7 +101,7 @@ class DataLoader:
         # Prüfe, ob alle Summenfelder numerisch sind
         sum_columns = [
             col.name
-            for col in getattr(self.config.get_expected_columns(), "general", [])
+            for col in getattr(expected_columns_model, "general", [])
             if getattr(col, "sum", False)
         ]
         for col in sum_columns:

@@ -24,14 +24,16 @@ class InvoiceFactory:
     def __init__(self, config: Config):
         """
         Initialisiert die Factory mit einer Pydantic-basierten Konfiguration.
+        Args:
+            config (Config): Singleton-Konfiguration mit Pydantic-Modell.
         """
         self.config: Config = config
         # Empfänger als Entity-Objekt, Zugriff auf Provider-Konfiguration typisiert
         provider_cfg = self.config.data.provider
         self.provider: LegalPerson = LegalPerson(
-            name=provider_cfg.name,
-            street=provider_cfg.strasse,
-            zip_city=provider_cfg.plz_ort,
+            name=provider_cfg.name or "",
+            street=provider_cfg.strasse or "",
+            zip_city=provider_cfg.plz_ort or "",
             iban=provider_cfg.IBAN,
         )
 
@@ -61,6 +63,10 @@ class InvoiceFactory:
         """
         Erstellt einen Einzahlungsschein als PNG mit QR-Code.
         Nutzt ausschließlich typisierte Entity- und Kontextdaten.
+        Args:
+            invoice_context (InvoiceContext): Kontext mit Rechnungsdaten.
+            output_png (str): Zielpfad für das PNG.
+            font_dir (str): Verzeichnis mit Schriftarten.
         """
         Path(output_png).parent.mkdir(parents=True, exist_ok=True)
         width, height = 1800, 900
@@ -212,5 +218,8 @@ class InvoiceFactory:
 
 if __name__ == "__main__":
     print("InvoiceFactory Modul. Nicht direkt ausführbar.")
+
+[mypy-docxtpl.*]
+ignore_missing_imports = True
 
 

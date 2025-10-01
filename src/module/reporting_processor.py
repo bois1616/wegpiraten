@@ -2,7 +2,7 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ValidationError
 from typing import Optional
 
 # Pydantic-Modell für die Struktur-Konfiguration
@@ -17,18 +17,31 @@ class ReportingConfig(BaseModel):
     client_sheet_name: Optional[str] = "MD_Client"
 
 class ReportingProcessor:
-    def __init__(self, config: ReportingConfig, factory):
+    """
+    Klasse zur Verarbeitung von Reporting-Daten.
+    Erwartet ausschließlich Pydantic-Modelle für Konfiguration und nutzt Typsicherheit.
+    """
+    def __init__(self, config: ReportingConfig, factory: object):
         """
-        Konstruktor erwartet jetzt ein Pydantic-Modell für die Konfiguration.
+        Konstruktor erwartet ein Pydantic-Modell für die Konfiguration.
         Das sorgt für Typsicherheit und Validierung der Konfigurationsdaten.
+        Args:
+            config (ReportingConfig): Validierte Reporting-Konfiguration.
+            factory (object): Factory-Objekt zur Erstellung der Reporting-Sheets.
         """
-        self.config = config
+        self.config: ReportingConfig = config
         self.factory = factory
 
     def load_client_data(self, reporting_month: str) -> pd.DataFrame:
         """
         Lädt die Klientendaten für den angegebenen Berichtsmonat.
         Nutzt die validierte Pydantic-Konfiguration für alle Pfadangaben.
+
+        Args:
+            reporting_month (str): Monat im Format "YYYY-MM".
+
+        Returns:
+            pd.DataFrame: Gefilterte Klientendaten.
         """
         # Zugriff auf die Konfigurationsdaten über das Pydantic-Modell
         prj_root = Path(self.config.structure.prj_root)
@@ -50,14 +63,19 @@ class ReportingProcessor:
         else:
             raise ValueError(f"Tabelle {table_name} nicht gefunden in {db_name}")
 
-        # Datumsfilterung
+        # Datumsfilterung: Nur Klienten, deren "Ende" leer ist oder nach dem Berichtsmonat liegt
         df["Ende"] = pd.to_datetime(df["Ende"], format="%d.%m.%Y", errors="coerce")
         df = df[(df["Ende"].isna()) | (df["Ende"] >= reporting_month_dt)]
         return df
 
-    def run(self, reporting_month: str, output_path: Path, template_path: Path):
+    def run(self, reporting_month: str, output_path: Path, template_path: Path) -> None:
         """
         Führt die Berichtsverarbeitung für den angegebenen Monat aus.
+
+        Args:
+            reporting_month (str): Monat im Format "YYYY-MM".
+            output_path (Path): Zielverzeichnis für die erzeugten Dateien.
+            template_path (Path): Verzeichnis mit den Excel-Templates.
         """
         reporting_month_dt = datetime.strptime(reporting_month, "%Y-%m")
         df = self.load_client_data(reporting_month)

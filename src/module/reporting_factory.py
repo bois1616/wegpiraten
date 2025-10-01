@@ -5,18 +5,25 @@ from openpyxl import load_workbook
 from pydantic import BaseModel, Field, ValidationError
 from typing import Optional
 
-# Pydantic-Modell für die ReportingFactory-Konfiguration
 class ReportingFactoryConfig(BaseModel):
+    """
+    Pydantic-Modell für die Konfiguration der ReportingFactory.
+    Sorgt für Typsicherheit und Validierung der Konfigurationsdaten.
+    """
     reporting_template: str = "zeiterfassunsboegen.xlsx"  # Standard-Template-Dateiname
     sheet_password: str = "wegpiraten"                   # Standard-Passwort für Blattschutz
 
 class ReportingFactory:
+    """
+    Factory-Klasse zur Erstellung von Reporting-Sheets.
+    Erwartet ein Pydantic-Modell für die Konfiguration.
+    """
     def __init__(self, config: ReportingFactoryConfig):
         """
         Konstruktor erwartet ein Pydantic-Modell für die Konfiguration.
         Das sorgt für Typsicherheit und Validierung der Konfigurationsdaten.
         """
-        self.config = config
+        self.config: ReportingFactoryConfig = config
 
     def create_reporting_sheet(
         self,
@@ -28,9 +35,18 @@ class ReportingFactory:
         """
         Erstellt ein Reporting-Sheet auf Basis der übergebenen Datenreihe und speichert es ab.
         Alle Konfigurationswerte werden typisiert über das Pydantic-Modell bezogen.
+
+        Args:
+            row (pd.Series): Datenzeile mit den auszufüllenden Werten.
+            reporting_month_dt (datetime): Berichtsmonat als Datum.
+            output_path (Path): Zielverzeichnis für das Reporting-Sheet.
+            template_path (Path): Verzeichnis mit dem Excel-Template.
+
+        Returns:
+            str: Dateiname der erzeugten Excel-Datei.
         """
         # Zugriff auf Template-Name und Passwort über das Pydantic-Modell
-        template_name = self.config.reporting_template
+        template_name: str = self.config.reporting_template
         wb = load_workbook(template_path / template_name)
         ws = wb.active
 
@@ -67,7 +83,7 @@ class ReportingFactory:
         ws.protection.scenarios = False
 
         # Dateinamen generieren und Datei speichern
-        dateiname = f"Aufwandserfassung_{reporting_month_dt.strftime('%Y-%m')}_{row['Kürzel']}.xlsx"
+        dateiname: str = f"Aufwandserfassung_{reporting_month_dt.strftime('%Y-%m')}_{row['Kürzel']}.xlsx"
         wb.save(output_path / dateiname)
         return dateiname
 

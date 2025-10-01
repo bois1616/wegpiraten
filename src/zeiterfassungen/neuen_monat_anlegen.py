@@ -1,38 +1,45 @@
 from pathlib import Path
+
 from module.config import Config
 from module.reporting_factory import ReportingFactory, ReportingFactoryConfig
-from module.reporting_processor import ReportingProcessor, ReportingConfig
+from module.reporting_processor import ReportingProcessor, ReportingConfig, StructureConfig
 
-def main():
-    # Pfad zur YAML-Konfigurationsdatei bestimmen
-    config_path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
-    config = Config()
+def main() -> None:
+    """
+    Einstiegspunkt für das Anlegen eines neuen Berichtsmonats.
+    Lädt die Konfiguration (validiert mit Pydantic), initialisiert Factory und Processor
+    und startet die Verarbeitung. Nutzt ausschließlich Pydantic-Modelle für Konfiguration.
+    """
+    # Pfad zur YAML-Konfigurationsdatei bestimmen (typisiert mit pathlib.Path)
+    config_path: Path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
+    config: Config = Config()
     config.load(config_path)
 
-    # Zugriff auf die Konfigurationsdaten erfolgt jetzt typisiert über das Pydantic-Modell
-    structure = config.get_structure()  # Gibt ein StructureConfig-Pydantic-Modell zurück
+    # Zugriff auf die Struktur-Konfiguration über das Pydantic-Modell
+    structure: StructureConfig = config.get_structure()
 
     # Die Pfade werden direkt aus dem Pydantic-Modell gelesen
-    prj_root = Path(structure.prj_root)
-    output_path = prj_root / getattr(structure, "output_path", "output")  # Fallback falls output_path nicht gesetzt
-    template_path = prj_root / getattr(structure, "template_path", "templates")  # Fallback falls template_path nicht gesetzt
+    prj_root: Path = Path(structure.prj_root)
+    output_path: Path = prj_root / (structure.output_path or "output")
+    template_path: Path = prj_root / (structure.template_path or "templates")
 
-    reporting_month = "2025-09"  # Beispiel: September 2025
+    reporting_month: str = "2025-09"  # Beispiel: September 2025
 
-    # Initialisierung der ReportingFactory mit Pydantic-Konfiguration
-    # Annahme: Die Factory-Konfiguration ist Teil der Hauptkonfiguration oder wird separat geladen
-    # Hier als Beispiel aus der Hauptkonfiguration extrahiert:
-    factory_config_data = getattr(config.data, "reporting_factory", {})
-    factory_config = ReportingFactoryConfig(**factory_config_data)
-    factory = ReportingFactory(factory_config)
+    # Erweiterung: ReportingFactory- und ReportingProcessor-Konfiguration auslagern
+    # Diese Blöcke prüfen, ob die Konfiguration in der Hauptkonfiguration vorhanden ist,
+    # und nutzen ansonsten Defaultwerte der jeweiligen Pydantic-Modelle.
 
-    # Initialisierung des ReportingProcessors mit Pydantic-Konfiguration
-    # Annahme: Die Reporting-Konfiguration ist Teil der Hauptkonfiguration oder wird separat geladen
-    reporting_config_data = getattr(config.data, "reporting_processor", {})
+    # ReportingFactoryConfig aus der Hauptkonfiguration extrahieren (falls vorhanden)
+    factory_config_data: dict = getattr(config.data, "reporting_factory", {})
+    factory_config: ReportingFactoryConfig = ReportingFactoryConfig(**factory_config_data)
+    factory: ReportingFactory = ReportingFactory(factory_config)
+
+    # ReportingConfig aus der Hauptkonfiguration extrahieren (falls vorhanden)
+    reporting_config_data: dict = getattr(config.data, "reporting_processor", {})
     # Die Struktur wird aus der Hauptkonfiguration übernommen
     reporting_config_data["structure"] = structure
-    reporting_config = ReportingConfig(**reporting_config_data)
-    processor = ReportingProcessor(reporting_config, factory)
+    reporting_config: ReportingConfig = ReportingConfig(**reporting_config_data)
+    processor: ReportingProcessor = ReportingProcessor(reporting_config, factory)
 
     # Ausführung der Verarbeitung
     processor.run(reporting_month, output_path, template_path)

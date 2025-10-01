@@ -1,6 +1,6 @@
 from typing import Optional, Tuple, List
 from datetime import datetime
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, model_validator
 from .utils import get_month_period
 
 class InvoiceFilter(BaseModel):
@@ -38,6 +38,7 @@ class InvoiceFilter(BaseModel):
         """
         Setzt service_date_range automatisch anhand des invoice_month,
         falls dieses Feld nicht explizit gesetzt wurde.
+        Nutzt das Pydantic-Modell MonthPeriod aus utils für Typsicherheit.
         """
         if self.service_date_range is None and self.invoice_month:
             # get_month_period gibt ein Pydantic-Modell mit start und end zurück
@@ -49,8 +50,7 @@ class InvoiceFilter(BaseModel):
         """
         Gibt eine lesbare String-Repräsentation des Filters zurück.
         """
-        filters = []
-        filters.append(f"invoice_month={self.invoice_month}")
+        filters: List[str] = [f"invoice_month={self.invoice_month}"]
         if self.payer:
             filters.append(f"payer={self.payer}")
         if self.client:
