@@ -7,21 +7,21 @@ from openpyxl import load_workbook
 
 from .config import Config
 from .invoice_filter import InvoiceFilter
-
+from pydantic import ValidationError
 
 class DataLoader:
     """
     Klasse zum Laden und Prüfen von Daten aus einer Excel-Datenbank.
-    Nutzt die Konfiguration für erwartete Spalten und Filter.
+    Nutzt die Pydantic-basierte Konfiguration für erwartete Spalten und Filter.
     """
 
     def __init__(self, config: Config, filter: InvoiceFilter):
         """
-        Initialisiert den DataLoader mit einer Konfigurationsinstanz.
-
+        Initialisiert den DataLoader mit einer Konfigurationsinstanz und einem Filterobjekt.
+        Beide werden konsequent als Pydantic-Modelle genutzt.
         Args:
-            config (Config): Singleton-Konfiguration mit allen Einstellungen.
-            filter (InvoiceFilter): Filterobjekt mit den Filterkriterien.
+            config (Config): Singleton-Konfiguration mit Pydantic-Modell.
+            filter (InvoiceFilter): Pydantic-Modell mit den Filterkriterien.
         """
         self.config = config
         self.filter = filter
@@ -33,7 +33,6 @@ class DataLoader:
     ) -> pd.DataFrame:
         """
         Lädt die Daten aus einer Excel-Datei und filtert sie nach den Kriterien im Filterobjekt.
-
         Args:
             db (Path): Pfad zur Excel-Datenbank.
             sheet (str, optional): Name des Arbeitsblatts. Falls None, wird das aktive Blatt verwendet.
@@ -55,12 +54,12 @@ class DataLoader:
         # Alle Felder mit "(Leer)" durch "" ersetzen
         df = df.replace("(Leer)", "")
 
-        # Dynamische Filterung nach allen gesetzten Feldern im Filterobjekt
-        for key, value in vars(self.filter).items():
+        # Dynamische Filterung nach allen gesetzten Feldern im Pydantic-Filterobjekt
+        for key, value in self.filter.model_dump().items():
             if value is None:
                 continue
             # Bereichsfilter (z.B. service_date_range)
-            if key.endswith("_range") and isinstance(value, tuple) and len(value) == 2:
+            if key.endswith("_range") and isinstance(value, (list, tuple)) and len(value) == 2:
                 col_name = key.replace("_range", "")
                 if col_name in df.columns:
                     df = df[df[col_name].between(value[0], value[1])]
@@ -79,19 +78,19 @@ class DataLoader:
     def check_data_consistency(self, df: pd.DataFrame):
         """
         Prüft, ob alle erwarteten Spalten im DataFrame vorhanden sind.
-
+        Nutzt die Pydantic-basierte Konfiguration für die Spaltendefinitionen.
         Args:
             df (pd.DataFrame): Zu prüfender DataFrame.
-
         Raises:
             ValueError: Falls erwartete Spalten fehlen.
+            TypeError: Falls Summenfelder nicht numerisch sind.
         """
-        # Extrahiere die erwarteten Spaltennamen aus der Konfiguration
+        # Extrahiere die erwarteten Spaltennamen aus der Pydantic-Konfiguration
         expected_columns = set()
         for section in ["payer", "client", "general"]:
-            expected_columns.update(
-                col["name"] for col in self.config.get_expected_columns().get(section, [])
-            )
+            # Die Konfiguration liefert jetzt Pydantic-Modelle, daher Zugriff über Attribute
+            col_list = getattr(self.config.get_expected_columns(), section, [])
+            expected_columns.update(col.name for col in col_list)
         missing_columns = expected_columns - set(df.columns)
         if missing_columns:
             missing_str = "\n".join(sorted(missing_columns))
@@ -100,9 +99,9 @@ class DataLoader:
 
         # Prüfe, ob alle Summenfelder numerisch sind
         sum_columns = [
-            col["name"]
-            for col in self.config.get_expected_columns().get("general", [])
-            if col.get("sum", False)
+            col.name
+            for col in getattr(self.config.get_expected_columns(), "general", [])
+            if getattr(col, "sum", False)
         ]
         for col in sum_columns:
             if col in df.columns and not pd.api.types.is_numeric_dtype(df[col]):

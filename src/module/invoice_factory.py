@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 import qrcode
 from docx.shared import Mm
@@ -17,30 +18,35 @@ class InvoiceFactory:
     """
     Factory-Klasse zur Erstellung von Rechnungen und Einzahlungsscheinen.
     Nutzt Babel/Jinja2-Filter für die Formatierung.
+    Erwartet eine Pydantic-basierte Konfiguration und Entity-Objekte.
     """
 
     def __init__(self, config: Config):
-        self.config = config
-        # Empfänger als Entity-Objekt
-        provider_cfg = self.config.data["provider"]
-        self.provider = LegalPerson(
-            name=provider_cfg.get("name", ""),
-            street=provider_cfg.get("strasse", ""),
-            zip_city=provider_cfg.get("plz_ort", ""),
-            iban=provider_cfg.get("IBAN"),
+        """
+        Initialisiert die Factory mit einer Pydantic-basierten Konfiguration.
+        """
+        self.config: Config = config
+        # Empfänger als Entity-Objekt, Zugriff auf Provider-Konfiguration typisiert
+        provider_cfg = self.config.data.provider
+        self.provider: LegalPerson = LegalPerson(
+            name=provider_cfg.name,
+            street=provider_cfg.strasse,
+            zip_city=provider_cfg.plz_ort,
+            iban=provider_cfg.IBAN,
         )
 
     def create_invoice_id(
         self, 
         client_id: str, 
-        invoice_month: str) -> str:
+        invoice_month: str
+    ) -> str:
         """
         Erstellt eine eindeutige Rechnungsnummer aus Leistungszeitraum und Klienten-ID.
         Args:
             client_id (str): Klienten-ID.
             invoice_month (str): Abrechnungsmonat im Format 'MM-YYYY'.
         Returns:
-            str: Rechnungsnummer im Format 'RMMYY_CLIENTID'.
+            str: Rechnungsnummer im Format 'MM-YYYY_CLIENTID'.
         """
     
         # TODO Prüfen, ob das als Rechnungsnummer ausreicht
@@ -51,8 +57,11 @@ class InvoiceFactory:
         invoice_context: InvoiceContext,
         output_png: str,
         font_dir: str = "/usr/share/fonts/truetype/msttcorefonts/",
-    ):
-        """Erstellt einen Einzahlungsschein als PNG mit QR-Code."""
+    ) -> None:
+        """
+        Erstellt einen Einzahlungsschein als PNG mit QR-Code.
+        Nutzt ausschließlich typisierte Entity- und Kontextdaten.
+        """
         Path(output_png).parent.mkdir(parents=True, exist_ok=True)
         width, height = 1800, 900
         img = Image.new("RGB", (width, height), "white")
@@ -67,8 +76,8 @@ class InvoiceFactory:
         except Exception:
             font = font_bold = font_small = font_small_bold = ImageFont.load_default()
 
-        # Service Provider nur aus Factory, im Kontext nur Referenz
-        service_provider = self.provider
+        # Service Provider aus typisiertem Entity-Objekt
+        service_provider: LegalPerson = self.provider
         payer = invoice_context.data.get("payer")
 
         provider_name = getattr(service_provider, "name", "")
@@ -80,7 +89,7 @@ class InvoiceFactory:
         payer_street = getattr(payer, "street", "")
         payer_zip_city = getattr(payer, "zip_city", "")
 
-        # Betragsformatierung mit Babel
+        # Betragsformatierung mit Babel (hier als float)
         currency = self.config.get_currency()
         total_str = f'{invoice_context.data.get("summe_kosten", -999):.2f}'
         invoice_id = invoice_context.data.get("invoice_id", "-ReNr-")
@@ -148,7 +157,7 @@ class InvoiceFactory:
     def render_invoice(
         self,
         invoice_context: InvoiceContext,
-        jinja_env: Environment = None,
+        jinja_env: Optional[Environment] = None,
     ) -> DocxTemplate:
         """
         Generiert ein fertig formatiertes Rechnungsdokument.
@@ -161,21 +170,22 @@ class InvoiceFactory:
         Returns:
             DocxTemplate: Gerendertes Dokument.
         """
+        # Zugriff auf Pfade und Template-Namen über typisierte Pydantic-Konfiguration
+        structure = self.config.data.structure
         template_path = (
-            Path(self.config.data["structure"]["prj_root"])
-            / self.config.data["structure"]["template_path"]
-            / self.config.data["invoice_template_name"]
+            Path(structure.prj_root)
+            / structure.template_path
+            / self.config.data.invoice_template_name
         )
         assert template_path.exists(), f"Template nicht gefunden: {template_path}"
 
         invoice_template = DocxTemplate(template_path)
 
-        # Einzahlungsschein-Bild wie gehabt erzeugen
-        output_png = self.config.data["structure"]["tmp_path"]
-
-        # Kontextmanager für temporäre Datei, automatische Löschung nach Verwendung
+        # Einzahlungsschein-Bild erzeugen, temporär speichern
+        tmp_dir = Path(structure.tmp_path)
+        tmp_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
-            dir=output_png,
+            dir=tmp_dir,
             suffix=".png",
             delete=True
         ) as tmp_file:
@@ -187,14 +197,11 @@ class InvoiceFactory:
             )
             invoice_context["payment_part"] = payment_part_img
 
-            # füge hier einen check ein, welche felder im context sind
-            # vergleiche mit den feldern im template
-            
+            # Optional: Template- und Kontext-Felder vergleichen (Debug)
             # template_fields = invoice_template.get_undeclared_template_variables(jinja_env=jinja_env)
             # print('Template (ist):\n', template_fields)
             # context_fields = list(invoice_context.as_dict().keys())
             # print('Kontext (Soll)\n', context_fields)
-            # #gib die felder von Positions aus
             # print('Positionen-Felder:')
             # print(invoice_context["positions"][0] if invoice_context["positions"] else "Keine Positionen")
             # exit(0)

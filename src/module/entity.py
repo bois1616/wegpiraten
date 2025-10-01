@@ -1,11 +1,11 @@
-from dataclasses import dataclass
 from typing import Optional
+from pydantic import BaseModel, field_validator
 
-@dataclass
-class Entity:
+class Entity(BaseModel):
     """
     Basisklasse für juristische und private Personen.
     Ermöglicht die Eingabe von PLZ und Ort entweder getrennt oder als gemeinsamen String.
+    Nutzt Pydantic für Validierung und Typsicherheit.
     """
     name: str = ""
     name_2: str = ""  # Ergänzung für zweiten Namen
@@ -15,33 +15,45 @@ class Entity:
     zip_city: str = ""
     key: str = ""
 
-    def __post_init__(self):
-        # zip_city hat immer Vorrang, falls gesetzt
-        if self.zip_city:
-            parts = self.zip_city.strip().split(" ", 1)
+    @field_validator("zip_city", mode="after")
+    def split_zip_city(cls, v, values):
+        """
+        Validiert und setzt zip und city anhand von zip_city, falls vorhanden.
+        """
+        if v:
+            parts = v.strip().split(" ", 1)
             if len(parts) == 2:
-                self.zip, self.city = parts
+                values["zip"] = parts[0]
+                values["city"] = parts[1]
             elif len(parts) == 1:
-                self.zip = parts[0]
-                self.city = ""
-        # Falls zip_city leer ist, aus zip und city zusammensetzen
+                values["zip"] = parts[0]
+                values["city"] = ""
         else:
-            self.zip_city = f"{self.zip} {self.city}".strip()
-        # name_2 auf "" setzen, falls "(leer)"
-        if self.name_2 == "(leer)":
-            self.name_2 = ""
+            # Falls zip_city leer ist, aus zip und city zusammensetzen
+            zip_val = values.get("zip", "")
+            city_val = values.get("city", "")
+            values["zip_city"] = f"{zip_val} {city_val}".strip()
+        return v
 
-    def as_dict(self):
-        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+    @field_validator("name_2", mode="after")
+    def empty_name_2(cls, v):
+        """
+        Setzt name_2 auf "" falls "(leer)" eingetragen ist.
+        """
+        return "" if v == "(leer)" else v
 
-@dataclass
+    def as_dict(self) -> dict:
+        """
+        Gibt die Felder als Dictionary zurück.
+        """
+        return self.model_dump()
+
 class LegalPerson(Entity):
     """
     Juristische Person (z.B. Zahlungsdienstleister).
     """
     iban: Optional[str] = None
 
-@dataclass
 class PrivatePerson(Entity):
     """
     Private Person (z.B. Klient).
@@ -51,19 +63,20 @@ class PrivatePerson(Entity):
     birth_date: Optional[str] = None  # Datumsformatierung erfolgt im Template
     social_security_number: str = ""  # Sozialversicherungsnummer
 
-    def __post_init__(self):
-        super().__post_init__()
-        # Setze name automatisch, falls nicht explizit gesetzt
-        if not self.name:
-            self.name = f"{self.last_name}, {self.first_name}"
+    @field_validator("name", mode="after")
+    def set_name_if_empty(cls, v, values):
+        """
+        Setzt name automatisch, falls nicht explizit gesetzt.
+        """
+        if not v:
+            last_name = values.get("last_name", "")
+            first_name = values.get("first_name", "")
+            return f"{last_name}, {first_name}".strip(", ")
+        return v
 
-    def as_dict(self):
-        base = super().as_dict()
-        base.update({
-            "first_name": self.first_name,
-            "last_name": self.last_name,
-            "birth_date": self.birth_date,
-            "social_security_number": self.social_security_number,
-        })
-        return base
+    def as_dict(self) -> dict:
+        """
+        Gibt die Felder als Dictionary zurück, inkl. Felder aus Entity.
+        """
+        return self.model_dump()
 

@@ -2,13 +2,16 @@ import sys
 from pathlib import Path
 from loguru import logger
 
-from module import Config, InvoiceProcessor, InvoiceFilter  # ignore: F401
+# Importiere die Pydantic-basierten Konfigurations- und Prozessorklassen
+from module.config import Config  # Pydantic-basierte Singleton-Konfiguration
+from module.invoice_processor import InvoiceProcessor  # Erwartet Pydantic-Konfiguration
+from module.invoice_filter import InvoiceFilter  # Erwartet typisierte Filterdaten
 
 
 def main():
     """
     Einstiegspunkt für den Rechnungsprozess.
-    Lädt die Konfiguration, initialisiert Filter und startet die Verarbeitung.
+    Lädt die Konfiguration (validiert mit Pydantic), initialisiert Filter und startet die Verarbeitung.
     """
     # Pfad zur YAML-Konfigurationsdatei bestimmen
     config_path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
@@ -23,14 +26,18 @@ def main():
         invoice_month = "08.2025"
         # sys.exit(1)
 
+    # Filter-Objekt für die Rechnungsverarbeitung (kann später erweitert werden)
     filter_obj = InvoiceFilter(invoice_month=invoice_month)
 
-    # Konfiguration laden, um Log-Verzeichnis zu bestimmen
+    # Konfiguration laden und validieren (Pydantic übernimmt die Validierung)
     config_obj = Config()
     config_obj.load(config_path)
 
-    # Log-Verzeichnis und Logdatei konfigurieren
-    logs_dir = Path(config_obj.data["structure"]["prj_root"]) / config_obj.data["structure"]["logs"]
+    # Zugriff auf die Struktur-Konfiguration über das Pydantic-Modell
+    structure = config_obj.get_structure()  # Gibt ein StructureConfig-Pydantic-Modell zurück
+
+    # Log-Verzeichnis und Logdatei konfigurieren, Pfade werden typisiert ausgelesen
+    logs_dir = Path(structure.prj_root) / structure.logs
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_file = logs_dir / "Rechnung.log"
 
@@ -40,12 +47,13 @@ def main():
 
     try:
         # Die Entitäten und erwarteten Spalten werden jetzt segmentiert aus der config geladen
-        # InvoiceContext wird im InvoiceProcessor genutzt
+        # InvoiceProcessor erhält die validierte Pydantic-Konfiguration
         processor = InvoiceProcessor(config=config_obj, filter=filter_obj)
         processor.run()
         logger.success("Rechnungsprozess erfolgreich abgeschlossen.")
     except Exception as e:
         logger.exception(f"Fehler im Rechnungsprozess: {e}")
+
 
 if __name__ == "__main__":
     main()

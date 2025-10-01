@@ -10,8 +10,9 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from PyPDF2 import PdfMerger
 
-from .config import Config
+from .config import Config, ConfigData  # ConfigData ist das Pydantic-Modell
 from .invoice_context import InvoiceContext
+from pydantic import ValidationError
 
 
 class DocumentUtils:
@@ -20,7 +21,6 @@ class DocumentUtils:
     - DOCX nach PDF konvertieren
     - PDFs zusammenführen
     - Rechnungsübersicht als Excel-Tabelle erstellen
-
     """
 
     @staticmethod
@@ -61,7 +61,7 @@ class DocumentUtils:
         payer_id = invoice_context.data.get("payer").key
         client_id = invoice_context.data.get("client").key
         invoice_month = invoice_context.data.get("invoice_month", "unbekannt")
-        target_name = f"Rechnung_{payer_id}_{client_id}_{invoice_month}"
+        target_name = f"Rechnung_{payer_id}_{client_id}_{invoice_month}.pdf"
         target_pdf = pdf_path.parent / target_name
         try:
             os.rename(generated_pdf, target_pdf)
@@ -80,7 +80,7 @@ class DocumentUtils:
 
         Args:
             pdf_files (List[Path]): Liste der PDF-Dateipfade.
-            invoice_context (InvoiceContext): Kontextobjekt mit Zahlungsdienstleister und Zeitraum.
+            payer_context (InvoiceContext): Kontextobjekt mit Zahlungsdienstleister und Zeitraum.
             output_path (Path, optional): Zielverzeichnis für die Sammel-PDF.
         Returns:
             Path: Pfad zur erzeugten PDF-Datei.
@@ -126,9 +126,17 @@ class DocumentUtils:
         Raises:
             RuntimeError: Wenn die Datei nicht geschrieben werden kann.
         """
-        output_path: Path = Path(config.data["structure"]["output_path"])
-        kosten_format = config.data.get("currency_format", '#,##0.00 "CHF"')
-        datum_format = config.data.get("date_format", "DD.MM.YY")
+        # Zugriff auf die Pydantic-basierte Konfiguration
+        try:
+            config_data: ConfigData = config.data  # Typ: Pydantic-Modell
+        except ValidationError as e:
+            logger.error(f"Ungültige Konfiguration: {e}")
+            raise
+
+        # Die Pfade und Formate werden typisiert aus dem Pydantic-Modell gelesen
+        output_path: Path = Path(config_data.structure.output_path)
+        kosten_format = config_data.currency_format
+        datum_format = config_data.date_format
 
         # Nur die gewünschten Felder extrahieren
         summary_rows = []

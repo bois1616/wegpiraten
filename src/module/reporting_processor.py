@@ -2,18 +2,40 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
+from pydantic import BaseModel, Field, ValidationError
+from typing import Optional
+
+# Pydantic-Modell für die Struktur-Konfiguration
+class StructureConfig(BaseModel):
+    prj_root: str
+    data_path: str
+
+# Pydantic-Modell für die Reporting-Konfiguration
+class ReportingConfig(BaseModel):
+    structure: StructureConfig
+    db_name: str
+    client_sheet_name: Optional[str] = "MD_Client"
 
 class ReportingProcessor:
-    def __init__(self, config, factory):
+    def __init__(self, config: ReportingConfig, factory):
+        """
+        Konstruktor erwartet jetzt ein Pydantic-Modell für die Konfiguration.
+        Das sorgt für Typsicherheit und Validierung der Konfigurationsdaten.
+        """
         self.config = config
         self.factory = factory
 
     def load_client_data(self, reporting_month: str) -> pd.DataFrame:
-        prj_root = Path(self.config.data["structure"]["prj_root"])
-        data_path = prj_root / self.config.data["structure"]["data_path"]
-        db_name = self.config.data["db_name"]
+        """
+        Lädt die Klientendaten für den angegebenen Berichtsmonat.
+        Nutzt die validierte Pydantic-Konfiguration für alle Pfadangaben.
+        """
+        # Zugriff auf die Konfigurationsdaten über das Pydantic-Modell
+        prj_root = Path(self.config.structure.prj_root)
+        data_path = prj_root / self.config.structure.data_path
+        db_name = self.config.db_name
         source = data_path / db_name
-        table_name = self.config.data.get("client_sheet_name", "MD_Client")
+        table_name = self.config.client_sheet_name
 
         reporting_month_dt = datetime.strptime(reporting_month, "%Y-%m")
         wb = load_workbook(source, data_only=True)
@@ -28,15 +50,41 @@ class ReportingProcessor:
         else:
             raise ValueError(f"Tabelle {table_name} nicht gefunden in {db_name}")
 
+        # Datumsfilterung
         df["Ende"] = pd.to_datetime(df["Ende"], format="%d.%m.%Y", errors="coerce")
         df = df[(df["Ende"].isna()) | (df["Ende"] >= reporting_month_dt)]
         return df
 
     def run(self, reporting_month: str, output_path: Path, template_path: Path):
+        """
+        Führt die Berichtsverarbeitung für den angegebenen Monat aus.
+        """
         reporting_month_dt = datetime.strptime(reporting_month, "%Y-%m")
         df = self.load_client_data(reporting_month)
         for idx, row in df.iterrows():
             dateiname = self.factory.create_reporting_sheet(
                 row, reporting_month_dt, output_path, template_path
             )
-            print(f"Erstelle AZ Erfassungsbogen für {row['Sozialpädagogin']} ({row['Kürzel']}, Ende: {row['Ende']}) -> {dateiname}")
+            print(
+                f"Erstelle AZ Erfassungsbogen für {row['Sozialpädagogin']} "
+                f"({row['Kürzel']}, Ende: {row['Ende']}) -> {dateiname}"
+            )
+
+# Beispiel für die Initialisierung mit Pydantic
+if __name__ == "__main__":
+    import yaml
+
+    # Beispiel: YAML-Konfiguration laden und mit Pydantic validieren
+    config_path = Path("wegpiraten_reporting_config.yaml")
+    with open(config_path, "r") as f:
+        raw_config = yaml.safe_load(f)
+    try:
+        config = ReportingConfig(**raw_config)
+    except ValidationError as e:
+        print(f"Konfigurationsfehler: {e}")
+        exit(1)
+
+    # Factory-Objekt muss bereitgestellt werden
+    factory = None  # Platzhalter
+    processor = ReportingProcessor(config, factory)
+    # processor.run("2025-08", Path("output"), Path("template.xlsx"))
