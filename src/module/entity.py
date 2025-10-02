@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 class Entity(BaseModel):
     """
@@ -15,27 +15,20 @@ class Entity(BaseModel):
     zip_city: str = ""
     key: str = ""
 
-    @field_validator("zip_city", mode="after")
-    def split_zip_city(cls, v: str, values: dict) -> str:
+    @model_validator(mode="after")
+    def sync_zip_city(self) -> "Entity":
         """
-        Validiert und setzt zip und city anhand von zip_city, falls vorhanden.
-        Wenn zip_city gesetzt ist, werden zip und city daraus extrahiert.
-        Wenn zip_city leer ist, wird es aus zip und city zusammengesetzt.
+        Synchronisiert zip, city und zip_city nach der Initialisierung.
+        - Wenn zip_city gesetzt ist, werden zip und city daraus extrahiert.
+        - Wenn zip_city leer ist, aber zip oder city gesetzt sind, wird zip_city zusammengesetzt.
         """
-        if v:
-            parts = v.strip().split(" ", 1)
-            if len(parts) == 2:
-                values["zip"] = parts[0]
-                values["city"] = parts[1]
-            elif len(parts) == 1:
-                values["zip"] = parts[0]
-                values["city"] = ""
-        else:
-            # Falls zip_city leer ist, aus zip und city zusammensetzen
-            zip_val = values.get("zip", "")
-            city_val = values.get("city", "")
-            values["zip_city"] = f"{zip_val} {city_val}".strip()
-        return v
+        if self.zip_city:
+            parts = self.zip_city.strip().split(" ", 1)
+            self.zip = parts[0] if len(parts) > 0 else ""
+            self.city = parts[1] if len(parts) > 1 else ""
+        elif self.zip or self.city:
+            self.zip_city = f"{self.zip} {self.city}".strip()
+        return self
 
     @field_validator("name_2", mode="after")
     def empty_name_2(cls, v: str) -> str:
@@ -68,14 +61,14 @@ class PrivatePerson(Entity):
     social_security_number: str = ""  # Sozialversicherungsnummer
 
     @field_validator("name", mode="after")
-    def set_name_if_empty(cls, v: str, values: dict) -> str:
+    def set_name_if_empty(cls, v: str, info) -> str:
         """
         Setzt name automatisch, falls nicht explizit gesetzt.
         Nutzt last_name und first_name, falls name leer ist.
         """
         if not v:
-            last_name = values.get("last_name", "")
-            first_name = values.get("first_name", "")
+            last_name = info.data.get("last_name", "")
+            first_name = info.data.get("first_name", "")
             return f"{last_name}, {first_name}".strip(", ")
         return v
 

@@ -1,4 +1,4 @@
-import os
+from typing import Optional
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -7,8 +7,10 @@ from zipfile import ZipFile
 
 from loguru import logger
 from pydantic import BaseModel, ValidationError, field_validator
-from typing import List, Iterator, Generator
+from typing import List, Generator
 
+# Importiere ggf. weitere Module aus .module, falls sinnvoll
+# (z.B. für zentrale Konfiguration oder weitere Hilfsfunktionen)
 
 @contextmanager
 def log_exceptions(msg: str, continue_on_error: bool = True) -> Generator[None, None, None]:
@@ -26,7 +28,6 @@ def log_exceptions(msg: str, continue_on_error: bool = True) -> Generator[None, 
         logger.error(f"{msg}: {e}")
         if not continue_on_error:
             raise
-
 
 @contextmanager
 def temporary_docx(suffix: str = ".docx") -> Generator[Path, None, None]:
@@ -48,26 +49,23 @@ def temporary_docx(suffix: str = ".docx") -> Generator[Path, None, None]:
         if tmp_path.exists():
             os.remove(tmp_path)
 
-
 class MonthPeriod(BaseModel):
     """
     Pydantic-Modell für einen Monatszeitraum.
     Sorgt für Typsicherheit und Validierung.
     """
-
     start: datetime
     end: datetime
 
-    @field_validator("end")
-    def end_must_be_after_start(cls, v, values):
+    @field_validator("end", mode="after")
+    def end_must_be_after_start(cls, v: datetime, info) -> datetime:
         """
         Validiert, dass das Enddatum nach dem Startdatum liegt.
         """
-        start = values.get("start")
+        start = info.data.get("start")
         if start and v < start:
             raise ValueError("Enddatum muss nach dem Startdatum liegen.")
         return v
-
 
 def get_month_period(abrechnungsmonat: str) -> MonthPeriod:
     """
@@ -81,18 +79,17 @@ def get_month_period(abrechnungsmonat: str) -> MonthPeriod:
         MonthPeriod: Pydantic-Modell mit Start- und Enddatum.
     """
     abrechnungsmonat = abrechnungsmonat.replace("-", ".")
-    monat, jahr = abrechnungsmonat.split(".")
-    monat = int(monat)
-    jahr = int(jahr)
-    start = datetime(jahr, monat, 1)
-    if monat == 12:
-        end = datetime(jahr, 12, 31)
+    month_str, year_str = abrechnungsmonat.split(".")
+    month = int(month_str)
+    year = int(year_str)
+    start = datetime(year, month, 1)
+    if month == 12:
+        end = datetime(year, 12, 31)
     else:
         # Letzter Tag im Monat = erster Tag im nächsten Monat - 1 Tag
-        end = datetime(jahr, monat + 1, 1) - timedelta(days=1)
+        end = datetime(year, month + 1, 1) - timedelta(days=1)
     # Rückgabe als Pydantic-Modell für Typsicherheit
     return MonthPeriod(start=start, end=end)
-
 
 def clear_path(path: Path) -> None:
     """
@@ -106,17 +103,15 @@ def clear_path(path: Path) -> None:
         if item.is_file():
             item.unlink()
 
-
 class PDFList(BaseModel):
     """
     Pydantic-Modell für eine Liste von PDF-Dateipfaden.
     Sorgt für Validierung und Typsicherheit.
     """
-
     pdf_files: List[Path]
 
     @field_validator("pdf_files")
-    def all_files_must_exist(cls, v):
+    def all_files_must_exist(cls, v: List[Path]) -> List[Path]:
         """
         Validiert, dass alle angegebenen Dateien existieren.
         """
@@ -124,7 +119,6 @@ class PDFList(BaseModel):
             if not file.exists():
                 raise ValueError(f"Datei nicht gefunden: {file}")
         return v
-
 
 def zip_invoices(pdf_files: List[Path], zip_path: Path) -> None:
     """
@@ -146,5 +140,5 @@ def zip_invoices(pdf_files: List[Path], zip_path: Path) -> None:
         for file in pdf_list.pdf_files:
             zipf.write(file, arcname=file.name)
 
-# Alle Formatierungen für Zahlen, Währungen und Datumsfelder erfolgen ausschließlich im Template
+# Hinweis: Alle Formatierungen für Zahlen, Währungen und Datumsfelder erfolgen ausschließlich im Template
 # über Babel/Jinja2-Filter und die Konfiguration. Keine eigene Formatierungsfunktion mehr nötig.

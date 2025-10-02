@@ -37,6 +37,8 @@ def main() -> None:
     structure = config_obj.get_structure()  # Gibt ein StructureConfig-Pydantic-Modell zurück
 
     # Log-Verzeichnis und Logdatei konfigurieren, Pfade werden typisiert ausgelesen
+    if structure.logs is None:
+        raise ValueError("structure.logs darf nicht None sein!")
     logs_dir: Path = Path(structure.prj_root) / structure.logs
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_file: Path = logs_dir / "Rechnung.log"

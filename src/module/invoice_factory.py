@@ -218,8 +218,3 @@ class InvoiceFactory:
 
 if __name__ == "__main__":
     print("InvoiceFactory Modul. Nicht direkt ausführbar.")
-
-[mypy-docxtpl.*]
-ignore_missing_imports = True
-
-

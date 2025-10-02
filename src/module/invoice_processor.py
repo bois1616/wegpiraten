@@ -53,14 +53,18 @@ class InvoiceProcessor:
         # Zugriff auf die Struktur-Konfiguration über das Pydantic-Modell
         structure = self.config.get_structure()
         project_root = Path(structure.prj_root)
-        tmp_path = project_root / structure.tmp_path
-        output_path = project_root / structure.output_path
+        tmp_path = project_root / (structure.tmp_path or "")
+        output_path = project_root / (structure.output_path or "")
 
         clear_path(tmp_path)
         logger.debug(f"Temporäres Verzeichnis {tmp_path} geleert.")
 
         # Datenquelle und Blattname typisiert aus der Konfiguration
-        source = project_root / structure.data_path / self.config.data.db_name
+        source = (
+            project_root
+            / (structure.data_path or "")
+            / (self.config.data.db_name or "")
+        )
         sheet_name = getattr(self.config.data, "sheet_name", None)
         logger.debug(f"Lade Daten aus {source}, Blatt: {sheet_name or 'aktiv'}")
 
