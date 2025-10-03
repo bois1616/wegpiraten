@@ -1,9 +1,11 @@
 from datetime import datetime
-from babel.numbers import format_currency, format_decimal
+from typing import Any, Optional
+
 from babel.dates import format_date
+from babel.numbers import format_currency, format_decimal
 from jinja2 import Environment, Undefined
 from pydantic import BaseModel
-from typing import Optional, Any
+
 
 class FilterConfig(BaseModel):
     """

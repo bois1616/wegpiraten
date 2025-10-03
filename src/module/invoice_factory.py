@@ -12,6 +12,7 @@ from rich import print
 from .config import Config
 from .entity import LegalPerson
 from .invoice_context import InvoiceContext
+from .utils import safe_str  # Zentrale String-Konvertierung für Typensicherheit
 
 
 class InvoiceFactory:
@@ -30,17 +31,16 @@ class InvoiceFactory:
         self.config: Config = config
         # Empfänger als Entity-Objekt, Zugriff auf Provider-Konfiguration typisiert
         provider_cfg = self.config.data.provider
+        # Alle Felder werden mit safe_str abgesichert, um Typfehler zu vermeiden
         self.provider: LegalPerson = LegalPerson(
-            name=provider_cfg.name or "",
-            street=provider_cfg.strasse or "",
-            zip_city=provider_cfg.plz_ort or "",
-            iban=provider_cfg.IBAN,
+            name=safe_str(provider_cfg.name),
+            street=safe_str(provider_cfg.strasse),
+            zip_city=safe_str(provider_cfg.plz_ort),
+            iban=safe_str(provider_cfg.IBAN),
         )
 
     def create_invoice_id(
-        self, 
-        client_id: str, 
-        invoice_month: str
+        self, client_id: str, invoice_month: str
     ) -> str:
         """
         Erstellt eine eindeutige Rechnungsnummer aus Leistungszeitraum und Klienten-ID.
@@ -86,19 +86,19 @@ class InvoiceFactory:
         service_provider: LegalPerson = self.provider
         payer = invoice_context.data.get("payer")
 
-        provider_name = getattr(service_provider, "name", "")
-        provider_street = getattr(service_provider, "street", "")
-        provider_zip_city = getattr(service_provider, "zip_city", "")
-        provider_iban = getattr(service_provider, "iban", "")
+        provider_name = safe_str(getattr(service_provider, "name", ""))
+        provider_street = safe_str(getattr(service_provider, "street", ""))
+        provider_zip_city = safe_str(getattr(service_provider, "zip_city", ""))
+        provider_iban = safe_str(getattr(service_provider, "iban", ""))
 
-        payer_name = getattr(payer, "name", "")
-        payer_street = getattr(payer, "street", "")
-        payer_zip_city = getattr(payer, "zip_city", "")
+        payer_name = safe_str(getattr(payer, "name", ""))
+        payer_street = safe_str(getattr(payer, "street", ""))
+        payer_zip_city = safe_str(getattr(payer, "zip_city", ""))
 
         # Betragsformatierung mit Babel (hier als float)
         currency = self.config.get_currency()
         total_str = f'{invoice_context.data.get("summe_kosten", -999):.2f}'
-        invoice_id = invoice_context.data.get("invoice_id", "-ReNr-")
+        invoice_id = safe_str(invoice_context.data.get("invoice_id", "-ReNr-"))
 
         # Linien
         draw.line([(width // 2, 60), (width // 2, height - 60)], fill="black", width=3)
@@ -123,7 +123,7 @@ class InvoiceFactory:
                 y1 += 10
                 draw.text((x1, y1), label, font=font_small_bold, fill="black")
                 y1 += 30
-            draw.text((x1, y1), str(value) if value is not None else "", font=font, fill="black")
+            draw.text((x1, y1), safe_str(value), font=font, fill="black")
             y1 += 40
 
         # Rechter Bereich: Zahlteil
@@ -146,7 +146,7 @@ class InvoiceFactory:
                 y2 += 10
                 draw.text((x2, y2), label, font=font_small_bold, fill="black")
                 y2 += 30
-            draw.text((x2, y2), str(value) if value is not None else "", font=font, fill="black")
+            draw.text((x2, y2), safe_str(value), font=font, fill="black")
             y2 += 40
 
         # QR-Code-Daten aus Kontext

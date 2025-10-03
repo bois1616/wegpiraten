@@ -2,8 +2,8 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
-from pydantic import BaseModel, Field, ValidationError
-from typing import Optional
+from pydantic import BaseModel,  ValidationError
+
 
 class ReportingFactoryConfig(BaseModel):
     """

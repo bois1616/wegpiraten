@@ -2,6 +2,7 @@
     "cSpell.words": [
         "calibrib",
         "docxtpl",
+        "jahr",
         "Konsolenausgabe",
         "libreoffice",
         "msttcorefonts",
@@ -10,7 +11,8 @@
         "pdfs",
         "strasse",
         "Summenfeld",
-        "Summenfelder"
+        "Summenfelder",
+        "Validierungsfehler"
     ],
     "cSpell.ignoreWords": [
         "positionen"

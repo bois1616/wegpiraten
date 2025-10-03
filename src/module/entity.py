@@ -1,11 +1,16 @@
 from typing import Optional
+
 from pydantic import BaseModel, field_validator, model_validator
+
+from .utils import safe_str  # Nutze zentrale Hilfsfunktion für String-Konvertierung
+
 
 class Entity(BaseModel):
     """
     Basisklasse für juristische und private Personen.
     Ermöglicht die Eingabe von PLZ und Ort entweder getrennt oder als gemeinsamen String.
     Nutzt Pydantic für Validierung und Typsicherheit.
+    Alle Felder werden beim Initialisieren auf str gecastet, um Typfehler durch z.B. numerische PLZ zu vermeiden.
     """
     name: str = ""
     name_2: str = ""  # Ergänzung für zweiten Namen
@@ -14,6 +19,17 @@ class Entity(BaseModel):
     city: str = ""
     zip_city: str = ""
     key: str = ""
+
+    @model_validator(mode="before")
+    def ensure_str_fields(cls, data):
+        """
+        Sorgt dafür, dass alle string-Felder wirklich als str vorliegen.
+        Das verhindert Validierungsfehler, wenn z.B. PLZ als int aus einer Datenquelle kommt.
+        """
+        for field in ["name", "name_2", "street", "zip", "city", "zip_city", "key"]:
+            if field in data:
+                data[field] = safe_str(data[field])
+        return data
 
     @model_validator(mode="after")
     def sync_zip_city(self) -> "Entity":
@@ -50,6 +66,15 @@ class LegalPerson(Entity):
     """
     iban: Optional[str] = None
 
+    @model_validator(mode="before")
+    def ensure_iban_str(cls, data):
+        """
+        Sorgt dafür, dass IBAN immer ein String oder None ist.
+        """
+        if "iban" in data and data["iban"] is not None:
+            data["iban"] = safe_str(data["iban"])
+        return data
+
 class PrivatePerson(Entity):
     """
     Private Person (z.B. Klient).
@@ -59,6 +84,16 @@ class PrivatePerson(Entity):
     last_name: str = ""
     birth_date: Optional[str] = None  # Datumsformatierung erfolgt im Template
     social_security_number: str = ""  # Sozialversicherungsnummer
+
+    @model_validator(mode="before")
+    def ensure_private_str_fields(cls, data):
+        """
+        Sorgt dafür, dass alle string-Felder wirklich als str vorliegen.
+        """
+        for field in ["first_name", "last_name", "birth_date", "social_security_number"]:
+            if field in data and data[field] is not None:
+                data[field] = safe_str(data[field])
+        return data
 
     @field_validator("name", mode="after")
     def set_name_if_empty(cls, v: str, info) -> str:

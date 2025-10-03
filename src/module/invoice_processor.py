@@ -9,14 +9,15 @@ from .config import Config
 from .data_loader import DataLoader
 from .document_utils import DocumentUtils
 from .entity import LegalPerson, PrivatePerson
-from .filters import register_filters, FilterConfig
+from .filters import FilterConfig, register_filters
 from .invoice_context import InvoiceContext
 from .invoice_factory import InvoiceFactory
 from .invoice_filter import InvoiceFilter
+from .month_period import MonthPeriod, get_month_period
 from .utils import (
     clear_path,
-    get_month_period,
     log_exceptions,
+    safe_str,
     temporary_docx,
     zip_invoices,
 )
@@ -77,10 +78,10 @@ class InvoiceProcessor:
         service_provider_obj: LegalPerson = self.invoice_factory.provider
         logger.debug(f"Empfänger der Rechnungen: {service_provider_obj}")
 
-        # Zeitraum für den gesamten Rechnungsprozess einmal berechnen
-        period = get_month_period(self.filter.invoice_month)
-        start_inv_period = period.start.strftime("%d.%m.%Y")
-        end_inv_period = period.end.strftime("%d.%m.%Y")
+        # Zeitraum für den gesamten Rechnungsprozess als MonthPeriod berechnen
+        period: MonthPeriod = get_month_period(self.filter.invoice_month)
+        start_inv_period: str = period.start.strftime("%d.%m.%Y")
+        end_inv_period: str = period.end.strftime("%d.%m.%Y")
 
         invoice_list: List[InvoiceContext] = []
         all_invoices: List[Path] = []
@@ -120,13 +121,13 @@ class InvoiceProcessor:
 
             # LegalPerson wird mit typisierten Feldern aus der DataFrame-Zeile erstellt
             payer_obj = LegalPerson(
-                name=payer_row.get("ZD_Name", ""),
-                name_2=payer_row.get("ZD_Name2", ""),
-                street=payer_row.get("ZD_Strasse", ""),
-                zip=payer_row.get("ZD_PLZ", ""),
-                city=payer_row.get("ZD_Ort", ""),
-                iban=payer_row.get("ZD_IBAN", None),
-                key=str(payer_id),
+                name=safe_str(payer_row.get("ZD_Name")),
+                name_2=safe_str(payer_row.get("ZD_Name2")),
+                street=safe_str(payer_row.get("ZD_Strasse")),
+                zip=safe_str(payer_row.get("ZD_PLZ")),
+                city=safe_str(payer_row.get("ZD_Ort")),
+                iban=safe_str(payer_row.get("ZD_IBAN")),
+                key=safe_str(payer_id),
             )
 
             logger.debug(
@@ -140,6 +141,7 @@ class InvoiceProcessor:
                     "start_inv_period": start_inv_period,
                     "end_inv_period": end_inv_period,
                     "invoice_month": self.filter.invoice_month,
+                    "service_date_range": period,  # MonthPeriod für Templates und weitere Verarbeitung
                 }
             )
 
@@ -148,13 +150,13 @@ class InvoiceProcessor:
 
                 # PrivatePerson wird mit typisierten Feldern aus der DataFrame-Zeile erstellt
                 client_obj = PrivatePerson(
-                    first_name=client_row.get("CL_Vorname", ""),
-                    last_name=client_row.get("CL_Nachname", ""),
-                    street=client_row.get("CL_Strasse", ""),
-                    zip_city=client_row.get("CL_PLZ_Ort", ""),
-                    birth_date=client_row.get("CL_Geburtsdatum", None),
-                    social_security_number=client_row.get("CL_SozVersNr", ""),
-                    key=str(client_id),
+                    first_name=safe_str(client_row.get("CL_Vorname")),
+                    last_name=safe_str(client_row.get("CL_Nachname")),
+                    street=safe_str(client_row.get("CL_Strasse")),
+                    zip_city=safe_str(client_row.get("CL_PLZ_Ort")),
+                    birth_date=safe_str(client_row.get("CL_Geburtsdatum")),
+                    social_security_number=safe_str(client_row.get("CL_SozVersNr")),
+                    key=safe_str(client_id),
                 )
 
                 logger.debug(
@@ -186,6 +188,7 @@ class InvoiceProcessor:
                         "invoice_month": self.filter.invoice_month,
                         "start_inv_period": start_inv_period,
                         "end_inv_period": end_inv_period,
+                        "service_date_range": period,  # MonthPeriod für Templates und weitere Verarbeitung
                         "service_requester": service_requester,
                         "care_type": care_type,
                         "payer": payer_obj,

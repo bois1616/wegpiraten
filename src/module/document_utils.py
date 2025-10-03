@@ -8,11 +8,11 @@ from loguru import logger
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from pydantic import ValidationError
 from PyPDF2 import PdfMerger
 
 from .config import Config, ConfigData  # ConfigData ist das Pydantic-Modell
 from .invoice_context import InvoiceContext
-from pydantic import ValidationError
 
 
 class DocumentUtils:
