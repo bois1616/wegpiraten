@@ -1,15 +1,15 @@
 from pathlib import Path
 
-from module.config import (
+from shared_modules.config import (
     Config,
     StructureConfig,  # Passe den Modulnamen ggf. an
 )
-from module.reporting_factory import ReportingFactory, ReportingFactoryConfig
+from modules.reporting_factory import ReportingFactory, ReportingFactoryConfig
 
 # The lines you provided are importing specific classes from the modules
 # `reporting_processor` and `structure_config`. Here's a breakdown of what each
 # import statement is doing:
-from module.reporting_processor import (
+from modules.reporting_processor import (
     ReportingConfig,
     ReportingProcessor,
 )

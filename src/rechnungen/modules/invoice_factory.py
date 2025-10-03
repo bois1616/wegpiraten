@@ -6,13 +6,15 @@ import qrcode
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage
 from jinja2 import Environment
+from modules.invoice_context import InvoiceContext
 from PIL import Image, ImageDraw, ImageFont
 from rich import print
 
-from .config import Config
-from .entity import LegalPerson
-from .invoice_context import InvoiceContext
-from .utils import safe_str  # Zentrale String-Konvertierung für Typensicherheit
+from shared_modules.config import Config
+from shared_modules.entity import LegalPerson
+from shared_modules.utils import (
+    safe_str,  # Zentrale String-Konvertierung für Typensicherheit
+)
 
 
 class InvoiceFactory:

@@ -1,8 +1,14 @@
-from typing import Optional, Tuple, List
 from datetime import datetime
+from typing import List, Optional, Tuple
+
 from pydantic import BaseModel, model_validator
-from .utils import safe_str
-from .month_period import MonthPeriod, get_month_period  # MonthPeriod nutzen
+
+from shared_modules.month_period import (  # MonthPeriod nutzen
+    MonthPeriod,
+    get_month_period,
+)
+from shared_modules.utils import safe_str
+
 
 class InvoiceFilter(BaseModel):
     """

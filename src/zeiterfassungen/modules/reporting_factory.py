@@ -52,7 +52,6 @@ class ReportingFactory:
         reporting_month_dt: datetime,
         output_path: Path,
         template_path: Path,
-        sheet_password: Optional[str] = None,
     ) -> str:
         """
         Erstellt ein Reporting-Sheet auf Basis der übergebenen Datenreihe und speichert es ab.
@@ -96,11 +95,9 @@ class ReportingFactory:
         if hasattr(ws, "protection") and ws.protection:
             ws.protection.sheet = True
             ws.protection.enable()
-            # sheet_password-Argument hat Vorrang, sonst Konfiguration
-            password = sheet_password if sheet_password is not None else self.config.sheet_password
-            if password is None:
+            if self.config.sheet_password is None:
                 raise RuntimeError("Sheet-Passwort ist nicht gesetzt!")
-            ws.protection.set_password(str(password))
+            ws.protection.set_password(str(self.config.sheet_password))
             # Die folgenden Attribute sind optional und nicht in allen openpyxl-Versionen verfügbar
             for attr, value in [
                 ("enable_select_locked_cells", False),

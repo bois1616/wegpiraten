@@ -1,7 +1,7 @@
 from typing import Optional
 from pydantic import BaseModel
 
-from module.config import StructureConfig  # Struktur-Konfiguration importieren
+from shared_modules.config import StructureConfig  # Struktur-Konfiguration importieren
 
 class ReportingConfig(BaseModel):
     structure: StructureConfig

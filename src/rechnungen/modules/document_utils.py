@@ -11,8 +11,8 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 from pydantic import ValidationError
 from PyPDF2 import PdfMerger
 
-from .config import Config, ConfigData  # ConfigData ist das Pydantic-Modell
-from .invoice_context import InvoiceContext
+from shared_modules.config import Config, ConfigData  # ConfigData ist das Pydantic-Modell
+from modules.invoice_context import InvoiceContext
 
 
 class DocumentUtils:

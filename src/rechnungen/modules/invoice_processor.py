@@ -5,22 +5,23 @@ import pandas as pd
 from jinja2 import Environment
 from loguru import logger
 
-from .config import Config
-from .data_loader import DataLoader
-from .document_utils import DocumentUtils
-from .entity import LegalPerson, PrivatePerson
-from .filters import FilterConfig, register_filters
-from .invoice_context import InvoiceContext
-from .invoice_factory import InvoiceFactory
-from .invoice_filter import InvoiceFilter
-from .month_period import MonthPeriod, get_month_period
-from .utils import (
+from shared_modules.config import Config
+from shared_modules.entity import LegalPerson, PrivatePerson
+from shared_modules.month_period import MonthPeriod, get_month_period
+from shared_modules.utils import (
     clear_path,
     log_exceptions,
     safe_str,
     temporary_docx,
     zip_invoices,
 )
+
+from .data_loader import DataLoader
+from .document_utils import DocumentUtils
+from .filters import FilterConfig, register_filters
+from .invoice_context import InvoiceContext
+from .invoice_factory import InvoiceFactory
+from .invoice_filter import InvoiceFilter
 
 
 class InvoiceProcessor:

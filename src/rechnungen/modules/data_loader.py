@@ -5,8 +5,8 @@ import pandas as pd
 from loguru import logger
 from openpyxl import load_workbook
 
-from .config import Config, ExpectedColumnsConfig
-from .invoice_filter import InvoiceFilter
+from shared_modules.config import Config, ExpectedColumnsConfig
+from modules.invoice_filter import InvoiceFilter
 
 class DataLoader:
     """

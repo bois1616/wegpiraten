@@ -10,17 +10,18 @@ from .reporting_config import ReportingConfig  # ReportingConfig importieren
 
 
 class ReportingProcessor:
-    def get_db_password(self) -> str:
+    def get_sheet_password(self) -> str:
         """
-        Beispiel: Holt das Datenbank-Passwort sicher aus der Umgebung (z. B. für SQL- oder API-Logins).
-        Niemals im Code speichern!
-        Rückgabe: Passwort als String oder Exception, falls nicht gesetzt.
+        Holt das Excel-Blattschutz-Passwort sicher aus der Umgebung (.env), entschlüsselt falls nötig.
+        Gibt SHEET_PASSWORD_ENC (verschlüsselt) oder SHEET_PASSWORD (Klartext) zurück.
         """
-        from module.config import Config
+        from shared_modules.config import Config
         config = Config()
-        pw = config.get_secret("DB_PASSWORD")
+        pw = config.get_decrypted_secret("SHEET_PASSWORD_ENC")
         if not pw:
-            raise RuntimeError("Datenbank-Passwort nicht gesetzt! Bitte .env anlegen und DB_PASSWORD eintragen.")
+            pw = config.get_secret("SHEET_PASSWORD")
+        if not pw:
+            raise RuntimeError("Excel-Blattschutz-Passwort nicht gesetzt! Bitte .env mit SHEET_PASSWORD_ENC oder SHEET_PASSWORD anlegen.")
         return pw
 
     """
@@ -85,9 +86,10 @@ class ReportingProcessor:
         """
         reporting_month_dt = datetime.strptime(reporting_month, "%Y-%m")
         df = self.load_client_data(reporting_month)
+        sheet_password = self.get_sheet_password()
         for idx, row in df.iterrows():
             dateiname = self.factory.create_reporting_sheet(
-                row, reporting_month_dt, output_path, template_path
+                row, reporting_month_dt, output_path, template_path, sheet_password=sheet_password
             )
             print(
                 f"Erstelle AZ Erfassungsbogen für {row['Sozialpädagogin']} "
