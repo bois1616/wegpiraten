@@ -1,8 +1,19 @@
 from pathlib import Path
 
-from module.config import Config
+from module.config import (
+    Config,
+    StructureConfig,  # Passe den Modulnamen ggf. an
+)
 from module.reporting_factory import ReportingFactory, ReportingFactoryConfig
-from module.reporting_processor import ReportingProcessor, ReportingConfig, StructureConfig
+
+# The lines you provided are importing specific classes from the modules
+# `reporting_processor` and `structure_config`. Here's a breakdown of what each
+# import statement is doing:
+from module.reporting_processor import (
+    ReportingConfig,
+    ReportingProcessor,
+)
+
 
 def main() -> None:
     """
@@ -30,18 +41,22 @@ def main() -> None:
     # und nutzen ansonsten Defaultwerte der jeweiligen Pydantic-Modelle.
 
     # ReportingFactoryConfig aus der Hauptkonfiguration extrahieren (falls vorhanden)
+    # Die Konfiguration wird als dict ausgelesen und als Pydantic-Modell instanziiert
     factory_config_data: dict = getattr(config.data, "reporting_factory", {})
     factory_config: ReportingFactoryConfig = ReportingFactoryConfig(**factory_config_data)
     factory: ReportingFactory = ReportingFactory(factory_config)
 
     # ReportingConfig aus der Hauptkonfiguration extrahieren (falls vorhanden)
+    # Die Struktur wird aus der Hauptkonfiguration übernommen und als Pydantic-Modell übergeben
     reporting_config_data: dict = getattr(config.data, "reporting_processor", {})
-    # Die Struktur wird aus der Hauptkonfiguration übernommen
     reporting_config_data["structure"] = structure
+    # db_name aus der globalen Konfiguration ergänzen, falls nicht vorhanden
+    if "db_name" not in reporting_config_data:
+        reporting_config_data["db_name"] = getattr(config.data, "db_name", "Wegpiraten Datenbank.xlsx")
     reporting_config: ReportingConfig = ReportingConfig(**reporting_config_data)
     processor: ReportingProcessor = ReportingProcessor(reporting_config, factory)
 
-    # Ausführung der Verarbeitung
+    # Ausführung der Verarbeitung mit typisierten Pfaden und Monat
     processor.run(reporting_month, output_path, template_path)
 
 if __name__ == "__main__":

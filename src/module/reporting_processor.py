@@ -2,21 +2,27 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
-from pydantic import BaseModel, ValidationError
-from typing import Optional
+from pydantic import ValidationError
+from .reporting_config import ReportingConfig  # ReportingConfig importieren
 
-# Pydantic-Modell für die Struktur-Konfiguration
-class StructureConfig(BaseModel):
-    prj_root: str
-    data_path: str
 
 # Pydantic-Modell für die Reporting-Konfiguration
-class ReportingConfig(BaseModel):
-    structure: StructureConfig
-    db_name: str
-    client_sheet_name: Optional[str] = "MD_Client"
+
 
 class ReportingProcessor:
+    def get_db_password(self) -> str:
+        """
+        Beispiel: Holt das Datenbank-Passwort sicher aus der Umgebung (z. B. für SQL- oder API-Logins).
+        Niemals im Code speichern!
+        Rückgabe: Passwort als String oder Exception, falls nicht gesetzt.
+        """
+        from module.config import Config
+        config = Config()
+        pw = config.get_secret("DB_PASSWORD")
+        if not pw:
+            raise RuntimeError("Datenbank-Passwort nicht gesetzt! Bitte .env anlegen und DB_PASSWORD eintragen.")
+        return pw
+
     """
     Klasse zur Verarbeitung von Reporting-Daten.
     Erwartet ausschließlich Pydantic-Modelle für Konfiguration und nutzt Typsicherheit.

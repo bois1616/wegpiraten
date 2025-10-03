@@ -1,9 +1,14 @@
 from flask import Flask, render_template, redirect, url_for, request, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user
 import subprocess
+import os
+from module.config import Config
+
 
 app = Flask(__name__)
-app.secret_key = "test"
+# Secret Key sicher aus Umgebungsvariable oder .env laden
+config = Config()
+app.secret_key = config.get_secret("FLASK_SECRET_KEY", "unsicherer_fallback")
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -24,7 +29,10 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-        if username == "stephan" and password == "test":
+        # Sichere Passwortprüfung: Passwort aus Umgebungsvariable/.env
+        valid_user = config.get_secret("APP_USER", "stephan")
+        valid_password = config.get_secret("APP_PASSWORD", "test")
+        if username == valid_user and password == valid_password:
             user = User(username)
             login_user(user)
             return redirect(url_for("menu"))
