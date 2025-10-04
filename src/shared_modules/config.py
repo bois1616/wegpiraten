@@ -1,131 +1,76 @@
-import yaml
-from pathlib import Path
-from pydantic import BaseModel, Field, ValidationError
-from typing import Any, Optional, List
 import os
-from dotenv import load_dotenv  # type: ignore[import]
+import sys
+from pathlib import Path
+from typing import Any, Optional
 
-# Einzelne Spaltenbeschreibung für expected_columns
-class ColumnConfig(BaseModel):
-    name: str
-    type: str
-    format: Optional[str] = None
-    is_position: Optional[bool] = None
-    sum: Optional[bool] = None
-    decimals: Optional[int] = None
+import yaml  # YAML-Parser für das Einlesen der Konfigurationsdatei
+from cryptography.fernet import Fernet  # Für die Entschlüsselung von Secrets
+from dotenv import load_dotenv  # Lädt Umgebungsvariablen aus einer .env-Datei
+from pydantic import ValidationError  # Für die Validierung der Konfigurationsdaten
+from loguru import logger  # Leistungsfähiges Logging-Framework
 
-# expected_columns ist ein Dict[str, List[ColumnConfig]]
-class ExpectedColumnsConfig(BaseModel):
-    payer: List[ColumnConfig] = Field(default_factory=list)
-    client: List[ColumnConfig] = Field(default_factory=list)
-    general: List[ColumnConfig] = Field(default_factory=list)
-
-# Struktur-Teil der Konfiguration
-class StructureConfig(BaseModel):
-    prj_root: str
-    data_path: Optional[str] = None
-    output_path: Optional[str] = "output"
-    template_path: Optional[str] = "templates"
-    tmp_path: Optional[str] = ".tmp"
-    logs: Optional[str] = ".logs"
-
-# Optional: Provider-Informationen als eigenes Modell
-class ProviderConfig(BaseModel):
-    IBAN: Optional[str] = None
-    name: Optional[str] = None
-    strasse: Optional[str] = None
-    plz_ort: Optional[str] = None
-
-# Pydantic-Modell für die gesamte Konfiguration
-class ConfigData(BaseModel):
-    locale: str = "de_CH"                       # Gebietsschema
-    currency: str = "CHF"                       # Währung
-    currency_format: str = "¤#,##0.00"          # Format für Währungsangaben
-    date_format: str = "dd.MM.yyyy"             # Datumsformat
-    numeric_format: str = "#,##0.00"            # Zahlenformat
-    expected_columns: ExpectedColumnsConfig     # Erwartete Spalten als typisiertes Modell
-    structure: StructureConfig                  # Struktur-Teil (siehe oben)
-    db_name: Optional[str] = None
-    invoice_template_name: Optional[str] = None
-    sheet_name: Optional[str] = None
-    client_sheet_name: Optional[str] = None
-    reporting_template: Optional[str] = None
-    provider: Optional[ProviderConfig] = None
+# Eigene Pydantic-Modelle für die Konfigurationsstruktur importieren
+from .expected_columns_config import ExpectedColumnsConfig
+from .provider_config import ProviderConfig
+from .structure_config import StructureConfig
+from .config_data import ConfigData  # Zentrale Konfigurationsdatenstruktur
 
 class Config:
-    def get_decrypted_secret(self, key: str, fernet_key_env: str = "FERNET_KEY", default=None) -> Optional[str]:
-        """
-        Holt ein verschlüsseltes Secret aus der Umgebung und entschlüsselt es mit Fernet.
-        Gibt Debug-Ausgaben aus, um das Laden der Variablen und der .env-Datei zu prüfen.
-        Args:
-            key (str): Name der Umgebungsvariable mit dem verschlüsselten Secret
-            fernet_key_env (str): Name der Umgebungsvariable mit dem Fernet-Key
-            default: Optionaler Defaultwert
-        Returns:
-            Optional[str]: Entschlüsseltes Secret oder Default
-        """
-        import base64
-        from cryptography.fernet import Fernet
-        import sys
-        # Versuche .env explizit zu laden und logge den Pfad
-        env_paths = [Path(".env"), Path(__file__).parent.parent.parent / ".env"]
-        loaded = False
-        for env_path in env_paths:
-            if env_path.exists():
-                print(f"[DEBUG] Lade .env von: {env_path}", file=sys.stderr)
-                load_dotenv(dotenv_path=env_path, override=True)
-                loaded = True
-        if not loaded:
-            print("[DEBUG] Keine .env-Datei gefunden!", file=sys.stderr)
-        encrypted = os.getenv(key)
-        fernet_key = os.getenv(fernet_key_env)
-        print(f"[DEBUG] {key} aus env: {encrypted}", file=sys.stderr)
-        print(f"[DEBUG] {fernet_key_env} aus env: {fernet_key}", file=sys.stderr)
-        if not encrypted or not fernet_key:
-            print(f"[DEBUG] Secret oder Key nicht gefunden!", file=sys.stderr)
-            return default
-        try:
-            f = Fernet(fernet_key.encode())
-            decrypted = f.decrypt(encrypted.encode())
-            print(f"[DEBUG] Secret erfolgreich entschlüsselt.", file=sys.stderr)
-            return decrypted.decode()
-        except Exception as e:
-            print(f"[DEBUG] Entschlüsselung fehlgeschlagen: {e}", file=sys.stderr)
-            raise RuntimeError(f"Entschlüsselung fehlgeschlagen: {e}")
     """
     Singleton-Klasse für das Laden und Bereitstellen der Konfiguration.
     Nutzt Pydantic zur Validierung und Typisierung.
     """
 
-    _instance: Optional["Config"] = None  # Statische Variable für die Singleton-Instanz
+    _instance: Optional["Config"] = None
 
     def __new__(cls) -> "Config":
-        # Singleton-Pattern: Nur eine Instanz pro Prozess
+        """
+        Stellt sicher, dass nur eine Instanz der Config-Klasse existiert (Singleton).
+        """
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
-        # Initialisiere _config als Optional[ConfigData] nur, wenn es noch nicht existiert
+        """
+        Initialisiert die Konfigurationsinstanz.
+        """
         if not hasattr(self, "_config"):
             self._config: Optional[ConfigData] = None
+        self._log_configured = False
+
+    def _setup_logger(self):
+        """
+        Initialisiert loguru mit dem Log-Dateipfad und Level aus der geladenen Config.
+        Erstellt das Log-Verzeichnis falls nötig.
+        """
+        if self._log_configured:
+            return
+        # Hole Log-Pfade und Level aus der Config
+        structure = self.get_structure()
+        prj_root = Path(structure.prj_root)
+        logs_dir = prj_root / (getattr(structure, "log_path", ".logs") or ".logs")
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        log_file = logs_dir / (getattr(self, "get_log_file", lambda: "wegpiraten.log")())
+        # Hole Level aus der Config, fallback auf INFO
+        log_level = getattr(self, "get_log_level", lambda: "INFO")()
+        # Entferne alle bestehenden Handler
+        logger.remove()
+        # Schreibe ins Logfile
+        logger.add(str(log_file), rotation="10 MB", retention="10 days", encoding="utf-8", level=log_level)
+        # Schreibe auch ins Terminal ab log_level
+        logger.add(sys.stderr, level=log_level)
+        self._log_configured = True
 
     def load(self, config_path: Path) -> None:
         """
         Lädt die YAML-Konfiguration aus der angegebenen Datei und validiert sie mit Pydantic.
+        Lädt zusätzlich die .env-Datei aus dem Projekt-Root.
         Args:
             config_path (Path): Pfad zur YAML-Konfigurationsdatei
         Raises:
             ValueError: Falls kein Pfad übergeben wird oder die Datei nicht existiert.
         """
-        # .env-Datei laden, falls vorhanden (für Passwörter, API-Keys etc.)
-        env_path = config_path.parent.parent / ".env"
-        if env_path.exists():
-            load_dotenv(dotenv_path=env_path)
-        # Alternativ: Standard .env im Projektroot
-        elif Path(".env").exists():
-            load_dotenv(dotenv_path=Path(".env"))
-
         if not isinstance(config_path, Path):
             raise ValueError("config_path muss ein pathlib.Path-Objekt sein.")
         if not config_path.exists():
@@ -133,11 +78,60 @@ class Config:
         with open(config_path, "r") as f:
             raw_config = yaml.safe_load(f)
         try:
-            # Pydantic validiert und typisiert die geladenen Daten
             self._config = ConfigData(**raw_config)
+            # .env aus prj_root laden
+            prj_root = Path(self._config.structure.prj_root)
+            env_path = prj_root / ".env"
+            if env_path.exists():
+                load_dotenv(dotenv_path=env_path, override=True)
+                logger.debug(f".env geladen von: {env_path}")
+            else:
+                logger.debug(f"Keine .env-Datei gefunden in: {env_path}")
+            self._setup_logger()
+            logger.info("Konfiguration erfolgreich geladen und validiert.")
         except ValidationError as e:
             # Fehlerhafte oder unvollständige Konfiguration wird sofort erkannt
             raise ValueError(f"Fehlerhafte Konfiguration: {e}")
+
+    def get_log_file(self) -> str:
+        # log_file kann in der Config auf Top-Level oder in structure stehen
+        if hasattr(self.data, "log_file") and self.data.log_file:
+            return self.data.log_file
+        if hasattr(self.data.structure, "log_file") and self.data.structure.log_file:
+            return self.data.structure.log_file
+        return "wegpiraten.log"
+
+    def get_log_level(self) -> str:
+        # log_level kann auf Top-Level stehen, fallback auf INFO
+        return getattr(self.data, "log_level", "INFO")
+
+    def get_decrypted_secret(self, key: str, fernet_key_env: str = "FERNET_KEY", default=None) -> Optional[str]:
+        """
+        Holt ein verschlüsseltes Secret aus der Umgebung und entschlüsselt es mit Fernet.
+        Args:
+            key (str): Name der Umgebungsvariable mit dem verschlüsselten Secret
+            fernet_key_env (str): Name der Umgebungsvariable mit dem Fernet-Key
+            default: Optionaler Defaultwert
+        Returns:
+            Optional[str]: Entschlüsseltes Secret oder Default
+        Raises:
+            RuntimeError: Falls die Entschlüsselung fehlschlägt.
+        """
+        encrypted = os.getenv(key)
+        fernet_key = os.getenv(fernet_key_env)
+        logger.debug(f"{key} aus env: {encrypted}")
+        logger.debug(f"{fernet_key_env} aus env: {fernet_key}")
+        if not encrypted or not fernet_key:
+            logger.debug("Secret oder Key nicht gefunden!")
+            return default
+        try:
+            f = Fernet(fernet_key.encode())
+            decrypted = f.decrypt(encrypted.encode())
+            logger.debug("Secret erfolgreich entschlüsselt.")
+            return decrypted.decode()
+        except Exception as e:
+            logger.error(f"Entschlüsselung fehlgeschlagen: {e}")
+            raise RuntimeError(f"Entschlüsselung fehlgeschlagen: {e}")
 
     def get_secret(self, key: str, default=None) -> Optional[str]:
         """
@@ -163,31 +157,46 @@ class Config:
 
     # Zugriffsmethoden geben direkt typisierte Werte aus dem Pydantic-Modell zurück
     def get_locale(self) -> str:
+        """Gibt das Gebietsschema zurück."""
         return self.data.locale
 
     def get_currency(self) -> str:
+        """Gibt die Währung zurück."""
         return self.data.currency
 
     def get_currency_format(self) -> str:
+        """Gibt das Währungsformat zurück."""
         return self.data.currency_format
 
     def get_date_format(self) -> str:
+        """Gibt das Datumsformat zurück."""
         return self.data.date_format
 
     def get_numeric_format(self) -> str:
+        """Gibt das Zahlenformat zurück."""
         return self.data.numeric_format
 
     def get_expected_columns(self) -> ExpectedColumnsConfig:
+        """Gibt die erwarteten Spaltenkonfigurationen zurück."""
         return self.data.expected_columns
 
     def get_structure(self) -> StructureConfig:
+        """Gibt die Struktur-Konfiguration zurück."""
         return self.data.structure
 
     def get_provider(self) -> Optional[ProviderConfig]:
+        """Gibt die Provider-Konfiguration zurück (falls vorhanden)."""
         return self.data.provider
 
-    # Optional: Allgemeiner Getter für beliebige Felder (nur für flache Felder empfohlen)
     def get(self, key: str, default=None) -> Any:
+        """
+        Allgemeiner Getter für beliebige Felder (nur für flache Felder empfohlen).
+        Args:
+            key (str): Name des Feldes
+            default: Optionaler Defaultwert
+        Returns:
+            Any: Wert des Feldes oder Default
+        """
         return getattr(self.data, key, default)
 
 if __name__ == "__main__":
@@ -196,8 +205,7 @@ if __name__ == "__main__":
     config = Config()
     try:
         config.load(config_path)
-        print("Konfiguration erfolgreich geladen und validiert.")
-        print("Projektwurzel:", config.get_structure().prj_root)
-        print("Erwartete Spalten (general):", [col.name for col in config.get_expected_columns().general])
+        logger.info("Projektwurzel: {}", config.get_structure().prj_root)
+        logger.info("Erwartete Spalten (general): {}", [col.name for col in config.get_expected_columns().general])
     except Exception as e:
-        print(f"Fehler beim Laden der Konfiguration: {e}")
+        logger.error(f"Fehler beim Laden der Konfiguration: {e}")

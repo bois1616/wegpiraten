@@ -1,18 +1,11 @@
 from pathlib import Path
 
-from shared_modules.config import (
-    Config,
-    StructureConfig,  # Passe den Modulnamen ggf. an
-)
-from modules.reporting_factory import ReportingFactory, ReportingFactoryConfig
+# Importiere die zentrale Konfiguration und das Strukturmodell aus dem shared_modules-Paket.
+from shared_modules.config import Config, StructureConfig
 
-# The lines you provided are importing specific classes from the modules
-# `reporting_processor` and `structure_config`. Here's a breakdown of what each
-# import statement is doing:
-from modules.reporting_processor import (
-    ReportingConfig,
-    ReportingProcessor,
-)
+# Importiere die benötigten Klassen für die Berichtserstellung und -verarbeitung.
+from modules.reporting_factory import ReportingFactory, ReportingFactoryConfig
+from modules.reporting_processor import ReportingConfig, ReportingProcessor
 
 
 def main() -> None:
@@ -24,7 +17,7 @@ def main() -> None:
     # Pfad zur YAML-Konfigurationsdatei bestimmen (typisiert mit pathlib.Path)
     config_path: Path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
     config: Config = Config()
-    config.load(config_path)
+    config.load(config_path)  # Lädt und validiert die Konfiguration, initialisiert Logger
 
     # Zugriff auf die Struktur-Konfiguration über das Pydantic-Modell
     structure: StructureConfig = config.get_structure()
@@ -34,9 +27,9 @@ def main() -> None:
     output_path: Path = prj_root / (structure.output_path or "output")
     template_path: Path = prj_root / (structure.template_path or "templates")
 
-    reporting_month: str = "2025-09"  # Beispiel: September 2025
+    reporting_month: str = "2025-10"  # Beispiel: September 2025
 
-    # Erweiterung: ReportingFactory- und ReportingProcessor-Konfiguration auslagern
+    # TODO: Erweiterung: ReportingFactory- und ReportingProcessor-Konfiguration auslagern
     # Diese Blöcke prüfen, ob die Konfiguration in der Hauptkonfiguration vorhanden ist,
     # und nutzen ansonsten Defaultwerte der jeweiligen Pydantic-Modelle.
 
@@ -58,6 +51,7 @@ def main() -> None:
 
     # Ausführung der Verarbeitung mit typisierten Pfaden und Monat
     processor.run(reporting_month, output_path, template_path)
+
 
 if __name__ == "__main__":
     main()

@@ -3,12 +3,10 @@ from pathlib import Path
 
 from loguru import logger
 from modules.invoice_filter import InvoiceFilter  # Erwartet typisierte Filterdaten
-from modules.invoice_processor import (
-    InvoiceProcessor,  # Erwartet Pydantic-Konfiguration
-)
+from modules.invoice_processor import InvoiceProcessor  # Erwartet Pydantic-Konfiguration
 
-# Importiere die Pydantic-basierten Konfigurations- und Prozessorklassen
-from shared_modules.config import Config  # Pydantic-basierte Singleton-Konfiguration
+# Importiere die Pydantic-basierte Singleton-Konfiguration
+from shared_modules.config import Config
 
 
 def main() -> None:
@@ -39,15 +37,8 @@ def main() -> None:
     # Zugriff auf die Struktur-Konfiguration über das Pydantic-Modell
     structure = config_obj.get_structure()  # Gibt ein StructureConfig-Pydantic-Modell zurück
 
-    # Log-Verzeichnis und Logdatei konfigurieren, Pfade werden typisiert ausgelesen
-    if structure.logs is None:
-        raise ValueError("structure.logs darf nicht None sein!")
-    logs_dir: Path = Path(structure.prj_root) / structure.logs
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    log_file: Path = logs_dir / "Rechnung.log"
-
-    # Loguru-Konfiguration: Logdatei im gewünschten Verzeichnis und Konsolenausgabe
-    logger.add(str(log_file), rotation="10 MB", retention="10 days", level="INFO")
+    # Logdatei und Logverzeichnis werden automatisch durch config.setup_logger() eingerichtet
+    # (Logger ist bereits durch Config initialisiert, keine doppelte Konfiguration nötig)
     logger.info("Starte Rechnungsprozess...")
 
     try:

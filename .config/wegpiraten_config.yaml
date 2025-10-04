@@ -4,14 +4,18 @@ structure:
   output_path: output
   template_path: templates
   tmp_path: .tmp
-  logs: .logs
+  log_path: .logs
 
 db_name: Wegpiraten Datenbank.xlsx
 
+log_file: wegpiraten.log
+log_level: DEBUG
+
 invoice_template_name: rechnungsvorlage.docx
 sheet_name: Pivot Rechnungsdaten
-client_sheet_name: MD_Klienten
+
 reporting_template: zeiterfassungsboegen.xlsx
+client_sheet_name: MD_Klienten
 
 # Globale Formatierungseinstellungen für Babel/Jinja2-Filter
 locale: de_CH

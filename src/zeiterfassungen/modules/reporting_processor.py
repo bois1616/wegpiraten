@@ -1,43 +1,63 @@
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 import pandas as pd
+import yaml  # Wird nur im __main__-Block benötigt, aber für Übersichtlichkeit oben gelassen
+from loguru import logger
 from openpyxl import load_workbook
 from pydantic import ValidationError
-from .reporting_config import ReportingConfig  # ReportingConfig importieren
 
+from shared_modules.config import Config  # Für Passwort-Handling
 
-# Pydantic-Modell für die Reporting-Konfiguration
+from .reporting_config import (
+    ReportingConfig,  # Import des Pydantic-Modells für die Reporting-Konfiguration
+)
+from .reporting_factory import ReportingFactory
 
 
 class ReportingProcessor:
+    """
+    Klasse zur Verarbeitung von Reporting-Daten.
+    Erwartet ausschließlich Pydantic-Modelle für Konfiguration und nutzt Typsicherheit.
+    """
+
     def get_sheet_password(self) -> str:
         """
         Holt das Excel-Blattschutz-Passwort sicher aus der Umgebung (.env), entschlüsselt falls nötig.
         Gibt SHEET_PASSWORD_ENC (verschlüsselt) oder SHEET_PASSWORD (Klartext) zurück.
+
+        Returns:
+            str: Das entschlüsselte oder im Klartext gespeicherte Passwort.
+
+        Raises:
+            RuntimeError: Wenn kein Passwort gefunden werden kann.
         """
-        from shared_modules.config import Config
         config = Config()
         pw = config.get_decrypted_secret("SHEET_PASSWORD_ENC")
         if not pw:
             pw = config.get_secret("SHEET_PASSWORD")
         if not pw:
-            raise RuntimeError("Excel-Blattschutz-Passwort nicht gesetzt! Bitte .env mit SHEET_PASSWORD_ENC oder SHEET_PASSWORD anlegen.")
+            logger.error(
+                "Excel-Blattschutz-Passwort nicht gesetzt! Bitte .env mit SHEET_PASSWORD_ENC oder SHEET_PASSWORD anlegen."
+            )
+            raise RuntimeError(
+                "Excel-Blattschutz-Passwort nicht gesetzt! Bitte .env mit SHEET_PASSWORD_ENC oder SHEET_PASSWORD anlegen."
+            )
         return pw
 
-    """
-    Klasse zur Verarbeitung von Reporting-Daten.
-    Erwartet ausschließlich Pydantic-Modelle für Konfiguration und nutzt Typsicherheit.
-    """
-    def __init__(self, config: ReportingConfig, factory: object):
+    def __init__(
+        self, reporting_config: ReportingConfig, reporting_factory: ReportingFactory
+    ):
         """
         Konstruktor erwartet ein Pydantic-Modell für die Konfiguration.
         Das sorgt für Typsicherheit und Validierung der Konfigurationsdaten.
+
         Args:
-            config (ReportingConfig): Validierte Reporting-Konfiguration.
-            factory (object): Factory-Objekt zur Erstellung der Reporting-Sheets.
+            reporting_config (ReportingConfig): Validierte Reporting-Konfiguration.
+            reporting_factory (ReportingFactory): Factory-Objekt zur Erstellung der Reporting-Sheets.
         """
-        self.config: ReportingConfig = config
-        self.factory = factory
+        self.reporting_config: ReportingConfig = reporting_config
+        self.reporting_factory = reporting_factory
 
     def load_client_data(self, reporting_month: str) -> pd.DataFrame:
         """
@@ -49,13 +69,21 @@ class ReportingProcessor:
 
         Returns:
             pd.DataFrame: Gefilterte Klientendaten.
+
+        Raises:
+            ValueError: Wenn die gewünschte Tabelle nicht gefunden wird.
         """
         # Zugriff auf die Konfigurationsdaten über das Pydantic-Modell
-        prj_root = Path(self.config.structure.prj_root)
-        data_path = prj_root / self.config.structure.data_path
-        db_name = self.config.db_name
+        data_path = Path(self.reporting_config.structure.data_path)
+        db_name = self.reporting_config.db_name
         source = data_path / db_name
-        table_name = self.config.client_sheet_name
+        table_name = self.reporting_config.client_sheet_name
+
+        if not source.exists():
+            logger.error(f"Quelldatei für Klientendaten nicht gefunden: {source}")
+            raise FileNotFoundError(
+                f"Quelldatei für Klientendaten nicht gefunden: {source}"
+            )
 
         reporting_month_dt = datetime.strptime(reporting_month, "%Y-%m")
         wb = load_workbook(source, data_only=True)
@@ -65,15 +93,16 @@ class ReportingProcessor:
                 ref = table.ref
                 data = ws[ref]
                 rows = [[cell.value for cell in row] for row in data]
-                df = pd.DataFrame(rows[1:], columns=rows[0])
+                client_masterdata = pd.DataFrame(rows[1:], columns=rows[0])
                 break
         else:
+            logger.error(f"Tabelle {table_name} nicht gefunden in {db_name}")
             raise ValueError(f"Tabelle {table_name} nicht gefunden in {db_name}")
 
         # Datumsfilterung: Nur Klienten, deren "Ende" leer ist oder nach dem Berichtsmonat liegt
-        df["Ende"] = pd.to_datetime(df["Ende"], format="%d.%m.%Y", errors="coerce")
-        df = df[(df["Ende"].isna()) | (df["Ende"] >= reporting_month_dt)]
-        return df
+        client_masterdata["Ende"] = pd.to_datetime(client_masterdata["Ende"], format="%d.%m.%Y", errors="coerce")
+        client_masterdata = client_masterdata[(client_masterdata["Ende"].isna()) | (client_masterdata["Ende"] >= reporting_month_dt)]
+        return client_masterdata
 
     def run(self, reporting_month: str, output_path: Path, template_path: Path) -> None:
         """
@@ -85,21 +114,24 @@ class ReportingProcessor:
             template_path (Path): Verzeichnis mit den Excel-Templates.
         """
         reporting_month_dt = datetime.strptime(reporting_month, "%Y-%m")
-        df = self.load_client_data(reporting_month)
+        client_masterdata = self.load_client_data(reporting_month)
         sheet_password = self.get_sheet_password()
-        for idx, row in df.iterrows():
-            dateiname = self.factory.create_reporting_sheet(
-                row, reporting_month_dt, output_path, template_path, sheet_password=sheet_password
+        for _, header_data in client_masterdata.iterrows():
+            dateiname = self.reporting_factory.create_reporting_sheet(
+                header_data=header_data,
+                reporting_month_dt=reporting_month_dt,
+                output_path=output_path,
+                template_path=template_path,
+                sheet_password=sheet_password,
             )
-            print(
-                f"Erstelle AZ Erfassungsbogen für {row['Sozialpädagogin']} "
-                f"({row['Kürzel']}, Ende: {row['Ende']}) -> {dateiname}"
+            logger.info(
+                f"Erstelle AZ Erfassungsbogen für {header_data['Sozialpädagogin']} "
+                f"({header_data['Kürzel']}, Ende: {header_data['Ende']}) -> {dateiname}"
             )
+
 
 # Beispiel für die Initialisierung mit Pydantic
 if __name__ == "__main__":
-    import yaml
-
     # Beispiel: YAML-Konfiguration laden und mit Pydantic validieren
     config_path = Path("wegpiraten_reporting_config.yaml")
     with open(config_path, "r") as f:
