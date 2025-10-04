@@ -104,6 +104,7 @@ class ReportingFactory:
                 logger.error("Sheet-Passwort ist nicht gesetzt!")
                 raise RuntimeError("Sheet-Passwort ist nicht gesetzt!")
             ws.protection.set_password(str(password))
+            ws.protection.objects = True  # <--- Diese Zeile ergänzt den Objektschutz
             # Die folgenden Attribute sind optional und nicht in allen openpyxl-Versionen verfügbar
             for attr, value in [
                 ("enable_select_locked_cells", False),
@@ -125,7 +126,7 @@ class ReportingFactory:
                     setattr(ws.protection, attr, value)
 
         # Dateinamen generieren und Datei speichern
-        dateiname: str = f"Aufwandserfassung_{reporting_month_dt.strftime('%Y-%m')}_{header_data['Kürzel']}.xlsx"
+        dateiname: str = f"{header_data['KlientNr']} ({header_data['Kürzel']})_{reporting_month_dt.strftime('%Y-%m')}.xlsx"
         try:
             wb.save(output_path / dateiname)
         except Exception as e:

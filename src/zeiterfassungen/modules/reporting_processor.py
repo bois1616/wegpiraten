@@ -96,8 +96,8 @@ class ReportingProcessor:
                 client_masterdata = pd.DataFrame(rows[1:], columns=rows[0])
                 break
         else:
-            logger.error(f"Tabelle {table_name} nicht gefunden in {db_name}")
-            raise ValueError(f"Tabelle {table_name} nicht gefunden in {db_name}")
+            logger.error(f"Klientendaten {table_name} nicht gefunden in {db_name}")
+            raise ValueError(f"Klientendaten {table_name} nicht gefunden in {db_name}")
 
         # Datumsfilterung: Nur Klienten, deren "Ende" leer ist oder nach dem Berichtsmonat liegt
         client_masterdata["Ende"] = pd.to_datetime(client_masterdata["Ende"], format="%d.%m.%Y", errors="coerce")
