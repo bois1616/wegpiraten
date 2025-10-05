@@ -15,10 +15,10 @@ class StructureConfig(BaseModel):
         log_file (Optional[str]): Name der Logdatei (Standard: "wegpiraten.log").
     """
     prj_root: str
-    data_path: Optional[str] = None
+    shared_data_path: Optional[str] = None
     output_path: Optional[str] = "output"
     template_path: Optional[str] = "templates"
     tmp_path: Optional[str] = ".tmp"
     logs: Optional[str] = ".logs"
     log_file: Optional[str] = "wegpiraten.log"
-    data: Optional[str] = 'data'
+    local_data_path: Optional[str] = 'data'

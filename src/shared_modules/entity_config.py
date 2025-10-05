@@ -2,40 +2,40 @@ from pydantic import BaseModel
 from typing import Optional
 
 class Employee(BaseModel):
-    PersNr: str
-    Name: str
-    Vorname: str
-    Nachname: str
-    FTE: Optional[float]
-    Kommentar: Optional[str]
+    emp_id: str
+    first_name: str
+    last_name: str
+    fte: Optional[float]
+    notes: Optional[str]
     # ...weitere Felder...
 
 class Payer(BaseModel):
-    ZdNr: str
-    Name: str
-    Name2: Optional[str]
-    Strasse: str
-    PLZ: str
-    Ort: str
-    Kommentar: Optional[str]
+    payer_id: str
+    name: str
+    name2: Optional[str]
+    street: Optional[str]
+    zip_code: Optional[str]
+    city: Optional[str]
+    notes: Optional[str]
     # ...weitere Felder...
 
 class ServiceRequester(BaseModel):
-    LBNr: str
-    Name: str
+    service_requester_id: str
+    name: str
     # ...weitere Felder...
 
 class Client(BaseModel):
-    KlientNr: str
-    Vorname: str
-    Nachname: str
-    Kuerzel: Optional[str]
-    payer_id: Optional[str]  # ZdNr als Fremdschlüssel
-    service_requester_id: Optional[str]  # LBNr als Fremdschlüssel
-    Start: Optional[str]  # Datum als String, z.B. "2023-01-15"
-    Ende: Optional[str]  # Datum als String
-    betreuer_id: Optional[str]  # PersNr als Fremdschlüssel
-    Stunden_pro_monat: Optional[float]
-    Betreuungstyp: Optional[str] # kann SPF oder BBT sein
-    Kommentar: Optional[str]
+    client_id: str
+    social_security_number: Optional[str]
+    first_name: str
+    last_name: str
+    initials: Optional[str]  # oder "short_code", je nach Mapping
+    payer_id: Optional[str]  # Fremdschlüssel auf Payer
+    service_requester_id: Optional[str]  # Fremdschlüssel auf ServiceRequester
+    start_date: Optional[str]
+    end_date: Optional[str]
+    employee_id: Optional[str]  # Fremdschlüssel auf Employee
+    allowed_hours_per_month: Optional[float]
+    service_type: Optional[str]  # z.B. "SPF" oder "BBT"
+    notes: Optional[str]
     # ...weitere Felder...

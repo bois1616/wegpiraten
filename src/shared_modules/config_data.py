@@ -1,15 +1,16 @@
-from typing import Optional
+from typing import Optional, Dict
 from pydantic import BaseModel
 
 from .expected_columns_config import ExpectedColumnsConfig
 from .structure_config import StructureConfig
 from .provider_config import ProviderConfig
+from .mapping_entry import MappingEntry
 
 class ConfigData(BaseModel):
     """
     Modell für die gesamte Konfiguration des Projekts.
 
-    Attributte:
+    Attribute:
         locale (str): Gebietsschema (z.B. "de_CH").
         currency (str): Währung (z.B. "CHF").
         currency_format (str): Format für Währungsangaben.
@@ -25,14 +26,16 @@ class ConfigData(BaseModel):
         client_sheet_name (Optional[str]): Name des Klienten-Sheets (optional).
         reporting_template (Optional[str]): Name der Reporting-Vorlage (optional).
         provider (Optional[ProviderConfig]): Anbieter-Konfiguration (optional).
+        table_mappings (Dict[str, Dict[str, str]]): Tabellen-Mapping (Excel-Tabelle → Entity/Zieltabelle).
+        field_mappings (Dict[str, Dict[str, MappingEntry]]): Feld-Mappings für jede Entity.
     """
-    locale: str = "de_CH"                       # Gebietsschema
-    currency: str = "CHF"                       # Währung
-    currency_format: str = "¤#,##0.00"          # Format für Währungsangaben
-    date_format: str = "dd.MM.yyyy"             # Datumsformat
-    numeric_format: str = "#,##0.00"            # Zahlenformat
-    expected_columns: ExpectedColumnsConfig     # Erwartete Spalten als typisiertes Modell
-    structure: StructureConfig                  # Struktur-Teil (siehe oben)
+    locale: str = "de_CH"
+    currency: str = "CHF"
+    currency_format: str = "¤#,##0.00"
+    date_format: str = "dd.MM.yyyy"
+    numeric_format: str = "#,##0.00"
+    expected_columns: ExpectedColumnsConfig
+    structure: StructureConfig
     db_name: Optional[str] = None
     sqlite_db_name: Optional[str] = None
     db_encrypted: Optional[bool] = None
@@ -41,3 +44,7 @@ class ConfigData(BaseModel):
     client_sheet_name: Optional[str] = None
     reporting_template: Optional[str] = None
     provider: Optional[ProviderConfig] = None
+    # Tabellen-Mapping: Excel-Tabelle → {"entity": Entity-Name, "target": Zieltabelle}
+    table_mappings: Dict[str, Dict[str, str]]
+    # Feld-Mappings: Entity-Name → {Excel-Spaltenname: MappingEntry}
+    field_mappings: Dict[str, Dict[str, MappingEntry]]

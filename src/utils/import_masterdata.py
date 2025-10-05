@@ -1,7 +1,8 @@
 """
-Importiert Stammdaten aus einer bestehenden SQLite-Datenbank (z.B. Excel-Export) in die Projekt-SQLite-DB.
-Die Ziel-DB wird automatisch im data-Verzeichnis unterhalb des Projekt-Roots angelegt (Pfad und Name aus Config).
-Verwendet zentrale Config, Entity-Modelle aus shared_modules.entity_config und Feld-Mappings aus md_mappings.
+Importiert Stammdaten aus einer bestehenden Excel-Datei (mit mehreren Tabellen/Excel-Tabellen) in die Projekt-SQLite-DB.
+Die Ziel-DB wird automatisch im local_data_path unterhalb des Projekt-Roots angelegt (Pfad und Name aus Config).
+Die Quelldatei (Excel) wird aus shared_data_path geladen.
+Verwendet zentrale Config, Entity-Modelle aus shared_modules.entity_config und Feld-Mappings aus der Config.
 """
 
 from pathlib import Path
@@ -9,97 +10,126 @@ import sqlite3
 from typing import Dict, Type, Any
 import pandas as pd
 from loguru import logger
+import openpyxl
 
 from shared_modules.config import Config
 from shared_modules.entity_config import Employee, Client, Payer, ServiceRequester
-import md_mappings  # Muss ein Dict mit Tabellen-Mappings bereitstellen
+from shared_modules.mapping_entry import MappingEntry
 
-# Mapping: Quell-Tabellenname -> Ziel-Tabellenname und Entity-Modell
-TABLES: Dict[str, Dict[str, Any]] = {
-    "MD_MA": {"target": "employees", "model": Employee, "mapping": md_mappings.EMPLOYEE_MAPPING},
-    "Leistungsbesteller": {"target": "service_requester", "model": ServiceRequester, "mapping": md_mappings.SERVICE_REQUESTER_MAPPING},
-    "Zahlungsdienstleister": {"target": "payer", "model": Payer, "mapping": md_mappings.PAYER_MAPPING},
-    "MD_Client": {"target": "clients", "model": Client, "mapping": md_mappings.CLIENT_MAPPING},
-}
+def sql_type(py_type: str) -> str:
+    # Mapping von Python-Typnamen (als String) auf SQLite-Typen
+    return {
+        "str": "TEXT",
+        "float": "REAL",
+        "int": "INTEGER",
+        "bool": "INTEGER"
+    }.get(py_type, "TEXT")
 
-def create_target_tables(conn: sqlite3.Connection) -> None:
-    """
-    Legt die Zieltabellen in der SQLite-DB an.
-    Die Struktur orientiert sich an den Entity-Modellen und verwendet die korrekten Schlüssel.
-    """
+def create_target_tables(conn, table_mappings, field_mappings):
     cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS employees (
-            PersNr TEXT PRIMARY KEY,
-            Name TEXT,
-            Vorname TEXT,
-            Nachname TEXT,
-            FTE REAL,
-            Kommentar TEXT
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS service_requester (
-            LBNr TEXT PRIMARY KEY,
-            Name TEXT
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS payer (
-            ZdNr TEXT PRIMARY KEY,
-            Name TEXT,
-            Name2 TEXT,
-            Strasse TEXT,
-            PLZ TEXT,
-            Ort TEXT,
-            Kommentar TEXT
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS clients (
-            KlientNr TEXT PRIMARY KEY,
-            Vorname TEXT,
-            Nachname TEXT,
-            payer_id TEXT,
-            service_requester_id TEXT,
-            Kommentar TEXT
-        )
-    """)
+    for excel_table, table_cfg in table_mappings.items():
+        target_table = table_cfg["target"]
+        entity = table_cfg["entity"]
+        primary_key = table_cfg.get("primary_key")
+        fields = field_mappings[entity]
+        columns = []
+        for excel_col, entry in fields.items():
+            col_name = entry.field
+            col_type = sql_type(entry.type)
+            if col_name == primary_key:
+                columns.append(f"{col_name} {col_type} PRIMARY KEY")
+            else:
+                columns.append(f"{col_name} {col_type}")
+        columns_sql = ",\n    ".join(columns)
+        sql = f"CREATE TABLE IF NOT EXISTS {target_table} (\n    {columns_sql}\n)"
+        cur.execute(sql)
     conn.commit()
 
-def map_row(row: pd.Series, mapping: Dict[str, str]) -> Dict[str, Any]:
+def get_type_from_str(type_str: str):
     """
-    Mappt die Felder einer Zeile gemäß dem Mapping-Dict.
+    Wandelt einen Typnamen als String in einen Python-Typ um.
     """
-    return {target: row.get(source) for source, target in mapping.items()}
+    mapping = {
+        "str": str,
+        "float": float,
+        "int": int,
+        "bool": bool,
+    }
+    return mapping.get(type_str, str)
+
+def map_row(row: pd.Series, mapping: Dict[str, MappingEntry], required_fields: list) -> Dict[str, Any]:
+    """
+    Mappt die Felder einer Zeile gemäß dem Mapping-Dict aus der Config.
+    Führt erforderliche Typkonvertierungen durch und ergänzt fehlende Felder mit None.
+    """
+    result = {}
+    for excel_col, entry in mapping.items():
+        field_name = entry.field
+        field_type = get_type_from_str(entry.type)
+        value = row.get(excel_col)
+        if value is not None:
+            try:
+                # Spezialfall: float auf int, falls nötig
+                if field_type is int and isinstance(value, float) and value.is_integer():
+                    value = int(value)
+                else:
+                    value = field_type(value)
+            except Exception:
+                logger.warning(f"Typkonvertierung für Feld '{field_name}' fehlgeschlagen, Wert: {value}")
+        result[field_name] = value
+    # Fehlende Pflichtfelder ergänzen
+    for field in required_fields:
+        if field not in result:
+            result[field] = None
+    return result
+
+def read_excel_table(file_path: Path, table_name: str) -> pd.DataFrame:
+    """
+    Liest eine benannte Tabelle (Excel Table, nicht Sheet!) aus einer Excel-Datei als DataFrame.
+    """
+    wb = openpyxl.load_workbook(file_path, data_only=True)
+    for ws in wb.worksheets:
+        if table_name in ws.tables:
+            table = ws.tables[table_name]
+            ref = table.ref  # z.B. 'A1:F20'
+            min_col, min_row, max_col, max_row = openpyxl.utils.range_boundaries(ref)
+            data = []
+            for row in ws.iter_rows(min_row=min_row, max_row=max_row,
+                                    min_col=min_col, max_col=max_col):
+                data.append([cell.value for cell in row])
+            df = pd.DataFrame(data[1:], columns=data[0])  # Erste Zeile als Header
+            return df
+    raise ValueError(f"Tabelle {table_name} nicht gefunden.")
 
 def import_table(
     source_excel: Path,
     target_conn: sqlite3.Connection,
-    source_sheet: str,
+    table_name: str,
     target_table: str,
     model: Type,
-    mapping: Dict[str, str],
+    mapping: Dict[str, MappingEntry],
 ) -> None:
     """
-    Liest alle Daten aus dem angegebenen Excel-Sheet, mappt die Felder und schreibt sie in die Zieltabelle.
-    Nutzt das zentrale Entity-Modell zur Validierung.
+    Liest alle Daten aus der angegebenen Excel-Tabelle (nicht Sheet!), mappt die Felder und schreibt sie in die Zieltabelle.
     """
-    logger.info(f"Importiere Sheet {source_sheet} → {target_table}")
+    logger.info(f"Importiere Excel-Tabelle {table_name} → {target_table}")
     try:
-        df = pd.read_excel(source_excel, sheet_name=source_sheet)
+        excel_table = read_excel_table(source_excel, table_name)
     except Exception as e:
-        logger.error(f"Fehler beim Lesen von Sheet {source_sheet}: {e}")
+        logger.error(f"Fehler beim Lesen der Excel-Tabelle {table_name}: {e}")
         return
 
+    required_fields = list(model.model_fields.keys())
     records = []
-    for _, row in df.iterrows():
+    for _, row in excel_table.iterrows():
+        if row.isnull().all():
+            continue
         try:
-            mapped = map_row(row, mapping)
+            mapped = map_row(row, mapping, required_fields)
             rec = model(**mapped)
             records.append(rec.dict())
         except Exception as e:
-            logger.error(f"Fehler beim Validieren eines Datensatzes aus {source_sheet}: {e}")
+            logger.error(f"Fehler beim Validieren eines Datensatzes aus {table_name}: {e}")
 
     if records:
         df_target = pd.DataFrame(records)
@@ -121,34 +151,63 @@ def main() -> None:
     config = Config()
     config.load(config_path)
 
-    # Ermittle Ziel-DB-Pfad aus der Config
+    # Ermittle Pfade aus der Config
     prj_root = Path(config.get_structure().prj_root)
-    data_dir = config.get_structure().data or 'data'
+    shared_data_path = getattr(config.get_structure(), "shared_data_path", "shared_data")
+    local_data_path = getattr(config.get_structure(), "local_data_path", "data")
     sqlite_db_name = config.get("sqlite_db_name")
-    target_db_path = prj_root / data_dir / sqlite_db_name
+    source_db_name = config.get("db_name")
+
+    # Ziel-DB: im local_data_path unterhalb von prj_root
+    target_db_path = prj_root / local_data_path / sqlite_db_name
     target_db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Quelle: aus data_path und db_name
-    import_path = Path(config.get_structure().data_path)
-    source_db_name = config.get("db_name")
-    source_db_path = import_path / source_db_name
+    # Quelle: Excel-Datei im shared_data_path unterhalb von prj_root
+    source_excel_path = prj_root / shared_data_path / source_db_name
 
-    logger.info(f"Quelle: {source_db_path}")
+    logger.info(f"Quelle: {source_excel_path}")
     logger.info(f"Ziel:   {target_db_path}")
 
-    if not source_db_path.exists():
-        logger.error(f"Quelldatenbank nicht gefunden: {source_db_path}")
+    if not source_excel_path.exists():
+        logger.error(f"Quelldatei nicht gefunden: {source_excel_path}")
         return
 
-    with sqlite3.connect(source_db_path) as source_conn, \
-         sqlite3.connect(target_db_path) as target_conn:
-        create_target_tables(target_conn)
+    # Lade Tabellen-Mapping aus der Config (z.B. aus mappings_config)
+    # Beispielstruktur in der Config:
+    # table_mappings:
+    #   MD_MA:
+    #     entity: employee
+    #     target: employees
+    #   ...
+    table_mappings = config.get("table_mappings")
+    field_mappings = config.get("field_mappings")
+
+    # Entity-Name zu Modell
+    entity_models = {
+        "employee": Employee,
+        "service_requester": ServiceRequester,
+        "payer": Payer,
+        "client": Client,
+    }
+
+    # Generiere TABLES dynamisch aus der Config
+    TABLES = {}
+    for excel_table, table_cfg in table_mappings.items():
+        entity = table_cfg["entity"]
+        TABLES[excel_table] = {
+            "target": table_cfg["target"],
+            "model": entity_models[entity],
+            "mapping": field_mappings[entity],
+        }
+
+    with sqlite3.connect(target_db_path) as target_conn:
+        create_target_tables(target_conn, table_mappings, field_mappings)
         for source_table, meta in TABLES.items():
             try:
                 import_table(
-                    source_conn,
+                    source_excel_path,
                     target_conn,
-                    source_table,
+                    source_table,      # Tabellenname in Excel
                     meta["target"],
                     meta["model"],
                     meta["mapping"],

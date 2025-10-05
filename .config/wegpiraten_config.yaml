@@ -1,11 +1,11 @@
 structure:
   prj_root: /home/stephan/projects/wegpiraten
-  data_path: /mnt/c/Users/micro/OneDrive/Shared/Beatus/Wegpiraten Unterlagen
+  shared_data_path: /mnt/c/Users/micro/OneDrive/Shared/Beatus/Wegpiraten Unterlagen
   output_path: output
   template_path: templates
   tmp_path: .tmp
   log_path: .logs
-  data: data
+  local_data_path: data
 
 sqlite_db_name: Wegpiraten Datenbank.sqlite3
 db_name: Wegpiraten Datenbank.xlsx
@@ -120,3 +120,55 @@ provider:
   name: Wegpiraten GmbH
   strasse: Alpenstraße 2
   plz_ort: 3800 Interlaken
+
+field_mappings:
+  employee:
+    PersNr: { field: emp_id, type: str }
+    Vorname: { field: first_name, type: str }
+    Nachname: { field: last_name, type: str }
+    FTE: { field: fte, type: float }
+    Kommentar: { field: notes, type: str }
+  client:
+    KlientNr: { field: client_id, type: str }
+    SozVersNr: { field: social_security_number, type: str }
+    Vorname: { field: first_name, type: str }
+    Nachname: { field: surname, type: str }
+    Kürzel: { field: short_code, type: str }
+    ZdNr: { field: payer_id, type: str }
+    LbNr: { field: service_requester_id, type: str }
+    Beginn: { field: start_date, type: str }
+    Ende: { field: end_date, type: str }
+    MA_ID: { field: employee_id, type: str }
+    Stunden pro Monat: { field: allowed_hours_per_month, type: float }
+    SPF / BBT: { field: service_type, type: str }
+    Kommentar: { field: notes, type: str }
+  payer:
+    ZdNr: { field: payer_id, type: str }
+    ZD_Name: { field: name, type: str }
+    ZD_Name2: { field: name2, type: str }
+    ZD_Strasse: { field: street, type: str }
+    ZD_PLZ: { field: zip_code, type: str }
+    ZD_Ort: { field: city, type: str }
+    Kommentar: { field: notes, type: str }
+  service_requester:
+    LBNr: { field: sr_key, type: str }
+    Leistungsbesteller: { field: name, type: str }
+
+
+table_mappings:
+  MD_MA: # Excel-Tabellenname
+    entity: employee # Entität im Code
+    target: employees # Zieltabelle in der DB
+    primary_key: emp_id # Primärschlüssel der Zieltabelle
+  Leistungsbesteller:
+    entity: service_requester
+    target: service_requester
+    primary_key: sr_key
+  Zahlungsdienstleister:
+    entity: payer
+    target: payer
+    primary_key: payer_id
+  MD_Client:
+    entity: client
+    target: clients
+    primary_key: client_id
