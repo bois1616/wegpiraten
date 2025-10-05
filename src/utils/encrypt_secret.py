@@ -1,8 +1,9 @@
 # Hilfsskript zum Verschlüsseln von Passwörtern für .env
 # Ausführen: python encrypt_secret.py <klartext-passwort>
 import sys
+from cryptography.fernet import Fernet  # type: ignore[import]
 
-from cryptography.fernet import Fernet  # type: ignore[import]  
+from shared_modules.config import Config
 
 
 def main():
@@ -18,10 +19,19 @@ def main():
             sys.exit(1)
 
     password_bytes = password.encode()
-    # Schlüssel generieren und anzeigen (nur einmal erzeugen und dann sicher speichern!)
-    key = Fernet.generate_key()
-    print(f"Dein geheimer Schlüssel (FERNET_KEY): {key.decode()}")
-    f = Fernet(key)
+
+    # FERNET_KEY aus der Config laden oder neu erzeugen
+    config = Config()
+    fernet_key = config.get_secret("FERNET_KEY")
+    if not fernet_key:
+        fernet_key = Fernet.generate_key().decode()
+        print("\nKein FERNET_KEY in der Konfiguration/.env gefunden.")
+        print("Ein neuer Schlüssel wurde generiert:")
+        print(f"FERNET_KEY={fernet_key}")
+        print("Bitte diesen Schlüssel in deiner .env oder Konfiguration eintragen und das Skript erneut ausführen.\n")
+        sys.exit(1)
+
+    f = Fernet(fernet_key.encode())
     encrypted = f.encrypt(password_bytes)
     print(f"Verschlüsseltes Passwort für .env: {encrypted.decode()}")
 

@@ -5,8 +5,13 @@ structure:
   template_path: templates
   tmp_path: .tmp
   log_path: .logs
+  data: data
 
+sqlite_db_name: Wegpiraten Datenbank.sqlite3
 db_name: Wegpiraten Datenbank.xlsx
+db_encrypted: true
+# db password in .env
+
 
 log_file: wegpiraten.log
 log_level: DEBUG
@@ -16,6 +21,7 @@ sheet_name: Pivot Rechnungsdaten
 
 reporting_template: zeiterfassungsboegen.xlsx
 client_sheet_name: MD_Klienten
+# sheet password in .env
 
 # Globale Formatierungseinstellungen für Babel/Jinja2-Filter
 locale: de_CH

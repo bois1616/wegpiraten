@@ -21,3 +21,4 @@ class StructureConfig(BaseModel):
     tmp_path: Optional[str] = ".tmp"
     logs: Optional[str] = ".logs"
     log_file: Optional[str] = "wegpiraten.log"
+    data: Optional[str] = 'data'
