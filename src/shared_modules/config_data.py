@@ -1,7 +1,7 @@
 from typing import Optional, Dict
 from pydantic import BaseModel
 
-from .expected_columns_config import ExpectedColumnsConfig
+
 from .structure_config import StructureConfig
 from .provider_config import ProviderConfig
 from .mapping_entry import MappingEntry
@@ -16,7 +16,6 @@ class ConfigData(BaseModel):
         currency_format (str): Format für Währungsangaben.
         date_format (str): Datumsformat.
         numeric_format (str): Zahlenformat.
-        expected_columns (ExpectedColumnsConfig): Erwartete Spalten als typisiertes Modell.
         structure (StructureConfig): Struktur-Teil der Konfiguration.
         db_name (Optional[str]): Name der Datenbank (optional).
         sqlite_db_name (Optional[str]): Name der SQLite-Datenbank (optional).
@@ -34,7 +33,6 @@ class ConfigData(BaseModel):
     currency_format: str = "¤#,##0.00"
     date_format: str = "dd.MM.yyyy"
     numeric_format: str = "#,##0.00"
-    expected_columns: ExpectedColumnsConfig
     structure: StructureConfig
     db_name: Optional[str] = None
     sqlite_db_name: Optional[str] = None

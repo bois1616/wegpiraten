@@ -12,7 +12,6 @@ db_name: Wegpiraten Datenbank.xlsx
 db_encrypted: true
 # db password in .env
 
-
 log_file: wegpiraten.log
 log_level: DEBUG
 
@@ -26,138 +25,195 @@ client_sheet_name: MD_Klienten
 # Globale Formatierungseinstellungen für Babel/Jinja2-Filter
 locale: de_CH
 currency: CHF
-currency_format: "#,##0.00 ¤"      # Babel: ¤ steht für das Währungssymbol
-date_format: "dd.MM.yyyy"         # Babel: z.B. "yyyy-MM-dd" für ISO
-numeric_format: "#,##0.00"        # Standard für numerische Felder
+currency_format: "#,##0.00 ¤"
+date_format: "dd.MM.yyyy"
+numeric_format: "#,##0.00"
 
-expected_columns:
-  payer:
-    - name: ZDNR
-      type: text
-    - name: ZD_Name
-      type: text
-    - name: ZD_Name2
-      type: text
-    - name: ZD_Strasse
-      type: text
-    - name: ZD_PLZ
-      type: text
-    - name: ZD_Ort
-      type: text
-  client:
-    - name: Klient-Nr.
-      type: text
-    - name: CL_Vorname
-      type: text
-    - name: CL_Nachname
-      type: text
-    - name: CL_SozVersNr
-      type: text
-  general:
-    - name: Leistungsbesteller
-      type: text
-  
-    - name: Leistungsdatum
-      type: date
-      format: "dd.MM.yyyy"
-      is_position: true           # NEU: Soll als Rechnungsposition erscheinen
-      sum: false                  # NEU: Keine Summe berechnen
-  
-    - name: Betreuungstyp
-      type: text
-      is_position: false
-      sum: false
-
-    - name: Fahrtzeit
-      type: numeric
-      decimals: 2
-      is_position: true
-      sum: true                   # NEU: Summe berechnen
-
-    - name: Direkt
-      type: numeric
-      decimals: 2
-      is_position: true
-      sum: true
-
-    - name: Indirekt
-      type: numeric
-      decimals: 2
-      is_position: true
-      sum: true
-
-    - name: Sollstunden
-      type: numeric
-      decimals: 2
-      is_position: true
-      sum: true
-
-    - name: Stundensatz
-      type: currency
-      decimals: 2
-      is_position: false
-      sum: false
-
-    - name: km_Pauschale
-      type: numeric
-      decimals: 2
-      is_position: false
-      sum: true
-
-    - name: Stunden
-      type: numeric
-      decimals: 2
-      is_position: true
-      sum: true
- 
-    - name: Kosten
-      type: currency
-      is_position: true
-      sum: true
-
-provider:
-  IBAN: CH07 0839 3053 8385 3915 1
-  name: Wegpiraten GmbH
-  strasse: Alpenstraße 2
-  plz_ort: 3800 Interlaken
-
-field_mappings:
+models:
   employee:
-    PersNr: { field: emp_id, type: str }
-    Vorname: { field: first_name, type: str }
-    Nachname: { field: last_name, type: str }
-    FTE: { field: fte, type: float }
-    Kommentar: { field: notes, type: str }
-  client:
-    KlientNr: { field: client_id, type: str }
-    SozVersNr: { field: social_security_number, type: str }
-    Vorname: { field: first_name, type: str }
-    Nachname: { field: surname, type: str }
-    Kürzel: { field: short_code, type: str }
-    ZdNr: { field: payer_id, type: str }
-    LbNr: { field: service_requester_id, type: str }
-    Beginn: { field: start_date, type: str }
-    Ende: { field: end_date, type: str }
-    MA_ID: { field: employee_id, type: str }
-    Stunden pro Monat: { field: allowed_hours_per_month, type: float }
-    SPF / BBT: { field: service_type, type: str }
-    Kommentar: { field: notes, type: str }
-  payer:
-    ZdNr: { field: payer_id, type: str }
-    ZD_Name: { field: name, type: str }
-    ZD_Name2: { field: name2, type: str }
-    ZD_Strasse: { field: street, type: str }
-    ZD_PLZ: { field: zip_code, type: str }
-    ZD_Ort: { field: city, type: str }
-    Kommentar: { field: notes, type: str }
-  service_requester:
-    LBNr: { field: sr_key, type: str }
-    Leistungsbesteller: { field: name, type: str }
+    fields:
+      - name: emp_id
+        type: str
+        primary_key: true
+        excel_column: PersNr
+      - name: first_name
+        type: str
+        excel_column: Vorname
+      - name: last_name
+        type: str
+        excel_column: Nachname
+      - name: fte
+        type: float
+        excel_column: FTE
+        format: ${numeric_format}
+      - name: notes
+        type: str
+        excel_column: Kommentar
 
+  client:
+    fields:
+      - name: client_id
+        type: str
+        primary_key: true
+        excel_column: KlientNr
+      - name: social_security_number
+        type: str
+        excel_column: SozVersNr
+      - name: first_name
+        type: str
+        excel_column: Vorname
+      - name: last_name
+        type: str
+        excel_column: Nachname
+      - name: short_code
+        type: str
+        excel_column: Kürzel
+      - name: payer_id
+        type: str
+        excel_column: ZdNr
+      - name: service_requester_id
+        type: str
+        excel_column: LbNr
+      - name: start_date
+        type: str
+        excel_column: Beginn
+        format: ${date_format}
+      - name: end_date
+        type: str
+        excel_column: Ende
+        format: ${date_format}
+      - name: employee_id
+        type: str
+        excel_column: MA_ID
+      - name: allowed_hours_per_month
+        type: float
+        excel_column: Stunden pro Monat
+        format: ${numeric_format}
+        sum: true
+      - name: service_type
+        type: str
+        excel_column: SPF / BBT
+      - name: notes
+        type: str
+        excel_column: Kommentar
+
+  payer:
+    fields:
+      - name: payer_id
+        type: str
+        primary_key: true
+        excel_column: ZdNr
+      - name: name
+        type: str
+        excel_column: ZD_Name
+      - name: name2
+        type: str
+        excel_column: ZD_Name2
+      - name: street
+        type: str
+        excel_column: ZD_Strasse
+      - name: zip_code
+        type: str
+        excel_column: ZD_PLZ
+      - name: city
+        type: str
+        excel_column: ZD_Ort
+      - name: notes
+        type: str
+        excel_column: Kommentar
+
+  service_requester:
+    fields:
+      - name: service_requester_id
+        type: str
+        primary_key: true
+        excel_column: LBNr
+      - name: name
+        type: str
+        excel_column: Leistungsbesteller
+
+  invoice_data:
+    fields:
+      - name: invoice_number
+        type: str
+        primary_key: true
+        excel_column: Rechnungs-Nr
+      - name: client_id
+        type: str
+        excel_column: Klient-Nr.
+      - name: service_date
+        type: str
+        excel_column: Leistungsdatum
+        format: ${date_format}
+        is_position: true
+      - name: service_type
+        type: str
+        excel_column: Betreuungstyp
+      - name: travel_time
+        type: float
+        excel_column: Fahrtzeit
+        format: ${numeric_format}
+        decimals: 2
+        is_position: true
+        sum: true
+      - name: direct_time
+        type: float
+        excel_column: Direkt
+        format: ${numeric_format}
+        decimals: 2
+        is_position: true
+        sum: true
+      - name: indirect_time
+        type: float
+        excel_column: Indirekt
+        format: ${numeric_format}
+        decimals: 2
+        is_position: true
+        sum: true
+      - name: billable_hours
+        type: float
+        excel_column: Sollstunden
+        format: ${numeric_format}
+        decimals: 2
+        is_position: true
+        sum: true
+      - name: hourly_rate
+        type: currency
+        excel_column: Stundensatz
+        format: ${currency_format}
+        decimals: 2
+        is_position: false
+        sum: false
+      - name: km_allowance
+        type: float
+        excel_column: km_Pauschale
+        format: ${numeric_format}
+        decimals: 2
+        is_position: false
+        sum: true
+      - name: total_hours
+        type: float
+        excel_column: Stunden
+        format: ${numeric_format}
+        decimals: 2
+        is_position: true
+        sum: true
+      - name: total_costs
+        type: currency
+        excel_column: Kosten
+        format: ${currency_format}
+        is_position: true
+        sum: true
+      - name: service_requester_name
+        type: str
+        excel_column: Leistungsbesteller
+      - name: payer_id
+        type: str
+        excel_column: ZDNR
 
 table_mappings:
   MD_MA: # Excel-Tabellenname
-    entity: employee # Entität im Code
+    entity: employee # Entität im Code, s.a. field_mappings
     target: employees # Zieltabelle in der DB
     primary_key: emp_id # Primärschlüssel der Zieltabelle
   Leistungsbesteller:
@@ -172,3 +228,4 @@ table_mappings:
     entity: client
     target: clients
     primary_key: client_id
+  Rechnungsdaten:

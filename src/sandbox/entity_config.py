@@ -29,7 +29,7 @@ class Client(BaseModel):
     social_security_number: Optional[str]
     first_name: str
     last_name: str
-    initials: Optional[str]  # oder "short_code", je nach Mapping
+    short_code: Optional[str]  # oder "short_code", je nach Mapping
     payer_id: Optional[str]  # Fremdschlüssel auf Payer
     service_requester_id: Optional[str]  # Fremdschlüssel auf ServiceRequester
     start_date: Optional[str]

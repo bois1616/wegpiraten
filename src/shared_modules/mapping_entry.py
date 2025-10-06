@@ -1,4 +1,4 @@
-from typing import Dict
+
 from pydantic import BaseModel
 
 class MappingEntry(BaseModel):
@@ -8,5 +8,8 @@ class MappingEntry(BaseModel):
     - type: Typ als String (z.B. 'str', 'float')
     """
     field: str
-    type: str  # oder Optional[str], wenn nicht immer gesetzt
+    type: str
+
+    class Config:
+        extra = "allow"  # Erlaubt beliebige weitere Felder aus der Config
 

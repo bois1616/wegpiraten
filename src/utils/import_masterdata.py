@@ -127,7 +127,7 @@ def import_table(
         try:
             mapped = map_row(row, mapping, required_fields)
             rec = model(**mapped)
-            records.append(rec.dict())
+            records.append(rec.model_dump())
         except Exception as e:
             logger.error(f"Fehler beim Validieren eines Datensatzes aus {table_name}: {e}")
 

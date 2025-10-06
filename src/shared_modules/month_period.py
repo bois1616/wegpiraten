@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from pydantic import BaseModel, field_validator
-from typing import Any
 
 class MonthPeriod(BaseModel):
     """
