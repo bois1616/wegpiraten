@@ -6,28 +6,46 @@ structure:
   tmp_path: .tmp
   log_path: .logs
   local_data_path: data
+  graphics: graphics
 
-sqlite_db_name: Wegpiraten Datenbank.sqlite3
-db_name: Wegpiraten Datenbank.xlsx
-db_encrypted: true
-# db password in .env
+database:
+  sqlite_db_name: Wegpiraten Datenbank.sqlite3
+  db_name: Wegpiraten Datenbank.xlsx
+  db_encrypted: true
+  # db password in .env
 
-log_file: wegpiraten.log
-log_level: DEBUG
+logging:
+  log_file: wegpiraten.log
+  log_level: DEBUG
 
-invoice_template_name: rechnungsvorlage.docx
-sheet_name: Pivot Rechnungsdaten
+templates:
+  invoice_template_name: rechnungsvorlage.docx
+  sheet_name: Pivot Rechnungsdaten # deprecated, use sqlite table name
 
-reporting_template: zeiterfassungsboegen.xlsx
-client_sheet_name: MD_Klienten
-# sheet password in .env
+  reporting_template: zeiterfassungsboegen.xlsx
+  client_sheet_name: MD_Klienten # deprecated, use sqlite table name
+  # sheet password in .env
 
-# Globale Formatierungseinstellungen für Babel/Jinja2-Filter
-locale: de_CH
-currency: CHF
-currency_format: "#,##0.00 ¤"
-date_format: "dd.MM.yyyy"
-numeric_format: "#,##0.00"
+# Globale Formatierungseinstellungen für Babel/Jinja2-Filte
+formatting:
+  locale: de_CH
+  currency: CHF
+  currency_format: "#,##0.00 ¤"
+  date_format: "dd.MM.yyyy"
+  numeric_format: "#,##0.00"
+
+service_provider:
+  name: Wegpiraten GmbH
+  street: Alpenstrasse 2
+  zip_code: '3800'
+  city: Interlaken
+  phone: +41 (0)76 790 67 56
+  email: info@wegpiraten.ch
+  website: www.wegpiraten.ch
+  uid: CHE-123.456.789 MWST
+  bank: Bank EKI Genossenschaft
+  iban: CH07 0839 3053 8385 3915 1
+
 
 models:
   employee:
@@ -49,6 +67,7 @@ models:
       - name: notes
         type: str
         excel_column: Kommentar
+        optional: true
 
   client:
     fields:
@@ -82,11 +101,13 @@ models:
         type: str
         excel_column: Ende
         format: ${date_format}
-      - name: employee_id
+        optional: true
+      - name: employee_id # foreign key
         type: str
         excel_column: MA_ID
       - name: allowed_hours_per_month
         type: float
+        optional: true
         excel_column: Stunden pro Monat
         format: ${numeric_format}
         sum: true
@@ -96,6 +117,7 @@ models:
       - name: notes
         type: str
         excel_column: Kommentar
+        optional: true
 
   payer:
     fields:
@@ -108,6 +130,7 @@ models:
         excel_column: ZD_Name
       - name: name2
         type: str
+        optional: true
         excel_column: ZD_Name2
       - name: street
         type: str
@@ -121,6 +144,7 @@ models:
       - name: notes
         type: str
         excel_column: Kommentar
+        optional: true
 
   service_requester:
     fields:
@@ -184,13 +208,14 @@ models:
         decimals: 2
         is_position: false
         sum: false
-      - name: km_allowance
-        type: float
-        excel_column: km_Pauschale
-        format: ${numeric_format}
-        decimals: 2
-        is_position: false
-        sum: true
+      # - name: km_allowance
+      #   type: float
+      #   excel_column: km_Pauschale
+      #   format: ${numeric_format}
+      #   decimals: 2
+      #   is_position: false
+      #   sum: true
+      #   optional: true
       - name: total_hours
         type: float
         excel_column: Stunden
@@ -211,21 +236,20 @@ models:
         type: str
         excel_column: ZDNR
 
+# TODO: löschen nach import
 table_mappings:
-  MD_MA: # Excel-Tabellenname
-    entity: employee # Entität im Code, s.a. field_mappings
-    target: employees # Zieltabelle in der DB
-    primary_key: emp_id # Primärschlüssel der Zieltabelle
+  MD_MA:
+    entity: employee
+    target: employees
   Leistungsbesteller:
     entity: service_requester
     target: service_requester
-    primary_key: sr_key
   Zahlungsdienstleister:
     entity: payer
     target: payer
-    primary_key: payer_id
   MD_Client:
     entity: client
     target: clients
-    primary_key: client_id
-  Rechnungsdaten:
+  invoice_data:
+    entity: invoice_data
+    target: invoice_data

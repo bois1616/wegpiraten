@@ -1,19 +1,22 @@
 import os
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Dict, Type
+from pydantic import BaseModel, create_model  # create_model ergänzt
 
-import yaml  # YAML-Parser für das Einlesen der Konfigurationsdatei
-from cryptography.fernet import Fernet  # Für die Entschlüsselung von Secrets
-from dotenv import load_dotenv  # Lädt Umgebungsvariablen aus einer .env-Datei
-from pydantic import ValidationError  # Für die Validierung der Konfigurationsdaten
-from loguru import logger  # Leistungsfähiges Logging-Framework
+import yaml
+from cryptography.fernet import Fernet
+from dotenv import load_dotenv
+from loguru import logger
 
-# Eigene Pydantic-Modelle für die Konfigurationsstruktur importieren
-from .expected_columns_config import ExpectedColumnsConfig
-from .provider_config import ProviderConfig
-from .structure_config import StructureConfig
-from .config_data import ConfigData  # Zentrale Konfigurationsdatenstruktur
+from shared_modules.utils import get_type_from_str
+from shared_modules.config_data import ConfigData
+from shared_modules.provider_config import ProviderConfig
+from shared_modules.structure_config import StructureConfig
+
+# Typalias für Entity-Modelle
+EntityModelDict = Dict[str, Type[BaseModel]]
+
 
 class Config:
     """
@@ -22,6 +25,9 @@ class Config:
     """
 
     _instance: Optional["Config"] = None
+    _config: Optional[ConfigData] = None
+    _log_configured: bool = False
+    _entity_models: Optional[EntityModelDict] = None
 
     def __new__(cls) -> "Config":
         """
@@ -35,9 +41,9 @@ class Config:
         """
         Initialisiert die Konfigurationsinstanz.
         """
-        if not hasattr(self, "_config"):
-            self._config: Optional[ConfigData] = None
+        # Nur Initialisierung, keine Typangabe mehr nötig
         self._log_configured = False
+        self._entity_models = None
 
     def _setup_logger(self):
         """
@@ -51,13 +57,21 @@ class Config:
         prj_root = Path(structure.prj_root)
         logs_dir = prj_root / (getattr(structure, "log_path", ".logs") or ".logs")
         logs_dir.mkdir(parents=True, exist_ok=True)
-        log_file = logs_dir / (getattr(self, "get_log_file", lambda: "wegpiraten.log")())
+        log_file = logs_dir / (
+            getattr(self, "get_log_file", lambda: "wegpiraten.log")()
+        )
         # Hole Level aus der Config, fallback auf INFO
         log_level = getattr(self, "get_log_level", lambda: "INFO")()
         # Entferne alle bestehenden Handler
         logger.remove()
         # Schreibe ins Logfile
-        logger.add(str(log_file), rotation="10 MB", retention="10 days", encoding="utf-8", level=log_level)
+        logger.add(
+            str(log_file),
+            rotation="10 MB",
+            retention="10 days",
+            encoding="utf-8",
+            level=log_level,
+        )
         # Schreibe auch ins Terminal ab log_level
         logger.add(sys.stderr, level=log_level)
         self._log_configured = True
@@ -74,7 +88,9 @@ class Config:
         if not isinstance(config_path, Path):
             raise ValueError("config_path muss ein pathlib.Path-Objekt sein.")
         if not config_path.exists():
-            raise FileNotFoundError(f"Konfigurationsdatei nicht gefunden: {config_path}")
+            raise FileNotFoundError(
+                f"Konfigurationsdatei nicht gefunden: {config_path}"
+            )
         with open(config_path, "r") as f:
             raw_config = yaml.safe_load(f)
         try:
@@ -89,23 +105,25 @@ class Config:
                 logger.debug(f"Keine .env-Datei gefunden in: {env_path}")
             self._setup_logger()
             logger.info("Konfiguration erfolgreich geladen und validiert.")
-        except ValidationError as e:
+        except Exception as e:
             # Fehlerhafte oder unvollständige Konfiguration wird sofort erkannt
             raise ValueError(f"Fehlerhafte Konfiguration: {e}")
 
     def get_log_file(self) -> str:
-        # log_file kann in der Config auf Top-Level oder in structure stehen
-        if hasattr(self.data, "log_file") and self.data.log_file:
-            return self.data.log_file
-        if hasattr(self.data.structure, "log_file") and self.data.structure.log_file:
-            return self.data.structure.log_file
+        """Gibt den Namen der Logdatei zurück (aus logging.log_file oder Default)."""
+        if hasattr(self.data, "logging") and self.data.logging and self.data.logging.log_file:
+            return self.data.logging.log_file
         return "wegpiraten.log"
 
     def get_log_level(self) -> str:
-        # log_level kann auf Top-Level stehen, fallback auf INFO
-        return getattr(self.data, "log_level", "INFO")
+        """Gibt das Log-Level zurück (aus logging.log_level oder Default)."""
+        if hasattr(self.data, "logging") and self.data.logging and self.data.logging.log_level:
+            return self.data.logging.log_level
+        return "INFO"
 
-    def get_decrypted_secret(self, key: str, fernet_key_env: str = "FERNET_KEY", default=None) -> Optional[str]:
+    def get_decrypted_secret(
+        self, key: str, fernet_key_env: str = "FERNET_KEY", default: Any = None
+    ) -> Optional[str]:
         """
         Holt ein verschlüsseltes Secret aus der Umgebung und entschlüsselt es mit Fernet.
         Args:
@@ -133,7 +151,7 @@ class Config:
             logger.error(f"Entschlüsselung fehlgeschlagen: {e}")
             raise RuntimeError(f"Entschlüsselung fehlgeschlagen: {e}")
 
-    def get_secret(self, key: str, default=None) -> Optional[str]:
+    def get_secret(self, key: str, default: Any = None) -> Optional[str]:
         """
         Gibt ein Secret (z. B. Passwort, API-Key) aus Umgebungsvariablen zurück.
         Args:
@@ -176,10 +194,6 @@ class Config:
         """Gibt das Zahlenformat zurück."""
         return self.data.numeric_format
 
-    def get_expected_columns(self) -> ExpectedColumnsConfig:
-        """Gibt die erwarteten Spaltenkonfigurationen zurück."""
-        return self.data.expected_columns
-
     def get_structure(self) -> StructureConfig:
         """Gibt die Struktur-Konfiguration zurück."""
         return self.data.structure
@@ -188,7 +202,7 @@ class Config:
         """Gibt die Provider-Konfiguration zurück (falls vorhanden)."""
         return self.data.provider
 
-    def get(self, key: str, default=None) -> Any:
+    def get(self, key: str, default: Any = None) -> Any:
         """
         Allgemeiner Getter für beliebige Felder (nur für flache Felder empfohlen).
         Args:
@@ -199,13 +213,71 @@ class Config:
         """
         return getattr(self.data, key, default)
 
+    def get_entity_models(self) -> EntityModelDict:
+        """
+        Erzeugt und cached dynamisch Pydantic-Modelle für alle Entities aus der Config.
+
+        Rückgabe:
+            dict: Mapping von Entity-Namen auf dynamisch erzeugte Pydantic-Modelle.
+
+        Beispiel:
+            >>> config = Config()
+            >>> config.load(Path("wegpiraten_config.yaml"))
+            >>> entity_models = config.get_entity_models()
+            >>> ClientModel = entity_models["client"]
+            >>> client = ClientModel(client_id="123", first_name="Max", last_name="Muster")
+            >>> print(client.dict())
+            {'client_id': '123', 'first_name': 'Max', 'last_name': 'Muster', ...}
+        """
+        # Prüfe, ob die Modelle bereits erzeugt und gecached wurden
+        if hasattr(self, "_entity_models") and self._entity_models is not None:
+            return self._entity_models
+
+        # Hole die Modell-Definitionen aus der geladenen Config
+        models_config = self.get("models")
+        entity_models: EntityModelDict = {}
+
+        for entity_name, entity_def in models_config.items():
+            fields = entity_def.fields
+            annotations = {}
+            # ...baue ein Dictionary mit Feldnamen und Typen für das Pydantic-Modell
+            for field in fields:
+                field_name = field.name
+                if not field_name.isidentifier():
+                    raise ValueError(f"Ungültiger Feldname für Pydantic in Config: {field_name}")
+                typ = get_type_from_str(field.type)
+                # Prüfe, ob das Feld optional ist
+                if getattr(field, "optional", False):
+                    typ = Optional[typ]
+                    default = None
+                else:
+                    default = getattr(field, "default", ...)
+                annotations[field_name] = (typ, default)
+
+            logger.debug(f"Erzeuge Modell {entity_name}: {annotations}")
+            entity_models[entity_name] = create_model(
+                entity_name.capitalize(), **annotations
+            )
+        # Cache die erzeugten Modelle für spätere Aufrufe
+        self._entity_models = entity_models
+        return entity_models
+
+
 if __name__ == "__main__":
+    # Für Standalone-Tests: sys.path anpassen, damit absolute Imports funktionieren
+    sys.path.append(str(Path(__file__).parent.parent))
+
     # Beispiel für das Laden und Validieren der Konfiguration
-    config_path = Path("wegpiraten_config.yaml")
+    config_path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
     config = Config()
     try:
         config.load(config_path)
         logger.info("Projektwurzel: {}", config.get_structure().prj_root)
-        logger.info("Erwartete Spalten (general): {}", [col.name for col in config.get_expected_columns().general])
+        # Beispiel: Zugriff auf dynamisch erzeugte Entity-Modelle
+        entity_models = config.get_entity_models()
+        ClientModel = entity_models["client"]
+        # Beispiel-Instanz erzeugen
+        client = ClientModel(client_id="123", social_security_number="756.1234.5678.97")
+        logger.info("Client-Daten: {}", client.dict())
     except Exception as e:
         logger.error(f"Fehler beim Laden der Konfiguration: {e}")

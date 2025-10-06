@@ -113,6 +113,15 @@ def temporary_docx(suffix: str = ".docx") -> Generator[Path, None, None]:
         if tmp_path.exists():
             os.remove(tmp_path)
 
+# Hilfsfunktion für Typumwandlung (wird für dynamische Modell-Erzeugung benötigt)
+def get_type_from_str(type_str: str):
+    mapping = {
+        "str": str,
+        "float": float,
+        "int": int,
+        "bool": bool,
+    }
+    return mapping.get(type_str, str)
 
 # Hinweis: Alle Formatierungen für Zahlen, Währungen und Datumsfelder erfolgen ausschließlich im Template
 # über Babel/Jinja2-Filter und die Konfiguration. Keine eigene Formatierungsfunktion mehr nötig.
