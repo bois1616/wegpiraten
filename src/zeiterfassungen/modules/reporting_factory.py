@@ -1,33 +1,31 @@
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-
+import sqlite3
 import pandas as pd
 from openpyxl import load_workbook
 from pydantic import ValidationError
 from loguru import logger
 
 from .reporting_factory_config import ReportingFactoryConfig
+from shared_modules.config import Config
 
 
 class ReportingFactory:
     """
     Factory-Klasse zur Erstellung von Reporting-Sheets.
     Erwartet ein Pydantic-Modell für die Konfiguration.
+    Holt die Daten jetzt aus der SQLite-Datenbank gemäß zentraler Config.
     """
 
     def __init__(self, config: ReportingFactoryConfig):
         """
         Konstruktor erwartet ein Pydantic-Modell für die Konfiguration.
-        Das sorgt für Typsicherheit und Validierung der Konfigurationsdaten.
         Das Passwort für den Blattschutz wird sicher aus der Umgebung geladen.
         """
-        from shared_modules.config import Config
-
         self.config: ReportingFactoryConfig = config
         # sheet_password sicher aus Umgebungsvariable/.env laden, falls nicht gesetzt
         if not self.config.sheet_password:
-            # Versuche zuerst entschlüsseltes Secret zu laden
             secret = Config().get_decrypted_secret("SHEET_PASSWORD_ENC")
             if not secret:
                 # Fallback: Unverschlüsseltes Secret
@@ -38,6 +36,61 @@ class ReportingFactory:
                     "SHEET_PASSWORD_ENC oder SHEET_PASSWORD nicht gesetzt!\nBitte .env anlegen und Passwort eintragen."
                 )
             self.config.sheet_password = secret
+
+    def get_db_connection(self, db_path: Path) -> sqlite3.Connection:
+        """Öffnet eine SQLite-Verbindung zur angegebenen Datei."""
+        logger.info(f"Öffne SQLite-DB: {db_path}")
+        return sqlite3.connect(db_path)
+
+    def fetch_reporting_data(
+        self, db_path: Path, reporting_month: str
+    ) -> pd.DataFrame:
+        """
+        Holt alle für das Reporting benötigten Daten aus der SQLite-DB.
+        Erstellt die erforderlichen Joins und filtert auf den gewünschten Monat.
+        """
+        # Hole Tabellen- und Feldnamen aus der zentralen Config
+        config = Config()
+        table_mappings = config.data.table_mappings
+        models = config.data.models
+
+        
+        sql = f"""
+        SELECT
+            i.invoice_number,
+            i.client_id,
+            c.first_name AS client_first_name,
+            c.last_name AS client_last_name,
+            c.short_code,
+            c.allowed_hours_per_month,
+            c.employee_id,
+            e.first_name AS employee_first_name,
+            e.last_name AS employee_last_name,
+            i.service_date,
+            i.service_type,
+            i.travel_time,
+            i.direct_time,
+            i.indirect_time,
+            i.billable_hours,
+            i.hourly_rate,
+            i.total_hours,
+            i.total_costs,
+            i.service_requester_name,
+            i.payer_id,
+            p.name AS payer_name,
+            s.name AS service_requester_name
+        FROM invoice_data i
+        LEFT JOIN clients c ON i.client_id = c.client_id
+        LEFT JOIN employees e ON c.employee_id = e.emp_id
+        LEFT JOIN payer p ON i.payer_id = p.payer_id
+        LEFT JOIN service_requester s ON i.service_requester_name = s.name
+        WHERE strftime('%Y-%m', i.service_date) = ?
+        """
+        logger.info(f"Führe Reporting-Join-Query für Monat {reporting_month} aus.")
+        with self.get_db_connection(db_path) as conn:
+            df = pd.read_sql_query(sql, conn, params=(reporting_month,))
+        logger.info(f"{len(df)} Datensätze für das Reporting geladen.")
+        return df
 
     def create_reporting_sheet(
         self,
@@ -60,7 +113,6 @@ class ReportingFactory:
         Returns:
             str: Dateiname der erzeugten Excel-Datei.
         """
-        # Zugriff auf Template-Name und Passwort über das Pydantic-Modell
         template_name: str = self.config.reporting_template
 
         try:
@@ -82,14 +134,14 @@ class ReportingFactory:
 
         # Ausfüllen der relevanten Felder im Excel-Sheet
         try:
-            ws["c5"] = header_data["Sozialpädagogin"]
-            ws["g5"] = header_data["MA_ID"]
+            ws["c5"] = header_data.get("employee_first_name", "") + " " + header_data.get("employee_last_name", "")
+            ws["g5"] = header_data.get("employee_id", "")
             ws["c6"] = reporting_month_dt
             ws["c6"].number_format = "MM.YYYY"
-            ws["c7"] = header_data["Stunden pro Monat"]
-            ws["g7"] = header_data["SPF / BBT"]
-            ws["c8"] = header_data["Kürzel"]
-            ws["g8"] = header_data["KlientNr"]
+            ws["c7"] = header_data.get("allowed_hours_per_month", "")
+            ws["g7"] = header_data.get("service_type", "")
+            ws["c8"] = header_data.get("short_code", "")
+            ws["g8"] = header_data.get("client_id", "")
         except Exception as e:
             logger.error(f"Fehler beim Ausfüllen des Sheets: {e}")
             raise RuntimeError(f"Fehler beim Ausfüllen des Sheets: {e}")
@@ -98,14 +150,12 @@ class ReportingFactory:
         if original_sheet_protected:
             ws.protection.sheet = True
             ws.protection.enable()
-            # sheet_password-Argument hat Vorrang, sonst Konfiguration
             password = sheet_password if sheet_password is not None else self.config.sheet_password
             if password is None:
                 logger.error("Sheet-Passwort ist nicht gesetzt!")
                 raise RuntimeError("Sheet-Passwort ist nicht gesetzt!")
             ws.protection.set_password(str(password))
-            ws.protection.objects = True  # <--- Diese Zeile ergänzt den Objektschutz
-            # Die folgenden Attribute sind optional und nicht in allen openpyxl-Versionen verfügbar
+            ws.protection.objects = True
             for attr, value in [
                 ("enable_select_locked_cells", False),
                 ("enable_select_unlocked_cells", True),
@@ -126,7 +176,7 @@ class ReportingFactory:
                     setattr(ws.protection, attr, value)
 
         # Dateinamen generieren und Datei speichern
-        dateiname: str = f"{header_data['KlientNr']} ({header_data['Kürzel']})_{reporting_month_dt.strftime('%Y-%m')}.xlsx"
+        dateiname: str = f"{header_data.get('client_id', '')} ({header_data.get('short_code', '')})_{reporting_month_dt.strftime('%Y-%m')}.xlsx"
         try:
             wb.save(output_path / dateiname)
         except Exception as e:
@@ -139,7 +189,6 @@ class ReportingFactory:
 if __name__ == "__main__":
     import yaml
 
-    # Beispiel: YAML-Konfiguration laden und mit Pydantic validieren
     config_path = Path("wegpiraten_reporting_factory_config.yaml")
     with open(config_path, "r") as f:
         raw_config = yaml.safe_load(f)
@@ -149,7 +198,9 @@ if __name__ == "__main__":
         print(f"Konfigurationsfehler: {e}")
         exit(1)
 
-    # Beispielhafte Nutzung
     factory = ReportingFactory(config)
-    # Hier müssten row, reporting_month_dt, output_path, template_path übergeben werden
-    # factory.create_reporting_sheet(row, reporting_month_dt, output_path, template_path)
+    # Beispiel für das Laden der Daten aus der SQLite-DB:
+    db_path = Path("Wegpiraten Datenbank.sqlite3")
+    reporting_month = "2025-10"
+    df = factory.fetch_reporting_data(db_path, reporting_month)
+    print(df.head())

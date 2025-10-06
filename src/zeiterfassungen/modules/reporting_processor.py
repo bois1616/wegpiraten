@@ -1,24 +1,21 @@
 from datetime import datetime
 from pathlib import Path
-
+from typing import Any
 import pandas as pd
-import yaml  # Wird nur im __main__-Block benötigt, aber für Übersichtlichkeit oben gelassen
 from loguru import logger
-from openpyxl import load_workbook
-from pydantic import ValidationError
 
-from shared_modules.config import Config  # Für Passwort-Handling
-
-from .reporting_config import (
-    ReportingConfig,  # Import des Pydantic-Modells für die Reporting-Konfiguration
-)
+from shared_modules.config import Config
+from .reporting_config import ReportingConfig
 from .reporting_factory import ReportingFactory
+
+import sqlite3
 
 
 class ReportingProcessor:
     """
     Klasse zur Verarbeitung von Reporting-Daten.
     Erwartet ausschließlich Pydantic-Modelle für Konfiguration und nutzt Typsicherheit.
+    Holt die Daten jetzt aus der SQLite-Datenbank gemäß zentraler Config.
     """
 
     def get_sheet_password(self) -> str:
@@ -51,57 +48,65 @@ class ReportingProcessor:
         """
         Konstruktor erwartet ein Pydantic-Modell für die Konfiguration.
         Das sorgt für Typsicherheit und Validierung der Konfigurationsdaten.
-
-        Args:
-            reporting_config (ReportingConfig): Validierte Reporting-Konfiguration.
-            reporting_factory (ReportingFactory): Factory-Objekt zur Erstellung der Reporting-Sheets.
         """
         self.reporting_config: ReportingConfig = reporting_config
         self.reporting_factory = reporting_factory
 
     def load_client_data(self, reporting_month: str) -> pd.DataFrame:
         """
-        Lädt die Klientendaten für den angegebenen Berichtsmonat.
-        Nutzt die validierte Pydantic-Konfiguration für alle Pfadangaben.
+        Lädt die Klientendaten für den angegebenen Berichtsmonat aus der SQLite-DB.
+        Nutzt die validierte Pydantic-Konfiguration für alle Pfadangaben und dynamische Modelle.
 
         Args:
             reporting_month (str): Monat im Format "YYYY-MM".
 
         Returns:
             pd.DataFrame: Gefilterte Klientendaten.
-
-        Raises:
-            ValueError: Wenn die gewünschte Tabelle nicht gefunden wird.
         """
-        # Zugriff auf die Konfigurationsdaten über das Pydantic-Modell
-        data_path = Path(self.reporting_config.structure.data_path)
-        db_name = self.reporting_config.db_name
-        source = data_path / db_name
-        table_name = self.reporting_config.client_sheet_name
+        # Zugriff auf die SQLite-DB und Tabellenname aus der Config
+        config = Config()
+        prj_root = Path(config.data.structure.prj_root)
+        local_data_path = Path(config.data.structure.local_data_path)
+        db_name = config.data.database.sqlite_db_name
+        db_path = prj_root / local_data_path / db_name
 
-        if not source.exists():
-            logger.error(f"Quelldatei für Klientendaten nicht gefunden: {source}")
-            raise FileNotFoundError(
-                f"Quelldatei für Klientendaten nicht gefunden: {source}"
-            )
+        # Ziel-Tabelle (Clients) aus table_mappings bestimmen
+        table_mappings = config.data.table_mappings
+        client_table = table_mappings["MD_Client"]["target"]
 
+        # SQL-Join: Clients + Employees + Payer + ServiceRequester + InvoiceData
+        sql = f"""
+        SELECT
+            c.client_id,
+            c.first_name,
+            c.last_name,
+            c.short_code,
+            c.allowed_hours_per_month,
+            c.employee_id,
+            c.start_date,
+            c.end_date,
+            c.service_type,
+            c.notes,
+            e.first_name AS employee_first_name,
+            e.last_name AS employee_last_name,
+            e.fte,
+            e.notes AS employee_notes,
+            p.name AS payer_name,
+            s.name AS service_requester_name
+        FROM {client_table} c
+        LEFT JOIN employees e ON c.employee_id = e.emp_id
+        LEFT JOIN payer p ON c.payer_id = p.payer_id
+        LEFT JOIN service_requester s ON c.service_requester_id = s.service_requester_id
+        WHERE
+            (c.end_date IS NULL OR c.end_date >= ?)
+        """
         reporting_month_dt = datetime.strptime(reporting_month, "%Y-%m")
-        wb = load_workbook(source, data_only=True)
-        for ws in wb.worksheets:
-            if table_name in ws.tables:
-                table = ws.tables[table_name]
-                ref = table.ref
-                data = ws[ref]
-                rows = [[cell.value for cell in row] for row in data]
-                client_masterdata = pd.DataFrame(rows[1:], columns=rows[0])
-                break
-        else:
-            logger.error(f"Klientendaten {table_name} nicht gefunden in {db_name}")
-            raise ValueError(f"Klientendaten {table_name} nicht gefunden in {db_name}")
+        logger.info(f"Führe Client-Join-Query für Monat {reporting_month} aus: {sql}")
 
-        # Datumsfilterung: Nur Klienten, deren "Ende" leer ist oder nach dem Berichtsmonat liegt
-        client_masterdata["Ende"] = pd.to_datetime(client_masterdata["Ende"], format="%d.%m.%Y", errors="coerce")
-        client_masterdata = client_masterdata[(client_masterdata["Ende"].isna()) | (client_masterdata["Ende"] >= reporting_month_dt)]
+        with sqlite3.connect(db_path) as conn:
+            client_masterdata = pd.read_sql_query(sql, conn, params=(reporting_month_dt.strftime("%Y-%m-%d"),))
+
+        logger.info(f"{len(client_masterdata)} Klientendatensätze geladen.")
         return client_masterdata
 
     def run(self, reporting_month: str, output_path: Path, template_path: Path) -> None:
@@ -125,14 +130,16 @@ class ReportingProcessor:
                 sheet_password=sheet_password,
             )
             logger.info(
-                f"Erstelle AZ Erfassungsbogen für {header_data['Sozialpädagogin']} "
-                f"({header_data['Kürzel']}, Ende: {header_data['Ende']}) -> {dateiname}"
+                f"Erstelle AZ Erfassungsbogen für {header_data.get('employee_first_name', '')} "
+                f"({header_data.get('short_code', '')}, Ende: {header_data.get('end_date', '')}) -> {dateiname}"
             )
 
 
 # Beispiel für die Initialisierung mit Pydantic
 if __name__ == "__main__":
-    # Beispiel: YAML-Konfiguration laden und mit Pydantic validieren
+    import yaml
+    from pydantic import ValidationError
+
     config_path = Path("wegpiraten_reporting_config.yaml")
     with open(config_path, "r") as f:
         raw_config = yaml.safe_load(f)
