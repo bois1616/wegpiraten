@@ -7,15 +7,7 @@ from .database_config import DatabaseConfig
 from .templates_config import TemplatesConfig
 from .formatting_config import FormattingConfig
 from .service_provider_config import ServiceProviderConfig
-
-class FieldConfig(BaseModel):
-    name: str
-    type: str
-    excel_column: Optional[str] = None
-    default: Optional[Any] = None
-
-class EntityModelConfig(BaseModel):
-    fields: List[FieldConfig]
+from .entity_model_config import EntityModelConfig
 
 class ConfigData(BaseModel):
     """

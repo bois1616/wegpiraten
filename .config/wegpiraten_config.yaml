@@ -47,7 +47,7 @@ service_provider:
   iban: CH07 0839 3053 8385 3915 1
 
 
-models:
+entities:
   employee:
     fields:
       - name: emp_id
@@ -237,19 +237,19 @@ models:
         excel_column: ZDNR
 
 # TODO: löschen nach import
-table_mappings:
-  MD_MA:
-    entity: employee
-    target: employees
-  Leistungsbesteller:
-    entity: service_requester
-    target: service_requester
-  Zahlungsdienstleister:
-    entity: payer
-    target: payer
-  MD_Client:
-    entity: client
-    target: clients
-  invoice_data:
-    entity: invoice_data
-    target: invoice_data
+# table_mappings:
+#   MD_MA:
+#     entity: employee
+#     target: employees
+#   Leistungsbesteller:
+#     entity: service_requester
+#     target: service_requester
+#   Zahlungsdienstleister:
+#     entity: payer
+#     target: payer
+#   MD_Client:
+#     entity: client
+#     target: clients
+#   invoice_data:
+#     entity: invoice_data
+#     target: invoice_data

@@ -1,119 +1,93 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 import sqlite3
 import pandas as pd
 from openpyxl import load_workbook
 from pydantic import ValidationError
 from loguru import logger
 
-from .reporting_factory_config import ReportingFactoryConfig
 from shared_modules.config import Config
 
+from .reporting_row_model import ReportingRowModel
 
 class ReportingFactory:
     """
     Factory-Klasse zur Erstellung von Reporting-Sheets.
-    Erwartet ein Pydantic-Modell für die Konfiguration.
-    Holt die Daten jetzt aus der SQLite-Datenbank gemäß zentraler Config.
+    Holt alle Einstellungen und Daten aus dem zentralen Config-Objekt.
     """
 
-    def __init__(self, config: ReportingFactoryConfig):
+    def __init__(self, config: Config):
         """
-        Konstruktor erwartet ein Pydantic-Modell für die Konfiguration.
-        Das Passwort für den Blattschutz wird sicher aus der Umgebung geladen.
+        Initialisiert die Factory mit dem zentralen Config-Objekt.
+        Holt das Sheet-Passwort sicher aus der Umgebung, falls nicht in der Config gesetzt.
         """
-        self.config: ReportingFactoryConfig = config
-        # sheet_password sicher aus Umgebungsvariable/.env laden, falls nicht gesetzt
-        if not self.config.sheet_password:
-            secret = Config().get_decrypted_secret("SHEET_PASSWORD_ENC")
+        self.config: Config = config
+        # Sheet-Passwort aus Config oder Umgebungsvariable holen
+        self.sheet_password: Optional[str] = getattr(self.config, "sheet_password", None)
+        if not self.sheet_password:
+            secret = self.config.get_decrypted_secret("SHEET_PASSWORD_ENC")
             if not secret:
-                # Fallback: Unverschlüsseltes Secret
-                secret = Config().get_secret("SHEET_PASSWORD")
+                secret = self.config.get_secret("SHEET_PASSWORD")
             if not secret:
-                logger.error("SHEET_PASSWORD_ENC oder SHEET_PASSWORD nicht gesetzt!\nBitte .env anlegen und Passwort eintragen.")
-                raise RuntimeError(
-                    "SHEET_PASSWORD_ENC oder SHEET_PASSWORD nicht gesetzt!\nBitte .env anlegen und Passwort eintragen."
-                )
-            self.config.sheet_password = secret
+                logger.error("SHEET_PASSWORD_ENC oder SHEET_PASSWORD nicht gesetzt! Bitte .env anlegen und Passwort eintragen.")
+                raise RuntimeError("SHEET_PASSWORD_ENC oder SHEET_PASSWORD nicht gesetzt! Bitte .env anlegen und Passwort eintragen.")
+            self.sheet_password = secret
 
     def get_db_connection(self, db_path: Path) -> sqlite3.Connection:
-        """Öffnet eine SQLite-Verbindung zur angegebenen Datei."""
+        """
+        Öffnet eine SQLite-Verbindung zur angegebenen Datei.
+        """
         logger.info(f"Öffne SQLite-DB: {db_path}")
         return sqlite3.connect(db_path)
 
-    def fetch_reporting_data(
-        self, db_path: Path, reporting_month: str
-    ) -> pd.DataFrame:
+    def fetch_reporting_data(self, db_path: Path, reporting_month: str) -> List[ReportingRowModel]:
         """
-        Holt alle für das Reporting benötigten Daten aus der SQLite-DB.
-        Erstellt die erforderlichen Joins und filtert auf den gewünschten Monat.
+        Holt die für die Zeiterfassungs-Sheets benötigten Felder aus der Tabelle clients,
+        ergänzt um die relevanten Daten aus employees per JOIN.
+        Berücksichtigt nur Clients, die im Erfassungsmonat noch aktiv sind.
+        Gibt eine Liste von validierten ReportingRowModel-Instanzen zurück.
         """
-        # Hole Tabellen- und Feldnamen aus der zentralen Config
-        config = Config()
-        table_mappings = config.data.table_mappings
-        models = config.data.models
-
-        
-        sql = f"""
+        month_start = f"{reporting_month}-01"
+        sql = """
         SELECT
-            i.invoice_number,
-            i.client_id,
-            c.first_name AS client_first_name,
-            c.last_name AS client_last_name,
-            c.short_code,
-            c.allowed_hours_per_month,
-            c.employee_id,
             e.first_name AS employee_first_name,
             e.last_name AS employee_last_name,
-            i.service_date,
-            i.service_type,
-            i.travel_time,
-            i.direct_time,
-            i.indirect_time,
-            i.billable_hours,
-            i.hourly_rate,
-            i.total_hours,
-            i.total_costs,
-            i.service_requester_name,
-            i.payer_id,
-            p.name AS payer_name,
-            s.name AS service_requester_name
-        FROM invoice_data i
-        LEFT JOIN clients c ON i.client_id = c.client_id
+            c.employee_id,
+            c.allowed_hours_per_month,
+            c.service_type,
+            c.short_code,
+            c.client_id
+        FROM clients c
         LEFT JOIN employees e ON c.employee_id = e.emp_id
-        LEFT JOIN payer p ON i.payer_id = p.payer_id
-        LEFT JOIN service_requester s ON i.service_requester_name = s.name
-        WHERE strftime('%Y-%m', i.service_date) = ?
+        WHERE (c.end_date IS NULL OR c.end_date >= ?)
         """
-        logger.info(f"Führe Reporting-Join-Query für Monat {reporting_month} aus.")
+        logger.info(f"Führe Reporting-Query für Monat {reporting_month} aus.")
         with self.get_db_connection(db_path) as conn:
-            df = pd.read_sql_query(sql, conn, params=(reporting_month,))
-        logger.info(f"{len(df)} Datensätze für das Reporting geladen.")
-        return df
+            df = pd.read_sql_query(sql, conn, params=(month_start,))
+        logger.info(f"{len(df)} relevante Datensätze für Zeiterfassungs-Sheets geladen.")
+
+        reporting_rows: List[ReportingRowModel] = []
+        for idx, row in df.iterrows():
+            try:
+                reporting_row = ReportingRowModel(**row.to_dict())
+                reporting_rows.append(reporting_row)
+            except ValidationError as e:
+                logger.error(f"Ungültige Reporting-Daten in Zeile {idx}: {e}")
+        return reporting_rows
 
     def create_reporting_sheet(
         self,
-        header_data: pd.Series,
+        header_data: ReportingRowModel,
         reporting_month_dt: datetime,
         output_path: Path,
         template_path: Path,
         sheet_password: Optional[str] = None,
     ) -> str:
         """
-        Erstellt ein Reporting-Sheet auf Basis der übergebenen Datenreihe und speichert es ab.
-        Alle Konfigurationswerte werden typisiert über das Pydantic-Modell bezogen.
-
-        Args:
-            header_data (pd.Series): Datenzeile mit den auszufüllenden Werten.
-            reporting_month_dt (datetime): Berichtsmonat als Datum.
-            output_path (Path): Zielverzeichnis für das Reporting-Sheet.
-            template_path (Path): Verzeichnis mit dem Excel-Template.
-
-        Returns:
-            str: Dateiname der erzeugten Excel-Datei.
+        Erstellt ein Reporting-Sheet auf Basis der übergebenen ReportingRowModel-Daten und speichert es ab.
         """
-        template_name: str = self.config.reporting_template
+        template_name: str = template_path / self.config.templates.reporting_template
 
         try:
             wb = load_workbook(template_path / template_name)
@@ -134,14 +108,14 @@ class ReportingFactory:
 
         # Ausfüllen der relevanten Felder im Excel-Sheet
         try:
-            ws["c5"] = header_data.get("employee_first_name", "") + " " + header_data.get("employee_last_name", "")
-            ws["g5"] = header_data.get("employee_id", "")
+            ws["c5"] = f"{header_data.employee_first_name} {header_data.employee_last_name}"
+            ws["g5"] = header_data.employee_id
             ws["c6"] = reporting_month_dt
             ws["c6"].number_format = "MM.YYYY"
-            ws["c7"] = header_data.get("allowed_hours_per_month", "")
-            ws["g7"] = header_data.get("service_type", "")
-            ws["c8"] = header_data.get("short_code", "")
-            ws["g8"] = header_data.get("client_id", "")
+            ws["c7"] = header_data.allowed_hours_per_month
+            ws["g7"] = header_data.service_type
+            ws["c8"] = header_data.short_code
+            ws["g8"] = header_data.client_id
         except Exception as e:
             logger.error(f"Fehler beim Ausfüllen des Sheets: {e}")
             raise RuntimeError(f"Fehler beim Ausfüllen des Sheets: {e}")
@@ -150,7 +124,7 @@ class ReportingFactory:
         if original_sheet_protected:
             ws.protection.sheet = True
             ws.protection.enable()
-            password = sheet_password if sheet_password is not None else self.config.sheet_password
+            password = sheet_password if sheet_password is not None else self.sheet_password
             if password is None:
                 logger.error("Sheet-Passwort ist nicht gesetzt!")
                 raise RuntimeError("Sheet-Passwort ist nicht gesetzt!")
@@ -176,7 +150,7 @@ class ReportingFactory:
                     setattr(ws.protection, attr, value)
 
         # Dateinamen generieren und Datei speichern
-        dateiname: str = f"{header_data.get('client_id', '')} ({header_data.get('short_code', '')})_{reporting_month_dt.strftime('%Y-%m')}.xlsx"
+        dateiname: str = f"{header_data.client_id} ({header_data.short_code})_{reporting_month_dt.strftime('%Y-%m')}.xlsx"
         try:
             wb.save(output_path / dateiname)
         except Exception as e:
@@ -185,22 +159,21 @@ class ReportingFactory:
         return dateiname
 
 
-# Beispiel für die Initialisierung mit Pydantic
+# Beispiel für die Initialisierung mit zentralem Config-Objekt
 if __name__ == "__main__":
-    import yaml
-
-    config_path = Path("wegpiraten_reporting_factory_config.yaml")
-    with open(config_path, "r") as f:
-        raw_config = yaml.safe_load(f)
-    try:
-        config = ReportingFactoryConfig(**raw_config)
-    except ValidationError as e:
-        print(f"Konfigurationsfehler: {e}")
-        exit(1)
-
+    config_path = Path(__file__).parent.parent.parent.parent / ".config" / "wegpiraten_config.yaml"
+    config = Config(config_path)
     factory = ReportingFactory(config)
-    # Beispiel für das Laden der Daten aus der SQLite-DB:
-    db_path = Path("Wegpiraten Datenbank.sqlite3")
+    db_path = Path(config.structure.prj_root) / config.structure.local_data_path / config.database.sqlite_db_name
     reporting_month = "2025-10"
-    df = factory.fetch_reporting_data(db_path, reporting_month)
-    print(df.head())
+    reporting_rows = factory.fetch_reporting_data(db_path, reporting_month)
+    if reporting_rows:
+        output_path = Path(config.structure.prj_root) / config.structure.output_path
+        template_path = Path(config.structure.prj_root) / config.structure.template_path
+        new_sheet =factory.create_reporting_sheet(
+            header_data=reporting_rows[0],
+            reporting_month_dt=datetime.strptime(reporting_month, "%Y-%m"),
+            output_path=output_path,
+            template_path=template_path,
+        )
+        logger.info(f"Reporting-Sheet {new_sheet} erfolgreich erstellt.")

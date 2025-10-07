@@ -1,53 +1,44 @@
 from pathlib import Path
-from shared_modules.config import Config, StructureConfig
+from loguru import logger
 
-from modules.reporting_factory import ReportingFactory, ReportingFactoryConfig
-from modules.reporting_processor import ReportingConfig, ReportingProcessor
+from shared_modules.config import Config
+from zeiterfassungen.modules.reporting_factory import ReportingFactory
+from zeiterfassungen.modules.reporting_processor import ReportingProcessor
 
 
 def main() -> None:
     """
     Einstiegspunkt für das Anlegen eines neuen Berichtsmonats.
-    Lädt die Konfiguration (validiert mit Pydantic), initialisiert Factory und Processor
-    und startet die Verarbeitung. Nutzt ausschließlich Pydantic-Modelle für Konfiguration.
-    Die Datenquelle ist jetzt die SQLite-Datenbank aus der Konfiguration.
+    Lädt die zentrale Konfiguration (validiert mit Pydantic), initialisiert Factory und Processor
+    und startet die Verarbeitung. Nutzt ausschließlich Pydantic-Modelle für Konfiguration und Daten.
+    Die Datenquelle ist die SQLite-Datenbank aus der Konfiguration.
     """
+
     # Pfad zur YAML-Konfigurationsdatei bestimmen
     config_path: Path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
-    config: Config = Config()
-    config.load(config_path)  # Lädt und validiert die Konfiguration, initialisiert Logger
+    config: Config = Config(config_path)  # Singleton, lädt und validiert die Konfiguration, initialisiert Logger
 
     # Zugriff auf die Struktur-Konfiguration über das Pydantic-Modell
-    structure: StructureConfig = config.get_structure()
+    structure = config.structure
+    assert structure.prj_root, "Projektwurzel fehlt in der Config!"
 
     # Die Pfade werden direkt aus dem Pydantic-Modell gelesen
     prj_root: Path = Path(structure.prj_root)
     output_path: Path = prj_root / (structure.output_path or "output")
     template_path: Path = prj_root / (structure.template_path or "templates")
+    local_data_path: Path = prj_root / (structure.local_data_path or "data")
 
     # Zugriff auf die SQLite-Datenbank aus der Konfiguration
-    local_data_path: Path = Path(structure.local_data_path or "data")
-    sqlite_db_name: str = config.data.database.sqlite_db_name
-    db_path: Path = prj_root / local_data_path / sqlite_db_name
+    db_name: str = config.database.sqlite_db_name
+    assert db_name, "SQLite-Datenbankname fehlt in der Config!"
+    db_path: Path = local_data_path / db_name
+    assert db_path.exists(), f"SQLite-Datenbank nicht gefunden: {db_path}"
 
-    # TODO: Erweiterung: ReportingFactory- und ReportingProcessor-Konfiguration auslagern
-    # Diese Blöcke prüfen, ob die Konfiguration in der Hauptkonfiguration vorhanden ist,
-    # und nutzen ansonsten Defaultwerte der jeweiligen Pydantic-Modelle.
+    # Initialisiere die Factory und den Processor mit der geprüften Config
+    factory = ReportingFactory(config)
+    processor = ReportingProcessor(config, factory)
 
-    # ReportingFactoryConfig aus der Hauptkonfiguration extrahieren (falls vorhanden)
-    factory_config_data: dict = getattr(config.data, "reporting_factory", {})
-    factory_config: ReportingFactoryConfig = ReportingFactoryConfig(**factory_config_data)
-    factory: ReportingFactory = ReportingFactory(factory_config)
-
-    # ReportingConfig aus der Hauptkonfiguration extrahieren (falls vorhanden)
-    reporting_config_data: dict = getattr(config.data, "reporting_processor", {})
-    reporting_config_data["structure"] = structure
-    reporting_config_data["db_path"] = db_path  # <-- SQLite-DB statt Excel!
-    
-    reporting_config: ReportingConfig = ReportingConfig(**reporting_config_data)
-    processor: ReportingProcessor = ReportingProcessor(reporting_config, factory)
-
- # Monat für die Erfassungsbögen festlegen (z.B. als YYYY-MM)
+    # Monat für die Erfassungsbögen festlegen (z.B. als YYYY-MM)
     reporting_month: str = "2025-10"
 
     # Ausführung der Verarbeitung mit typisierten Pfaden und Monat
@@ -56,3 +47,11 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+"""
+Vorschläge für weitere Modelle:
+- Ein Modell für die Monats-Konfiguration (z.B. MonthConfig), das alle relevanten Einstellungen für einen Berichtsmonat kapselt.
+- Ein Modell für die Reporting-Parameter (z.B. ReportingParams), um alle Laufzeitparameter typisiert zu übergeben.
+- Ein Modell für die Ergebnisstruktur (z.B. ReportingResult), um die erzeugten Dateien und Statusmeldungen zu kapseln.
+- Ein Modell für die Fehlerbehandlung (z.B. ErrorReport), um Fehler strukturiert zu erfassen und zu reporten.
+"""
