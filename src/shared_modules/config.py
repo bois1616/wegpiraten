@@ -1,33 +1,34 @@
 import os
 import sys
 from pathlib import Path
-from typing import Any, Optional, Dict, Type
-from pydantic import BaseModel, create_model  # create_model ergänzt
-
+from typing import Any, Optional, Dict, Type, Callable
+from pydantic import BaseModel, create_model
 import yaml
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from loguru import logger
 
 from shared_modules.utils import get_type_from_str
-from shared_modules.config_data import ConfigData
-from shared_modules.provider_config import ProviderConfig
-from shared_modules.structure_config import StructureConfig
 
-# Typalias für Entity-Modelle
+# Typalias für Entity-Modelle: Entity-Name → Pydantic-Modellklasse
 EntityModelDict = Dict[str, Type[BaseModel]]
+
+# Typalias für Config-Abschnitte: Abschnittsname → Dict mit Feldern
+ConfigSectionDict = Dict[str, Dict[str, Any]]
 
 
 class Config:
     """
     Singleton-Klasse für das Laden und Bereitstellen der Konfiguration.
     Nutzt Pydantic zur Validierung und Typisierung.
+    Erzeugt alle relevanten Modelle dynamisch aus der zentralen Config-Datei.
     """
 
     _instance: Optional["Config"] = None
-    _config: Optional[ConfigData] = None
+    _config: Optional[Dict[str, Any]] = None
     _log_configured: bool = False
     _entity_models: Optional[EntityModelDict] = None
+    _section_models: Optional[Dict[str, Type[BaseModel]]] = None
 
     def __new__(cls) -> "Config":
         """
@@ -41,30 +42,24 @@ class Config:
         """
         Initialisiert die Konfigurationsinstanz.
         """
-        # Nur Initialisierung, keine Typangabe mehr nötig
         self._log_configured = False
         self._entity_models = None
+        self._section_models = None
 
-    def _setup_logger(self):
+    def _setup_logger(self) -> None:
         """
         Initialisiert loguru mit dem Log-Dateipfad und Level aus der geladenen Config.
         Erstellt das Log-Verzeichnis falls nötig.
         """
         if self._log_configured:
             return
-        # Hole Log-Pfade und Level aus der Config
-        structure = self.get_structure()
-        prj_root = Path(structure.prj_root)
-        logs_dir = prj_root / (getattr(structure, "log_path", ".logs") or ".logs")
+        structure = self.get_section("structure")
+        prj_root = Path(structure.get("prj_root", "."))
+        logs_dir = prj_root / structure.get("log_path", ".logs")
         logs_dir.mkdir(parents=True, exist_ok=True)
-        log_file = logs_dir / (
-            getattr(self, "get_log_file", lambda: "wegpiraten.log")()
-        )
-        # Hole Level aus der Config, fallback auf INFO
-        log_level = getattr(self, "get_log_level", lambda: "INFO")()
-        # Entferne alle bestehenden Handler
+        log_file = logs_dir / self.get("logging.log_file", "wegpiraten.log")
+        log_level = self.get("logging.log_level", "INFO")
         logger.remove()
-        # Schreibe ins Logfile
         logger.add(
             str(log_file),
             rotation="10 MB",
@@ -72,13 +67,12 @@ class Config:
             encoding="utf-8",
             level=log_level,
         )
-        # Schreibe auch ins Terminal ab log_level
         logger.add(sys.stderr, level=log_level)
         self._log_configured = True
 
     def load(self, config_path: Path) -> None:
         """
-        Lädt die YAML-Konfiguration aus der angegebenen Datei und validiert sie mit Pydantic.
+        Lädt die YAML-Konfiguration aus der angegebenen Datei.
         Lädt zusätzlich die .env-Datei aus dem Projekt-Root.
         Args:
             config_path (Path): Pfad zur YAML-Konfigurationsdatei
@@ -93,33 +87,49 @@ class Config:
             )
         with open(config_path, "r") as f:
             raw_config = yaml.safe_load(f)
-        try:
-            self._config = ConfigData(**raw_config)
-            # .env aus prj_root laden
-            prj_root = Path(self._config.structure.prj_root)
-            env_path = prj_root / ".env"
-            if env_path.exists():
-                load_dotenv(dotenv_path=env_path, override=True)
-                logger.debug(f".env geladen von: {env_path}")
+        self._config = raw_config
+        # .env aus prj_root laden
+        prj_root = Path(self.get("structure.prj_root", "."))
+        env_path = prj_root / ".env"
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path, override=True)
+            logger.debug(f".env geladen von: {env_path}")
+        else:
+            logger.debug(f"Keine .env-Datei gefunden in: {env_path}")
+        self._setup_logger()
+        logger.info("Konfiguration erfolgreich geladen.")
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """
+        Allgemeiner Getter für beliebige Felder (dot-notation für verschachtelte Felder).
+        Args:
+            key (str): Name des Feldes, z.B. 'structure.prj_root'
+            default: Optionaler Defaultwert
+        Returns:
+            Any: Wert des Feldes oder Default
+        """
+        if self._config is None:
+            raise ValueError("Config nicht geladen! Bitte zuerst load() aufrufen.")
+        parts = key.split(".")
+        val = self._config
+        for part in parts:
+            if isinstance(val, dict) and part in val:
+                val = val[part]
             else:
-                logger.debug(f"Keine .env-Datei gefunden in: {env_path}")
-            self._setup_logger()
-            logger.info("Konfiguration erfolgreich geladen und validiert.")
-        except Exception as e:
-            # Fehlerhafte oder unvollständige Konfiguration wird sofort erkannt
-            raise ValueError(f"Fehlerhafte Konfiguration: {e}")
+                return default
+        return val
 
-    def get_log_file(self) -> str:
-        """Gibt den Namen der Logdatei zurück (aus logging.log_file oder Default)."""
-        if hasattr(self.data, "logging") and self.data.logging and self.data.logging.log_file:
-            return self.data.logging.log_file
-        return "wegpiraten.log"
-
-    def get_log_level(self) -> str:
-        """Gibt das Log-Level zurück (aus logging.log_level oder Default)."""
-        if hasattr(self.data, "logging") and self.data.logging and self.data.logging.log_level:
-            return self.data.logging.log_level
-        return "INFO"
+    def get_section(self, section: str) -> Dict[str, Any]:
+        """
+        Gibt einen Abschnitt der Config als Dictionary zurück.
+        Args:
+            section (str): Abschnittsname (z.B. 'structure', 'database')
+        Returns:
+            Dict[str, Any]: Abschnittsdaten
+        """
+        if self._config is None:
+            raise ValueError("Config nicht geladen! Bitte zuerst load() aufrufen.")
+        return self._config.get(section, {})
 
     def get_decrypted_secret(
         self, key: str, fernet_key_env: str = "FERNET_KEY", default: Any = None
@@ -162,60 +172,28 @@ class Config:
         """
         return os.getenv(key, default)
 
-    @property
-    def data(self) -> ConfigData:
+    def get_section_model(self, section: str) -> Type[BaseModel]:
         """
-        Gibt die geladene Konfiguration als Pydantic-Modell zurück.
-        Raises:
-            ValueError: Falls die Konfiguration noch nicht geladen wurde.
-        """
-        if self._config is None:
-            raise ValueError("Config nicht geladen! Bitte zuerst load() aufrufen.")
-        return self._config
-
-    # Zugriffsmethoden geben direkt typisierte Werte aus dem Pydantic-Modell zurück
-    def get_locale(self) -> str:
-        """Gibt das Gebietsschema zurück."""
-        return self.data.locale
-
-    def get_currency(self) -> str:
-        """Gibt die Währung zurück."""
-        return self.data.currency
-
-    def get_currency_format(self) -> str:
-        """Gibt das Währungsformat zurück."""
-        return self.data.currency_format
-
-    def get_date_format(self) -> str:
-        """Gibt das Datumsformat zurück."""
-        return self.data.date_format
-
-    def get_numeric_format(self) -> str:
-        """Gibt das Zahlenformat zurück."""
-        return self.data.numeric_format
-
-    def get_structure(self) -> StructureConfig:
-        """Gibt die Struktur-Konfiguration zurück."""
-        return self.data.structure
-
-    def get_provider(self) -> Optional[ProviderConfig]:
-        """Gibt die Provider-Konfiguration zurück (falls vorhanden)."""
-        return self.data.provider
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """
-        Allgemeiner Getter für beliebige Felder (nur für flache Felder empfohlen).
+        Erzeugt und cached ein Pydantic-Modell für einen Config-Abschnitt.
         Args:
-            key (str): Name des Feldes
-            default: Optionaler Defaultwert
+            section (str): Abschnittsname (z.B. 'structure', 'database')
         Returns:
-            Any: Wert des Feldes oder Default
+            Type[BaseModel]: Dynamisch erzeugtes Pydantic-Modell für den Abschnitt
         """
-        return getattr(self.data, key, default)
+        if self._section_models is None:
+            self._section_models = {}
+        if section in self._section_models:
+            return self._section_models[section]
+        section_dict = self.get_section(section)
+        # Baue das Modell aus den Feldern des Abschnitts
+        fields = {k: (type(v), v) for k, v in section_dict.items()}
+        model = create_model(f"{section.capitalize()}Config", **fields)
+        self._section_models[section] = model
+        return model
 
     def get_entity_models(self) -> EntityModelDict:
         """
-        Erzeugt und cached dynamisch Pydantic-Modelle für alle Entities aus der Config.
+        Erzeugt und cached dynamisch Pydantic-Modelle für alle Entities/Models aus der Config.
 
         Rückgabe:
             dict: Mapping von Entity-Namen auf dynamisch erzeugte Pydantic-Modelle.
@@ -226,11 +204,10 @@ class Config:
             >>> entity_models = config.get_entity_models()
             >>> ClientModel = entity_models["client"]
             >>> client = ClientModel(client_id="123", first_name="Max", last_name="Muster")
-            >>> print(client.dict())
+            >>> print(client.model_dump())
             {'client_id': '123', 'first_name': 'Max', 'last_name': 'Muster', ...}
         """
-        # Prüfe, ob die Modelle bereits erzeugt und gecached wurden
-        if hasattr(self, "_entity_models") and self._entity_models is not None:
+        if self._entity_models is not None:
             return self._entity_models
 
         # Hole die Modell-Definitionen aus der geladenen Config
@@ -238,20 +215,20 @@ class Config:
         entity_models: EntityModelDict = {}
 
         for entity_name, entity_def in models_config.items():
-            fields = entity_def.fields
+            fields = entity_def["fields"]
             annotations = {}
             # ...baue ein Dictionary mit Feldnamen und Typen für das Pydantic-Modell
             for field in fields:
-                field_name = field.name
+                field_name = field["name"]
                 if not field_name.isidentifier():
                     raise ValueError(f"Ungültiger Feldname für Pydantic in Config: {field_name}")
-                typ = get_type_from_str(field.type)
-                # Prüfe, ob das Feld optional ist
-                if getattr(field, "optional", False):
+                typ = get_type_from_str(field["type"])
+                # Optionalität und Defaultwert
+                if field.get("optional", False):
                     typ = Optional[typ]
                     default = None
                 else:
-                    default = getattr(field, "default", ...)
+                    default = field.get("default", ...)
                 annotations[field_name] = (typ, default)
 
             logger.debug(f"Erzeuge Modell {entity_name}: {annotations}")
@@ -261,6 +238,24 @@ class Config:
         # Cache die erzeugten Modelle für spätere Aufrufe
         self._entity_models = entity_models
         return entity_models
+
+    # Beispiel für "prüfe einmal, dann vertraue": Validierung beim Laden, danach nur noch Zugriff
+    def validate_config(self) -> None:
+        """
+        Validiert die geladene Konfiguration einmalig.
+        Danach wird angenommen, dass die Daten gültig sind ("prüfe einmal, dann vertraue").
+        """
+        # Hier könntest du z.B. alle Entity-Modelle einmal instanziieren/testen
+        entity_models = self.get_entity_models()
+        for entity, model in entity_models.items():
+            logger.debug(f"Validiere Entity-Modell: {entity}")
+            # Test-Instanz mit Dummy-Daten (nur für Validierung, kann entfernt werden)
+            try:
+                dummy_data = {k: None for k in model.model_fields.keys()}
+                model(**dummy_data)
+            except Exception as e:
+                logger.error(f"Fehler im Modell {entity}: {e}")
+                raise ValueError(f"Fehler im Modell {entity}: {e}")
 
 
 if __name__ == "__main__":
@@ -272,12 +267,13 @@ if __name__ == "__main__":
     config = Config()
     try:
         config.load(config_path)
-        logger.info("Projektwurzel: {}", config.get_structure().prj_root)
-        # Beispiel: Zugriff auf dynamisch erzeugte Entity-Modelle
+        logger.info("Projektwurzel: {}", config.get("structure.prj_root"))
+        # Zugriff auf dynamisch erzeugte Entity-Modelle
         entity_models = config.get_entity_models()
         ClientModel = entity_models["client"]
-        # Beispiel-Instanz erzeugen
-        client = ClientModel(client_id="123", social_security_number="756.1234.5678.97")
-        logger.info("Client-Daten: {}", client.dict())
+        client = ClientModel(client_id="123", first_name="Max", last_name="Muster")
+        logger.info("Client-Daten: {}", client.model_dump())
+        # Validierungstest
+        config.validate_config()
     except Exception as e:
         logger.error(f"Fehler beim Laden der Konfiguration: {e}")
