@@ -21,8 +21,29 @@ logging:
 templates:
   invoice_template_name: rechnungsvorlage.docx
   sheet_name: Pivot Rechnungsdaten # deprecated, use sqlite table name
+  # TODO: Felder des Invoice Templates noch in Config aufnehmen
 
-  reporting_template: zeiterfassungsboegen.xlsx
+  time_sheet_header_cells:
+    employee_name: C5
+    emp_id: G5
+    reporting_month: C6
+    allowed_hours_per_month: C7
+    service_type: G7
+    short_code: C8
+    client_id: G8
+  time_sheet_data_start_cell: A10
+  time_sheet_data_end_cell: H28
+  time_sheet_row_mapping:
+    service_time: A
+    service_date: B
+    travel_time: C
+    travel_distance: D
+    direct_time: E
+    indirect_time: F
+    billable_hours: G # Summe aus travel_time, direct_time, indirect_time, information only
+    notes: H
+
+  time_sheet_template: time_sheet_template.xlsx
   client_sheet_name: MD_Klienten # deprecated, use sqlite table name
   # sheet password in .env
 
@@ -165,6 +186,10 @@ entities:
       - name: client_id
         type: str
         excel_column: Klient-Nr.
+      - name: service_time
+        type: str
+        excel_column: Uhrzeit
+        format: ${date_format} - ${date_format}
       - name: service_date
         type: str
         excel_column: Leistungsdatum
@@ -194,20 +219,20 @@ entities:
         decimals: 2
         is_position: true
         sum: true
-      - name: billable_hours
-        type: float
-        excel_column: Sollstunden
-        format: ${numeric_format}
-        decimals: 2
-        is_position: true
-        sum: true
-      - name: hourly_rate
-        type: currency
-        excel_column: Stundensatz
-        format: ${currency_format}
-        decimals: 2
-        is_position: false
-        sum: false
+      # - name: billable_hours
+      #   type: float
+      #   excel_column: Sollstunden
+      #   format: ${numeric_format}
+      #   decimals: 2
+      #   is_position: true
+      #   sum: true
+      # - name: hourly_rate
+      #   type: currency
+      #   excel_column: Stundensatz
+      #   format: ${currency_format}
+      #   decimals: 2
+      #   is_position: false
+      #   sum: false
       # - name: km_allowance
       #   type: float
       #   excel_column: km_Pauschale
@@ -216,19 +241,19 @@ entities:
       #   is_position: false
       #   sum: true
       #   optional: true
-      - name: total_hours
-        type: float
-        excel_column: Stunden
-        format: ${numeric_format}
-        decimals: 2
-        is_position: true
-        sum: true
-      - name: total_costs
-        type: currency
-        excel_column: Kosten
-        format: ${currency_format}
-        is_position: true
-        sum: true
+      # - name: total_hours
+      #   type: float
+      #   excel_column: Stunden
+      #   format: ${numeric_format}
+      #   decimals: 2
+      #   is_position: true
+      #   sum: true
+      # - name: total_costs
+      #   type: currency
+      #   excel_column: Kosten
+      #   format: ${currency_format}
+      #   is_position: true
+      #   sum: true
       - name: service_requester_name
         type: str
         excel_column: Leistungsbesteller

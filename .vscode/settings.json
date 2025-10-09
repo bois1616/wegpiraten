@@ -4,6 +4,8 @@
         "docxtpl",
         "dotenv",
         "fernet",
+        "Headerwerten",
+        "importierbaren",
         "jahr",
         "Konsolenausgabe",
         "libreoffice",
@@ -12,6 +14,7 @@
         "outdir",
         "parsen",
         "pdfs",
+        "Plausibilitätsfehler",
         "Projektroot",
         "Pydantic",
         "stephan",
@@ -19,6 +22,7 @@
         "structure",
         "Summenfeld",
         "Summenfelder",
+        "timesheet",
         "Validierungsfehler"
     ],
     "cSpell.ignoreWords": [

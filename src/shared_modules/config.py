@@ -1,25 +1,23 @@
+import keyword
 import os
 import sys
 from pathlib import Path
-from typing import Any, Optional, Dict, Type
+from typing import Any, Dict, Optional, Type
+
 import yaml
 from cryptography.fernet import Fernet
-from dotenv import load_dotenv
 from loguru import logger
-import keyword
+from pydantic import BaseModel
+
+from pydantic_models.config.database_config import DatabaseConfig
+from pydantic_models.config.entity_model_config import EntityModelConfig
+from pydantic_models.config.formatting_config import FormattingConfig
+from pydantic_models.config.logging_config import LoggingConfig
+from pydantic_models.config.service_provider_config import ServiceProviderConfig
 
 # Importiere die statischen Pydantic-Modelle direkt, wenn src im PYTHONPATH liegt
 from pydantic_models.config.structure_config import StructureConfig
-from pydantic_models.config.database_config import DatabaseConfig
-from pydantic_models.config.logging_config import LoggingConfig
-from pydantic_models.config.formatting_config import FormattingConfig
-from pydantic_models.config.service_provider_config import ServiceProviderConfig
 from pydantic_models.config.templates_config import TemplatesConfig
-from pydantic_models.config.entity_model_config import EntityModelConfig
-from pydantic_models.config.config_data import ConfigData
-
-from pydantic import BaseModel
-from typing import List
 
 ModelDict = Dict[str, EntityModelConfig]
 
@@ -60,6 +58,7 @@ class Config:
         self.templates = self._parse_section(self.raw_config, "templates", TemplatesConfig)
         self.models = self._parse_entities(self.raw_config.get("entities", {}))
 
+        self._validate_structure_and_paths()
         self._validate_consistency()
         logger.debug("Konfiguration erfolgreich geladen und validiert.")
         self._initialized = True
@@ -130,6 +129,76 @@ class Config:
                     raise ValueError(
                         f"Unbekannter Typ '{field.type}' für Feld '{field.name}' im Modell '{model_name}'."
                     )
+
+    def _validate_structure_and_paths(self) -> None:
+        """
+        Prüft einmalig alle Pfad- und Pflichtangaben. Scheitern die Prüfungen,
+        wird die Konfiguration verworfen.
+        """
+        prj_root_raw = getattr(self.structure, "prj_root", None)
+        if not prj_root_raw:
+            logger.error("structure.prj_root ist nicht gesetzt.")
+            raise ValueError("structure.prj_root ist Pflicht.")
+
+        prj_root = Path(prj_root_raw).expanduser().resolve()
+        if not prj_root.exists():
+            logger.error(f"Projektwurzel existiert nicht: {prj_root}")
+            raise FileNotFoundError(f"Projektwurzel nicht gefunden: {prj_root}")
+
+        local_data_rel = getattr(self.structure, "local_data_path", None) or "data"
+        data_dir = (prj_root / local_data_rel).resolve()
+        if not data_dir.exists():
+            logger.error(f"Datenverzeichnis existiert nicht: {data_dir}")
+            raise FileNotFoundError(f"Datenverzeichnis nicht gefunden: {data_dir}")
+
+        sqlite_name = getattr(self.database, "sqlite_db_name", None)
+        if not sqlite_name:
+            logger.error("database.sqlite_db_name ist nicht gesetzt.")
+            raise ValueError("database.sqlite_db_name ist Pflicht.")
+
+        db_path = data_dir / sqlite_name
+        if not db_path.exists():
+            logger.error(f"SQLite-Datenbank nicht gefunden: {db_path}")
+            raise FileNotFoundError(f"SQLite-Datenbank nicht gefunden: {db_path}")
+
+        template_rel = getattr(self.structure, "template_path", None) or "templates"
+        template_dir = (prj_root / template_rel).resolve()
+        if not template_dir.exists():
+            logger.error(f"Template-Verzeichnis existiert nicht: {template_dir}")
+            raise FileNotFoundError(f"Template-Verzeichnis nicht gefunden: {template_dir}")
+
+        reporting_template = getattr(self.templates, "reporting_template", None)
+        if not reporting_template:
+            logger.error("templates.reporting_template ist nicht gesetzt.")
+            raise ValueError("templates.reporting_template ist Pflicht.")
+
+        template_file = template_dir / reporting_template
+        if not template_file.exists():
+            logger.error(f"Reporting-Template nicht gefunden: {template_file}")
+            raise FileNotFoundError(f"Reporting-Template nicht gefunden: {template_file}")
+
+        # optionale Import-Pfade prüfen, Warnung statt Fehler
+        imports_rel = getattr(self.structure, "imports_path", None)
+        if imports_rel:
+            imports_path = (prj_root / imports_rel).resolve()
+            if not imports_path.exists():
+                logger.warning(f"Imports-Pfad existiert nicht: {imports_path}")
+
+        # Pflichtfelder für Timesheet-Layout prüfen
+        header_cfg = getattr(self.templates, "time_sheet_header_cells", None)
+        row_cfg = getattr(self.templates, "time_sheet_row_mapping", None)
+        start_cell = getattr(self.templates, "time_sheet_data_start_cell", None)
+        end_cell = getattr(self.templates, "time_sheet_data_end_cell", None)
+        missing = [
+            ("templates.time_sheet_header_cells", header_cfg),
+            ("templates.time_sheet_row_mapping", row_cfg),
+            ("templates.time_sheet_data_start_cell", start_cell),
+            ("templates.time_sheet_data_end_cell", end_cell),
+        ]
+        for field_name, value in missing:
+            if value is None:
+                logger.error(f"{field_name} ist nicht definiert.")
+                raise ValueError(f"{field_name} ist Pflicht.")
 
     def get(self, key: str, default: Any = None) -> Any:
         """
