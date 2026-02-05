@@ -27,12 +27,12 @@ templates:
 
   time_sheet_header_cells:
     employee_name: C5
-    emp_id: F5
+    emp_id: G5
     reporting_month: C6
     allowed_hours_per_month: C7
     service_type: G7
     short_code: C8
-    client_id: F8
+    client_id: G8
   time_sheet_data_start_cell: A10
   time_sheet_data_end_cell: H28
   time_sheet_row_mapping:

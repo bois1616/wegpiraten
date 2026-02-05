@@ -101,6 +101,36 @@ class Config:
         with open(self.config_path, "r") as f:
             return yaml.safe_load(f)
 
+    def _read_env_file(self, env_path: Path) -> Dict[str, str]:
+        """
+        Liest eine .env-Datei ohne externe Abhängigkeiten.
+        """
+        data: Dict[str, str] = {}
+        if not env_path.exists():
+            return data
+        try:
+            for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                value = value.strip().strip("'").strip('"')
+                data[key.strip()] = value
+        except Exception as exc:
+            logger.warning(f".env konnte nicht gelesen werden: {exc}")
+        return data
+
+    def _get_env_cache(self) -> Dict[str, str]:
+        """
+        Cached Zugriff auf .env (falls vorhanden).
+        """
+        cache = getattr(self, "_env_cache", None)
+        if cache is not None:
+            return cache
+        env_path = Path(self.structure.prj_root) / ".env"
+        self._env_cache = self._read_env_file(env_path)
+        return self._env_cache
+
     def _parse_section(self, config: Dict[str, Any], section: str, model: Type[BaseModel]) -> Any:
         """
         Parst einen Abschnitt der Config mit dem passenden Pydantic-Modell.
@@ -227,14 +257,20 @@ class Config:
         Gibt ein Secret (z. B. Passwort, API-Key) aus Umgebungsvariablen zurück.
         """
         logger.debug(f"Lese Secret '{key}' aus Umgebungsvariablen.")
-        return os.getenv(key, default)
+        env_val = os.getenv(key)
+        if env_val is not None:
+            return env_val
+        env_val = self._get_env_cache().get(key)
+        if env_val is not None:
+            return env_val
+        return default
 
     def get_decrypted_secret(self, key: str, fernet_key_env: str = "FERNET_KEY", default: Any = None) -> Optional[str]:
         """
         Holt ein verschlüsseltes Secret aus der Umgebung und entschlüsselt es mit Fernet.
         """
-        encrypted = os.getenv(key)
-        fernet_key = os.getenv(fernet_key_env)
+        encrypted = self.get_secret(key)
+        fernet_key = self.get_secret(fernet_key_env)
         logger.debug(f"Versuche Secret '{key}' mit Fernet-Key '{fernet_key_env}' zu entschlüsseln.")
         if not encrypted or not fernet_key:
             logger.debug("Kein Secret oder Key gefunden, Rückgabe Default.")
