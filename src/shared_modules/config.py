@@ -185,16 +185,6 @@ class Config:
             logger.error(f"Template-Verzeichnis existiert nicht: {template_dir}")
             raise FileNotFoundError(f"Template-Verzeichnis nicht gefunden: {template_dir}")
 
-        reporting_template = getattr(self.templates, "reporting_template", None)
-        if not reporting_template:
-            logger.error("templates.reporting_template ist nicht gesetzt.")
-            raise ValueError("templates.reporting_template ist Pflicht.")
-
-        template_file = template_dir / reporting_template
-        if not template_file.exists():
-            logger.error(f"Reporting-Template nicht gefunden: {template_file}")
-            raise FileNotFoundError(f"Reporting-Template nicht gefunden: {template_file}")
-
         # optionale Import-Pfade prüfen, Warnung statt Fehler
         imports_rel = getattr(self.structure, "imports_path", None)
         if imports_rel:

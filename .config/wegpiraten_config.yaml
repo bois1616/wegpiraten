@@ -1,6 +1,6 @@
 structure:
   prj_root: /home/stephan/projects/wegpiraten
-  shared_data_path: /mnt/c/Users/micro/OneDrive/Shared/Beatus/Wegpiraten Unterlagen
+  shared_data_path: data
   output_path: output
   template_path: templates
   tmp_path: .tmp
@@ -9,8 +9,8 @@ structure:
   graphics: graphics
 
 database:
-  sqlite_db_name: Wegpiraten Datenbank.sqlite3
-  db_name: Wegpiraten Datenbank.xlsx
+  sqlite_db_name: wegpiraten.sqlite3
+  db_name: wegpiraten_datenbank.xlsx
   db_encrypted: true
   # db password in .env
 
@@ -74,20 +74,20 @@ entities:
       - name: emp_id
         type: str
         primary_key: true
-        excel_column: PersNr
+        excel_column: employee_id
       - name: first_name
         type: str
-        excel_column: Vorname
+        excel_column: first_name
       - name: last_name
         type: str
-        excel_column: Nachname
+        excel_column: last_name
       - name: fte
         type: float
-        excel_column: FTE
+        excel_column: fte
         format: ${numeric_format}
       - name: notes
         type: str
-        excel_column: Kommentar
+        excel_column: notes
         optional: true
 
   client:
@@ -95,49 +95,49 @@ entities:
       - name: client_id
         type: str
         primary_key: true
-        excel_column: KlientNr
+        excel_column: client_id
       - name: social_security_number
         type: str
-        excel_column: SozVersNr
+        excel_column: social_security_number
       - name: first_name
         type: str
-        excel_column: Vorname
+        excel_column: first_name
       - name: last_name
         type: str
-        excel_column: Nachname
+        excel_column: last_name
       - name: short_code
         type: str
-        excel_column: Kürzel
+        excel_column: short_code
       - name: payer_id
         type: str
-        excel_column: ZdNr
+        excel_column: payer_id
       - name: service_requester_id
         type: str
-        excel_column: LbNr
+        excel_column: service_requester_id
       - name: start_date
         type: str
-        excel_column: Beginn
+        excel_column: start_date
         format: ${date_format}
       - name: end_date
         type: str
-        excel_column: Ende
+        excel_column: end_date
         format: ${date_format}
         optional: true
       - name: employee_id # foreign key
         type: str
-        excel_column: MA_ID
+        excel_column: employee_id
       - name: allowed_hours_per_month
         type: float
         optional: true
-        excel_column: Stunden pro Monat
+        excel_column: allowed_hours_per_month
         format: ${numeric_format}
         sum: true
       - name: service_type
         type: str
-        excel_column: SPF / BBT
+        excel_column: service_type_id
       - name: notes
         type: str
-        excel_column: Kommentar
+        excel_column: notes
         optional: true
 
   payer:
@@ -145,26 +145,26 @@ entities:
       - name: payer_id
         type: str
         primary_key: true
-        excel_column: ZdNr
+        excel_column: payer_id
       - name: name
         type: str
-        excel_column: ZD_Name
+        excel_column: name
       - name: name2
         type: str
         optional: true
-        excel_column: ZD_Name2
+        excel_column: name2
       - name: street
         type: str
-        excel_column: ZD_Strasse
+        excel_column: street
       - name: zip_code
         type: str
-        excel_column: ZD_PLZ
+        excel_column: zip_code
       - name: city
         type: str
-        excel_column: ZD_Ort
+        excel_column: city
       - name: notes
         type: str
-        excel_column: Kommentar
+        excel_column: notes
         optional: true
 
   service_requester:
@@ -172,10 +172,45 @@ entities:
       - name: service_requester_id
         type: str
         primary_key: true
-        excel_column: LBNr
+        excel_column: service_requester_id
       - name: name
         type: str
-        excel_column: Leistungsbesteller
+        excel_column: name
+
+  service_type:
+    fields:
+      - name: service_type_id
+        type: str
+        primary_key: true
+        excel_column: service_type_id
+      - name: code
+        type: str
+        excel_column: code
+      - name: description
+        type: str
+        excel_column: description
+        optional: true
+      - name: hourly_rate
+        type: float
+        excel_column: hourly_rate
+        format: ${numeric_format}
+      - name: km_rate
+        type: float
+        excel_column: km_rate
+        format: ${numeric_format}
+      - name: rundung
+        type: float
+        excel_column: rundung
+        format: ${numeric_format}
+      - name: from_date
+        type: str
+        excel_column: from_date
+        format: ${date_format}
+        optional: true
+      - name: notes
+        type: str
+        excel_column: notes
+        optional: true
 
   invoice_data:
     fields:
@@ -262,19 +297,19 @@ entities:
         excel_column: ZDNR
 
 # TODO: löschen nach import
-# table_mappings:
-#   MD_MA:
-#     entity: employee
-#     target: employees
-#   Leistungsbesteller:
-#     entity: service_requester
-#     target: service_requester
-#   Zahlungsdienstleister:
-#     entity: payer
-#     target: payer
-#   MD_Client:
-#     entity: client
-#     target: clients
-#   invoice_data:
-#     entity: invoice_data
-#     target: invoice_data
+table_mappings:
+  masterdata_employee:
+    entity: employee
+    target: employees
+  masterdata_service_requester:
+    entity: service_requester
+    target: service_requester
+  masterdata_payer:
+    entity: payer
+    target: payer
+  masterdata_client:
+    entity: client
+    target: clients
+  invoice_data:
+    entity: invoice_data
+    target: invoice_data

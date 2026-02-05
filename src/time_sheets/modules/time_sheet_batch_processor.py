@@ -69,11 +69,12 @@ class TimeSheetBatchProcessor:
             c.employee_id,
             c.first_name AS client_first_name,
             c.last_name AS client_last_name,
-            c.service_type,
+            st.code AS service_type,
             e.first_name AS employee_first_name,
             e.last_name AS employee_last_name
         FROM clients c
         LEFT JOIN employees e ON c.employee_id = e.emp_id
+        LEFT JOIN service_types st ON c.service_type = st.service_type_id
         WHERE (c.end_date IS NULL OR c.end_date >= ?)
         """
 

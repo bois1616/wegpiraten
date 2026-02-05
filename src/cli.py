@@ -11,10 +11,12 @@ Befehle:
     import-sheets   Ausgefüllte Zeiterfassungsbögen importieren
 """
 
+import sqlite3
 from pathlib import Path
 from typing import Optional
 
 import typer
+import yaml
 from loguru import logger
 from rich.console import Console
 
@@ -34,7 +36,50 @@ def get_config(config_path: Optional[Path] = None) -> Config:
     if not path.exists():
         console.print(f"[red]Konfigurationsdatei nicht gefunden: {path}[/red]")
         raise typer.Exit(1)
+    ensure_database_exists(path)
     return Config(path)
+
+
+def ensure_database_exists(config_path: Path) -> None:
+    """Erstellt die SQLite-Datenbank, falls sie fehlt."""
+    try:
+        with open(config_path, "r") as handle:
+            raw_config = yaml.safe_load(handle) or {}
+    except Exception as exc:
+        logger.error(f"Konfiguration konnte nicht gelesen werden: {exc}")
+        raise
+
+    structure_cfg = raw_config.get("structure", {}) or {}
+    database_cfg = raw_config.get("database", {}) or {}
+
+    prj_root_raw = structure_cfg.get("prj_root")
+    if not prj_root_raw:
+        logger.error("structure.prj_root ist nicht gesetzt.")
+        raise ValueError("structure.prj_root ist Pflicht.")
+
+    sqlite_name = database_cfg.get("sqlite_db_name")
+    if not sqlite_name:
+        logger.error("database.sqlite_db_name ist nicht gesetzt.")
+        raise ValueError("database.sqlite_db_name ist Pflicht.")
+
+    data_rel = structure_cfg.get("local_data_path") or "data"
+    data_dir = (Path(prj_root_raw).expanduser().resolve() / data_rel).resolve()
+    if not data_dir.exists():
+        logger.error(f"Datenverzeichnis existiert nicht: {data_dir}")
+        raise FileNotFoundError(f"Datenverzeichnis nicht gefunden: {data_dir}")
+
+    db_path = data_dir / sqlite_name
+    if db_path.exists():
+        return
+
+    console.print(f"[yellow]SQLite-Datenbank fehlt, wird erstellt: {db_path}[/yellow]")
+    logger.info(f"SQLite-Datenbank fehlt, wird erstellt: {db_path}")
+    try:
+        with sqlite3.connect(db_path) as connection:
+            connection.execute("PRAGMA user_version = 0")
+    except Exception as exc:
+        logger.error(f"SQLite-Datenbank konnte nicht erstellt werden: {exc}")
+        raise
 
 
 @app.command("invoice")

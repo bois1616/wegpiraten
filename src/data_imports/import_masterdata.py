@@ -95,11 +95,14 @@ def create_target_tables(
     entity_name: str,
     target_table: str,
     fields: list[FieldConfig],
+    foreign_keys: Optional[list[tuple[str, str, str]]] = None,
 ) -> None:
     """
     Erstellt die Zieltabelle in der SQLite-DB anhand der Felddefinitionen.
     """
     cur = conn.cursor()
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (target_table,))
+    table_exists = cur.fetchone() is not None
     columns = []
     primary_keys = []
     for field in fields:
@@ -113,10 +116,19 @@ def create_target_tables(
     pk_sql = ""
     if primary_keys:
         pk_sql = f",\n    PRIMARY KEY ({', '.join(primary_keys)})"
-    sql = f"CREATE TABLE IF NOT EXISTS {target_table} (\n    {columns_sql}{pk_sql}\n)"
+    fk_sql = ""
+    if foreign_keys:
+        fk_clauses = [
+            f"FOREIGN KEY ({column}) REFERENCES {ref_table}({ref_column})"
+            for column, ref_table, ref_column in foreign_keys
+        ]
+        fk_sql = ",\n    " + ",\n    ".join(fk_clauses)
+    sql = f"CREATE TABLE IF NOT EXISTS {target_table} (\n    {columns_sql}{pk_sql}{fk_sql}\n)"
     logger.debug(f"Erstelle Tabelle {target_table}: {sql}")
     cur.execute(sql)
     conn.commit()
+    if table_exists and foreign_keys:
+        logger.warning(f"Tabelle {target_table} existiert bereits. Foreign Keys wurden nicht nachträglich gesetzt.")
 
 
 def import_entity_data(
@@ -125,6 +137,7 @@ def import_entity_data(
     excel_table_name: str,
     target_table: str,
     fields: list[FieldConfig],
+    foreign_keys: Optional[list[tuple[str, str, str]]] = None,
 ) -> int:
     """
     Liest alle Daten aus der angegebenen Excel-Tabelle, mappt die Felder und schreibt sie in die Zieltabelle.
@@ -141,12 +154,28 @@ def import_entity_data(
     mapping = {f.excel_column: f for f in fields if f.excel_column}
     required_fields = [f.name for f in fields]
 
+    pk_fields = [field.name for field in fields if field.primary_key]
     records = []
     for _, row in excel_table.iterrows():
         if row.isnull().all():
             continue
         try:
             mapped = map_row(row, mapping, required_fields)
+            if foreign_keys:
+                missing_fk_fields = []
+                for column, _, _ in foreign_keys:
+                    value = mapped.get(column)
+                    if value is None or (isinstance(value, str) and value.strip() == ""):
+                        missing_fk_fields.append(column)
+                if missing_fk_fields:
+                    pk_values = {field: mapped.get(field) for field in pk_fields} if pk_fields else {}
+                    logger.error(
+                        "Datensatz übersprungen ({}): fehlende FK-Felder {}. PK={}",
+                        target_table,
+                        ", ".join(missing_fk_fields),
+                        pk_values or "n/a",
+                    )
+                    continue
             records.append(mapped)
         except Exception as e:
             logger.error(f"Fehler beim Validieren eines Datensatzes: {e}")
@@ -158,7 +187,8 @@ def import_entity_data(
             logger.success(f"{len(df_target)} Datensätze in {target_table} importiert.")
             return len(df_target)
         except Exception as e:
-            logger.error(f"Fehler beim Schreiben in {target_table}: {e}")
+            logger.exception(f"Fehler beim Schreiben in {target_table}: {e}")
+            _log_import_diagnostics(target_conn, target_table, df_target, fields)
             return 0
     else:
         logger.warning(f"Keine gültigen Datensätze für {target_table} gefunden.")
@@ -167,11 +197,89 @@ def import_entity_data(
 
 # Standard-Tabellen-Mapping (Excel-Tabellenname → SQLite-Tabelle, Entity-Name)
 DEFAULT_TABLE_MAPPINGS = {
-    "MD_MA": {"target": "employees", "entity": "employee"},
-    "Leistungsbesteller": {"target": "service_requester", "entity": "service_requester"},
-    "Zahlungsdienstleister": {"target": "payer", "entity": "payer"},
-    "MD_Client": {"target": "clients", "entity": "client"},
+    "masterdata_employee": {"target": "employees", "entity": "employee"},
+    "masterdata_payer": {"target": "payer", "entity": "payer"},
+    "masterdata_service_requester": {"target": "service_requester", "entity": "service_requester"},
+    "service_types": {"target": "service_types", "entity": "service_type"},
+    "masterdata_client": {"target": "clients", "entity": "client"},
 }
+
+FOREIGN_KEY_MAPPINGS: Dict[str, list[tuple[str, str, str]]] = {
+    "clients": [
+        ("employee_id", "employees", "emp_id"),
+        ("payer_id", "payer", "payer_id"),
+        ("service_requester_id", "service_requester", "service_requester_id"),
+        ("service_type", "service_types", "service_type_id"),
+    ],
+}
+
+
+def _log_import_diagnostics(
+    target_conn: sqlite3.Connection,
+    target_table: str,
+    df_target: pd.DataFrame,
+    fields: list[FieldConfig],
+) -> None:
+    pk_fields = [field.name for field in fields if field.primary_key]
+    if pk_fields:
+        duplicates = df_target[df_target.duplicated(subset=pk_fields, keep=False)]
+        if not duplicates.empty:
+            sample = duplicates[pk_fields].head(5).to_dict(orient="records")
+            logger.error(
+                "Doppelte Primärschlüssel in {} gefunden ({} Zeilen). Beispiele: {}",
+                target_table,
+                len(duplicates),
+                sample,
+            )
+
+    for column, ref_table, ref_column in FOREIGN_KEY_MAPPINGS.get(target_table, []):
+        if column not in df_target.columns:
+            logger.warning(
+                "FK-Prüfung übersprungen: Spalte {} fehlt in {}.",
+                column,
+                target_table,
+            )
+            continue
+        series = df_target[column]
+        blanks = series.isna() | series.astype(str).str.strip().eq("")
+        blank_count = int(blanks.sum())
+        if blank_count:
+            logger.error(
+                "FK-Spalte {} enthält {} leere Werte (NULL/leer).",
+                column,
+                blank_count,
+            )
+        values = set(series[~blanks].astype(str))
+        try:
+            cur = target_conn.cursor()
+            cur.execute(f"SELECT {ref_column} FROM {ref_table}")
+            ref_values = {str(row[0]) for row in cur.fetchall() if row[0] is not None and str(row[0]).strip() != ""}
+        except Exception as exc:
+            logger.error(
+                "FK-Prüfung fehlgeschlagen: {}.{} → {}.{} ({})",
+                target_table,
+                column,
+                ref_table,
+                ref_column,
+                exc,
+            )
+            continue
+        missing = sorted(values - ref_values)
+        if missing:
+            sample_missing = missing[:10]
+            sample_rows = (
+                df_target[df_target[column].astype(str).isin(sample_missing)][[column]]
+                .head(5)
+                .to_dict(orient="records")
+            )
+            logger.error(
+                "FK-Verletzung in {}.{}: {} fehlende Werte (z.B. {}). Beispiele Zeilen: {}",
+                target_table,
+                column,
+                len(missing),
+                sample_missing,
+                sample_rows,
+            )
 
 
 def run_import(config: Config, source_override: Optional[Path] = None) -> int:
@@ -209,6 +317,7 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
 
     total_imported = 0
     with sqlite3.connect(target_db_path) as target_conn:
+        target_conn.execute("PRAGMA foreign_keys = ON")
         for excel_table, table_cfg in DEFAULT_TABLE_MAPPINGS.items():
             entity_name = table_cfg["entity"]
             target_table = table_cfg["target"]
@@ -222,7 +331,13 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
             fields = entity_config.fields
 
             # Tabelle erstellen
-            create_target_tables(target_conn, entity_name, target_table, fields)
+            create_target_tables(
+                target_conn,
+                entity_name,
+                target_table,
+                fields,
+                foreign_keys=FOREIGN_KEY_MAPPINGS.get(target_table),
+            )
 
             # Daten importieren
             try:
@@ -232,6 +347,7 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
                     excel_table_name=excel_table,
                     target_table=target_table,
                     fields=fields,
+                    foreign_keys=FOREIGN_KEY_MAPPINGS.get(target_table),
                 )
                 total_imported += count
             except Exception as e:
