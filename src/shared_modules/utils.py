@@ -24,11 +24,13 @@ def clear_path(path: Path) -> None:
         if item.is_file():
             item.unlink()
 
+
 class PDFList(BaseModel):
     """
     Pydantic-Modell für eine Liste von PDF-Dateipfaden.
     Sorgt für Validierung und Typsicherheit.
     """
+
     pdf_files: List[Path]
 
     @field_validator("pdf_files")
@@ -40,6 +42,7 @@ class PDFList(BaseModel):
             if not file.exists():
                 raise ValueError(f"Datei nicht gefunden: {file}")
         return v
+
 
 def zip_invoices(pdf_files: List[Path], zip_path: Path) -> None:
     """
@@ -60,6 +63,7 @@ def zip_invoices(pdf_files: List[Path], zip_path: Path) -> None:
     with ZipFile(zip_path, "w") as zipf:
         for file in pdf_list.pdf_files:
             zipf.write(file, arcname=file.name)
+
 
 def safe_str(val) -> str:
     """
@@ -89,6 +93,7 @@ def log_exceptions(msg: str, continue_on_error: bool = True) -> Generator[None, 
         if not continue_on_error:
             raise
 
+
 @contextmanager
 def temporary_docx(suffix: str = ".docx") -> Generator[Path, None, None]:
     """
@@ -115,6 +120,7 @@ def temporary_docx(suffix: str = ".docx") -> Generator[Path, None, None]:
         if tmp_path.exists():
             os.remove(tmp_path)
 
+
 # Hilfsfunktion für Typumwandlung (wird für dynamische Modell-Erzeugung benötigt)
 def get_type_from_str(type_str: str):
     mapping = {
@@ -129,12 +135,14 @@ def get_type_from_str(type_str: str):
 # Datumsformate für freie Texteingaben
 DATE_FORMATS: tuple[str, ...] = ("%Y-%m-%d", "%d.%m.%Y", "%Y/%m/%d", "%m.%Y")
 
+
 def _parse_float_str(s: str) -> Optional[float]:
     s = s.strip().replace("’", "").replace("'", "").replace(" ", "").replace(",", ".")
     try:
         return float(s)
     except ValueError:
         return None
+
 
 def _parse_date_str(s: str) -> Optional[date]:
     s = s.strip()
@@ -147,6 +155,7 @@ def _parse_date_str(s: str) -> Optional[date]:
         except ValueError:
             continue
     return None
+
 
 _FLOAT_CONVERTERS: Dict[type, Callable[[Any], Optional[float]]] = {
     type(None): lambda _v: None,
@@ -162,20 +171,24 @@ _DATE_CONVERTERS: Dict[type, Callable[[Any], Optional[date]]] = {
     type(None): lambda _v: None,
 }
 
+
 def to_float(v: Any) -> Optional[float]:
     """Typbasierte Zahl-Konvertierung (None/str/int/float -> float|None)."""
     conv = _FLOAT_CONVERTERS.get(type(v))
     return conv(v) if conv else None
+
 
 def to_date(v: Any) -> Optional[date]:
     """Typbasierte Datums-Konvertierung (None/str/date/datetime -> date|None)."""
     conv = _DATE_CONVERTERS.get(type(v))
     return conv(v) if conv else None
 
+
 def to_year_month_str(v: Any) -> Optional[str]:
     """Konvertiert Eingabe nach YYYY-MM (falls Datum ermittelbar)."""
     d = to_date(v)
     return d.strftime("%Y-%m") if d else None
+
 
 def choose_existing_path(candidates: list[Optional[Path]], fallback: Path) -> Path:
     """Gibt den ersten existierenden Pfad aus candidates zurück, sonst fallback."""
@@ -184,14 +197,18 @@ def choose_existing_path(candidates: list[Optional[Path]], fallback: Path) -> Pa
             return p
     return fallback
 
+
 def ensure_dir(path: Path) -> Path:
     """Erzeugt ein Verzeichnis (rekursiv), falls es fehlt, und gibt den Pfad zurück."""
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
 # Hinweis: Alle Formatierungen für Zahlen, Währungen und Datumsfelder erfolgen ausschließlich im Template
 # über Babel/Jinja2-Filter und die Konfiguration. Keine eigene Formatierungsfunktion mehr nötig.
 
 _CELL_RE = re.compile(r"^[A-Za-z]+[0-9]+$")
+
 
 def split_cell_address(address: str) -> Tuple[str, int]:
     addr = address.strip().upper()
@@ -199,6 +216,7 @@ def split_cell_address(address: str) -> Tuple[str, int]:
         raise ValueError(f"Ungültige Zelladresse: {address}")
     col, row = coordinate_from_string(addr)
     return col, int(row)
+
 
 def derive_table_range(start_cell: str, end_cell: str) -> Tuple[str, int, str, int]:
     start_col, start_row = split_cell_address(start_cell)

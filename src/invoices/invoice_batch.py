@@ -31,11 +31,7 @@ def main() -> None:
     filter_obj: InvoiceFilter = InvoiceFilter(invoice_month=invoice_month)
 
     # Konfiguration laden und validieren (Pydantic übernimmt die Validierung)
-    config_obj: Config = Config()
-    config_obj.load(config_path)
-
-    # Zugriff auf die Struktur-Konfiguration über das Pydantic-Modell
-    structure = config_obj.get_structure()  # Gibt ein StructureConfig-Pydantic-Modell zurück
+    config_obj: Config = Config(config_path)
 
     # Logdatei und Logverzeichnis werden automatisch durch config.setup_logger() eingerichtet
     # (Logger ist bereits durch Config initialisiert, keine doppelte Konfiguration nötig)
@@ -53,5 +49,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

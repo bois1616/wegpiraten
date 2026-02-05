@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel
+
 
 class TemplatesConfig(BaseModel):
     invoice_template_name: Optional[str] = "Rechnungsvorlage.docx"

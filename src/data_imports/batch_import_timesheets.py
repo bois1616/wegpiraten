@@ -3,42 +3,42 @@
 # Die Daten werden in invoice_data gespeichert, ohne Rechnungsnummer
 # Nutzt reporting_row_model.py für die Datenstruktur
 # #
-# Gemeinsames Profil: Die Klassen HeaderCells, RowMapping, TableRange und 
-# ReportingImportProfile kapseln Zellen- und Spaltenbezüge sowie den Datenbereich. 
-# Diese Strukturen sollten idealerweise in ein gemeinsames Modul 
-# (z.B. zeiterfassungen/modules/reporting_sheet_profile.py) ausgelagert und 
-# sowohl in ReportingFactory (Erstellung) als auch hier (Import) genutzt werden. 
+# Gemeinsames Profil: Die Klassen HeaderCells, RowMapping, TableRange und
+# ReportingImportProfile kapseln Zellen- und Spaltenbezüge sowie den Datenbereich.
+# Diese Strukturen sollten idealerweise in ein gemeinsames Modul
+# (z.B. zeiterfassungen/modules/reporting_sheet_profile.py) ausgelagert und
+# sowohl in ReportingFactory (Erstellung) als auch hier (Import) genutzt werden.
 # So bleibt die Logik synchron.
-# Konsistenz mit create_reporting_sheet: 
-# Die verwendeten Header-Zellen (C5, G5, C6, C7, G7, C8, G8) entsprechen den in 
-# create_reporting_sheet beschriebenen Feldern. 
+# Konsistenz mit create_reporting_sheet:
+# Die verwendeten Header-Zellen (C5, G5, C6, C7, G7, C8, G8) entsprechen den in
+# create_reporting_sheet beschriebenen Feldern.
 # Bei Änderungen am Template muss nur HeaderCells angepasst werden.
-# Robustheit: 
-# Einmalige Prüfungen (DB-Pfad, Sheet-Existenz, notwendige Header-Felder) 
-# mit assert (“prüfe einmal und dann traue”). 
-# Zeilen werden defensiv konvertiert und validiert. 
+# Robustheit:
+# Einmalige Prüfungen (DB-Pfad, Sheet-Existenz, notwendige Header-Felder)
+# mit assert (“prüfe einmal und dann traue”).
+# Zeilen werden defensiv konvertiert und validiert.
 # Transaktionale Inserts mit Rollback bei Fehler.
-# Pfade: Vorerst wird ein fixer Windows-Pfad als Quelle verwendet. 
-# Wenn dieser nicht existiert, wird auf einen dynamischen Pfad aus der Config 
-# (structure.imports_path) oder schließlich prj_root/data_imports zurückgefallen. 
+# Pfade: Vorerst wird ein fixer Windows-Pfad als Quelle verwendet.
+# Wenn dieser nicht existiert, wird auf einen dynamischen Pfad aus der Config
+# (structure.imports_path) oder schließlich prj_root/data_imports zurückgefallen.
 # Die verarbeiteten Dateien werden in ein Unterverzeichnis importiert verschoben,
 #  welches bei Bedarf angelegt wird.
-# Pydantic: 
+# Pydantic:
 # Konsequent für Profil und Datenmodelle. Erweiterbar um weitere Felder (z.B. Notizen aus Spalte G/H).
-# Weiter normalisieren? 
-# Ja, sinnvoll wäre eine Normalisierung der Positionen in eine eigene Tabelle 
+# Weiter normalisieren?
+# Ja, sinnvoll wäre eine Normalisierung der Positionen in eine eigene Tabelle
 # timesheet_entries, wenn invoice_data bereits Rechnungsbelege abbildet.
-#  Alternativ kann invoice_data als staging genutzt werden und ein nachgelagerter 
+#  Alternativ kann invoice_data als staging genutzt werden und ein nachgelagerter
 # Prozess normalisiert in ein Faktentableau.
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
-import sqlite3
 from loguru import logger
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -60,6 +60,7 @@ class ImportedRowExport(BaseModel):
     """
     Erweiterung des InvoiceRowModel um Kontextinformationen für den Sammel-Export.
     """
+
     reporting_month: str
     source_file: str
     client_id: str
@@ -95,7 +96,6 @@ class TimeSheetsImporter:
         "total_hours",
         "total_costs",
     )
-    
 
     def __init__(self, config: Config, profile: Optional[TimeSheetImportProfile] = None):
         self.config = config
@@ -106,9 +106,8 @@ class TimeSheetsImporter:
         self.db_path = data_dir / self.config.database.sqlite_db_name
         self.output_dir = ensure_dir(prj_root / (getattr(self.config.structure, "output_path", None) or "output"))
 
-        cfg_imports_path = (
-            getattr(self.config.structure, "imports_path", None)
-            or self.config.get("structure.imports_path", None)
+        cfg_imports_path = getattr(self.config.structure, "imports_path", None) or self.config.get(
+            "structure.imports_path", None
         )
         default_windows = Path(r"C:\Users\micro\OneDrive\Shared\Beatus\Wegpiraten Unterlagen\data_imports")
         fallback_local = prj_root / "data_imports"
@@ -142,13 +141,13 @@ class TimeSheetsImporter:
     def _read_header(self, ws: Worksheet) -> Dict[str, object]:
         cells = self.profile.header_cells
         return {
-            "employee_fullname": ws[cells.employee_name].value,
-            "employee_id": ws[cells.emp_id].value,
-            "reporting_month": ws[cells.reporting_month].value,
-            "allowed_hours_per_month": ws[cells.allowed_hours_per_month].value,
-            "service_type": ws[cells.service_type].value,
-            "short_code": ws[cells.short_code].value,
-            "client_id": ws[cells.client_id].value,
+            "employee_fullname": ws[cells.employee_name].value,  # type: ignore[union-attr]
+            "employee_id": ws[cells.emp_id].value,  # type: ignore[union-attr]
+            "reporting_month": ws[cells.reporting_month].value,  # type: ignore[union-attr]
+            "allowed_hours_per_month": ws[cells.allowed_hours_per_month].value,  # type: ignore[union-attr]
+            "service_type": ws[cells.service_type].value,  # type: ignore[union-attr]
+            "short_code": ws[cells.short_code].value,  # type: ignore[union-attr]
+            "client_id": ws[cells.client_id].value,  # type: ignore[union-attr]
         }
 
     def _read_rows(self, ws: Worksheet, header: Dict[str, object]) -> List[InvoiceRowModel]:
@@ -198,8 +197,8 @@ class TimeSheetsImporter:
     def _import_rows(self, rows: Iterable[InvoiceRowModel]) -> int:
         sql = f"""
         INSERT INTO invoice_data (
-            {', '.join(self._INSERT_FIELDS)}
-        ) VALUES ({', '.join(['?'] * len(self._INSERT_FIELDS))})
+            {", ".join(self._INSERT_FIELDS)}
+        ) VALUES ({", ".join(["?"] * len(self._INSERT_FIELDS))})
         """
         count = 0
         with sqlite3.connect(self.db_path) as conn:
@@ -255,10 +254,14 @@ class TimeSheetsImporter:
         logger.info(f"Verarbeite: {file_path.name}")
         wb = load_workbook(file_path, data_only=True)
         if self.profile.sheet_name:
-            assert self.profile.sheet_name in wb.sheetnames, f"Sheet '{self.profile.sheet_name}' fehlt in {file_path.name}."
+            assert self.profile.sheet_name in wb.sheetnames, (
+                f"Sheet '{self.profile.sheet_name}' fehlt in {file_path.name}."
+            )
             ws = wb[self.profile.sheet_name]
         else:
             ws = wb.active
+            if ws is None:
+                raise ValueError(f"Kein aktives Sheet in {file_path.name}")
 
         header = self._read_header(ws)
         month_str = to_year_month_str(header.get("reporting_month"))

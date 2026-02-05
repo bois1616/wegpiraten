@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel
+
 
 class ProviderConfig(BaseModel):
     """
@@ -11,6 +13,7 @@ class ProviderConfig(BaseModel):
         strasse (Optional[str]): Straße und Hausnummer des Anbieters.
         plz_ort (Optional[str]): Postleitzahl und Ort des Anbieters.
     """
+
     IBAN: Optional[str] = None
     name: Optional[str] = None
     strasse: Optional[str] = None

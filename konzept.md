@@ -19,7 +19,7 @@
 - Stammdaten für Klienten, Provider und Payer können initial aus Excel-Dateien importiert werden.
 - Ein separates Import-Skript liest die Excel-Dateien ein und befüllt die jeweiligen Tabellen.
 
-## 5. Webbasierte Verwaltungsoberfläche (Flask)
+## 5. zurückgestellt: Webbasierte Verwaltungsoberfläche (Flask)
 - Eine Flask-Webanwendung bietet eine Verwaltungsoberfläche für die Stammdaten (CRUD für Klienten, Provider, Payer).
 - Die Oberfläche ermöglicht das Suchen, Bearbeiten und Anlegen von Stammdaten.
 - Optional: Verwaltung und Übersicht der eingelesenen Leistungen.

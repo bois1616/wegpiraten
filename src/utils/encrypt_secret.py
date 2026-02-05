@@ -1,6 +1,7 @@
 # Hilfsskript zum Verschlüsseln von Passwörtern für .env
 # Ausführen: python encrypt_secret.py <klartext-passwort>
 import sys
+
 from cryptography.fernet import Fernet  # type: ignore[import]
 
 from shared_modules.config import Config
@@ -12,6 +13,7 @@ def main():
     else:
         # Interaktive Abfrage, falls kein Argument übergeben wurde (z. B. VSCode Run/Debug)
         import getpass
+
         print("Kein Passwort als Argument übergeben.")
         password = getpass.getpass("Bitte Passwort eingeben (wird nicht angezeigt): ")
         if not password:
@@ -34,6 +36,7 @@ def main():
     f = Fernet(fernet_key.encode())
     encrypted = f.encrypt(password_bytes)
     print(f"Verschlüsseltes Passwort für .env: {encrypted.decode()}")
+
 
 if __name__ == "__main__":
     main()

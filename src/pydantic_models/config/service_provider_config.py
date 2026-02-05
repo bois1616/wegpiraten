@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel
+
 
 class ServiceProviderConfig(BaseModel):
     name: Optional[str] = "Wegpiraten GmbH"

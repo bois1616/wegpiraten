@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, model_validator
 
 
 class InvoiceRowModel(BaseModel):
@@ -13,6 +13,7 @@ class InvoiceRowModel(BaseModel):
     als auch bei nachgelagerten Auswertungen verwendet. Alle Felder müssen mit der Entity-
     Definition `invoice_data` in der Config übereinstimmen.
     """
+
     client_id: str
     employee_id: str
     service_date: date
@@ -21,43 +22,30 @@ class InvoiceRowModel(BaseModel):
     travel_time: float = 0.0
     direct_time: float = 0.0
     indirect_time: float = 0.0
-    billable_hours: float = 0.0
+    billable_hours: Optional[float] = None
 
     hourly_rate: Optional[float] = None
     total_hours: Optional[float] = None
     total_costs: Optional[float] = None
 
-    @field_validator("billable_hours", mode="before")
-    @classmethod
-    def default_billable_hours(cls, value, values):
+    @model_validator(mode="after")
+    def compute_derived_fields(self) -> "InvoiceRowModel":
         """
-        Falls das Excel-Sheet keine eigenen verrechenbaren Stunden liefert,
-        wird standardmäßig direct_time + indirect_time verwendet.
+        Berechnet abgeleitete Felder nach der Initialisierung:
+        - billable_hours: direct_time + indirect_time (falls nicht gesetzt)
+        - total_hours: travel_time + direct_time + indirect_time (falls nicht gesetzt)
+        - total_costs: billable_hours * hourly_rate (falls hourly_rate gesetzt)
         """
-        if value is None:
-            return float(values.get("direct_time", 0.0)) + float(values.get("indirect_time", 0.0))
-        return value
+        # billable_hours
+        if self.billable_hours is None:
+            self.billable_hours = self.direct_time + self.indirect_time
 
-    @field_validator("total_hours", mode="before")
-    @classmethod
-    def default_total_hours(cls, value, values):
-        """
-        Gesamtstunden sind S0-Feld (Reise + direkte + indirekte Zeiten).
-        """
-        if value is None:
-            return (
-                float(values.get("travel_time", 0.0))
-                + float(values.get("direct_time", 0.0))
-                + float(values.get("indirect_time", 0.0))
-            )
-        return value
+        # total_hours
+        if self.total_hours is None:
+            self.total_hours = self.travel_time + self.direct_time + self.indirect_time
 
-    @field_validator("total_costs", mode="before")
-    @classmethod
-    def default_total_costs(cls, value, values):
-        """
-        Bei gesetztem Stundensatz den Betrag automatisch berechnen.
-        """
-        if value is None and values.get("hourly_rate") is not None:
-            return float(values.get("billable_hours", 0.0)) * float(values["hourly_rate"])
-        return value
+        # total_costs
+        if self.total_costs is None and self.hourly_rate is not None:
+            self.total_costs = (self.billable_hours or 0.0) * self.hourly_rate
+
+        return self

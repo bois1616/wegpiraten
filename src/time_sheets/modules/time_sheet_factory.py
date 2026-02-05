@@ -1,22 +1,21 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
-import sqlite3
 from loguru import logger
 from openpyxl import load_workbook
 from openpyxl.workbook.workbook import Workbook
-from openpyxl.worksheet.worksheet import Worksheet
 from pydantic import ValidationError
 
-from shared_modules.config import Config
-from shared_modules.utils import ensure_dir, derive_table_range
 from pydantic_models.config.config_data import TimeSheetHeaderCells, TimeSheetRowMapping
-from pydantic_models.data.header_data_model import HeaderDataModel
 from pydantic_models.config.entity_model_config import EntityModelConfig
+from pydantic_models.data.header_data_model import HeaderDataModel
+from shared_modules.config import Config
+from shared_modules.utils import derive_table_range, ensure_dir
 
 
 class TimeSheetFactory:
@@ -86,12 +85,16 @@ class TimeSheetFactory:
 
         model_fields = set(HeaderDataModel.model_fields)
 
-        extra_in_model = model_fields - entity_fields - {
-            "client_first_name",
-            "client_last_name",
-            "employee_first_name",
-            "employee_last_name",
-        }
+        extra_in_model = (
+            model_fields
+            - entity_fields
+            - {
+                "client_first_name",
+                "client_last_name",
+                "employee_first_name",
+                "employee_last_name",
+            }
+        )
         if extra_in_model:
             logger.error(f"HeaderDataModel enthält unbekannte Felder: {extra_in_model}")
             raise ValueError(f"HeaderDataModel enthält unbekannte Felder: {extra_in_model}")
@@ -137,7 +140,8 @@ class TimeSheetFactory:
         headers: List[HeaderDataModel] = []
         for idx, row in df.iterrows():
             try:
-                headers.append(HeaderDataModel(**row.to_dict()))
+                row_dict = row.to_dict()
+                headers.append(HeaderDataModel(**row_dict))  # type: ignore[arg-type]
             except ValidationError as exc:
                 logger.error(f"Ungültige Reporting-Daten in Zeile {idx}: {exc}")
         return headers
@@ -181,12 +185,16 @@ class TimeSheetFactory:
                 ws = wb[self.sheet_name]
             else:
                 ws = wb.active
+                if ws is None:
+                    raise RuntimeError("Kein aktives Sheet im Template gefunden.")
         except Exception as exc:
             logger.error(f"Fehler beim Laden des Templates {template_file.name}: {exc}")
             raise RuntimeError(f"Fehler beim Laden des Templates: {exc}") from exc
 
         cells = self.header_cells
-        ws[cells.employee_name] = f"{header_data.employee_first_name or ''} {header_data.employee_last_name or ''}".strip()
+        ws[cells.employee_name] = (
+            f"{header_data.employee_first_name or ''} {header_data.employee_last_name or ''}".strip()
+        )
         ws[cells.emp_id] = header_data.employee_id
         ws[cells.reporting_month] = reporting_month_dt
         ws[cells.reporting_month].number_format = "MM.YYYY"

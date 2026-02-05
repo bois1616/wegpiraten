@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel
+
 
 class ColumnConfig(BaseModel):
     """
@@ -13,6 +15,7 @@ class ColumnConfig(BaseModel):
         sum (Optional[bool]): Gibt an, ob die Spalte summiert werden soll.
         decimals (Optional[int]): Anzahl Nachkommastellen (falls relevant).
     """
+
     name: str
     type: str
     format: Optional[str] = None

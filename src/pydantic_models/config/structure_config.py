@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel
+
 
 class StructureConfig(BaseModel):
     """
@@ -14,6 +16,7 @@ class StructureConfig(BaseModel):
         log_path (Optional[str]): Pfad zum Log-Verzeichnis relativ zu prj_root (Standard: ".logs").
         local_data_path (Optional[str]): Pfad zum lokalen Datenverzeichnis (Standard: "data").
     """
+
     prj_root: str = "/home/stephan/projects/wegpiraten"
     shared_data_path: Optional[str] = "shared_data"
     output_path: Optional[str] = "output"

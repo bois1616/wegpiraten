@@ -5,8 +5,9 @@ import pandas as pd
 from loguru import logger
 from openpyxl import load_workbook
 
-from shared_modules.config import Config, ExpectedColumnsConfig
 from modules.invoice_filter import InvoiceFilter
+from shared_modules.config import Config, ExpectedColumnsConfig
+
 
 class DataLoader:
     """
@@ -28,7 +29,7 @@ class DataLoader:
     def load_data(
         self,
         db: Path,
-        sheet: Optional[str], 
+        sheet: Optional[str],
     ) -> pd.DataFrame:
         """
         Lädt die Daten aus einer Excel-Datei und filtert sie nach den Kriterien im Filterobjekt.
@@ -40,6 +41,8 @@ class DataLoader:
         """
         work_book = load_workbook(db, data_only=True)
         work_sheet = work_book[sheet] if sheet else work_book.active
+        if work_sheet is None:
+            raise ValueError(f"Kein aktives Sheet in {db}")
 
         # Die ersten drei Zeilen sind Metadaten und werden übersprungen
         data = work_sheet.values
@@ -98,15 +101,12 @@ class DataLoader:
             raise ValueError(f"Fehlende Felder in der Pivot-Tabelle: {missing_str}")
 
         # Prüfe, ob alle Summenfelder numerisch sind
-        sum_columns = [
-            col.name
-            for col in getattr(expected_columns_model, "general", [])
-            if getattr(col, "sum", False)
-        ]
+        sum_columns = [col.name for col in getattr(expected_columns_model, "general", []) if getattr(col, "sum", False)]
         for col in sum_columns:
             if col in df.columns and not pd.api.types.is_numeric_dtype(df[col]):
                 logger.warning(f"Summenfeld '{col}' ist nicht numerisch!")
                 raise TypeError(f"Summenfeld '{col}' muss numerisch sein, ist aber {df[col].dtype}.")
+
 
 if __name__ == "__main__":
     print("DataLoader Modul. Nicht direkt ausführbar.")

@@ -8,13 +8,14 @@ class HeaderCells(BaseModel):
     Relevant sind hier nur die Felder G5 (emp_id) und G8 (client_id) als Schlüssel.
     Alle anderen Felder sind informativ oder optional.
     """
-    employee_name: str = "C5"           # rein informativ
-    emp_id: str = "G5"                 # Schlüssel
-    reporting_month: str = "C6"             # Datum (Excel-Date), i. d. R. pro Datei gleich
-    allowed_hours_per_month: str = "C7"     # informativ
-    service_type: str = "G7"                # Schlüssel/Festwert
-    short_code: str = "C8"                  # informativ
-    client_id: str = "G8"                   # Schlüssel
+
+    employee_name: str = "C5"  # rein informativ
+    emp_id: str = "G5"  # Schlüssel
+    reporting_month: str = "C6"  # Datum (Excel-Date), i. d. R. pro Datei gleich
+    allowed_hours_per_month: str = "C7"  # informativ
+    service_type: str = "G7"  # Schlüssel/Festwert
+    short_code: str = "C8"  # informativ
+    client_id: str = "G8"  # Schlüssel
 
     @classmethod
     def from_config(cls, cfg) -> "HeaderCells":

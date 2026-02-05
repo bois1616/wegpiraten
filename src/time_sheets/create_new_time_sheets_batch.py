@@ -1,10 +1,11 @@
 from pathlib import Path
+
 from loguru import logger
 
 from shared_modules.config import Config
 from shared_modules.utils import ensure_dir
-from time_sheets.modules.time_sheet_factory import TimeSheetFactory
 from time_sheets.modules.time_sheet_batch_processor import TimeSheetBatchProcessor
+from time_sheets.modules.time_sheet_factory import TimeSheetFactory
 
 
 def main() -> None:
@@ -33,4 +34,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

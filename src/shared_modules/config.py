@@ -10,7 +10,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from pydantic_models.config.database_config import DatabaseConfig
-from pydantic_models.config.entity_model_config import EntityModelConfig
+from pydantic_models.config.entity_model_config import EntityModelConfig, FieldConfig
 from pydantic_models.config.formatting_config import FormattingConfig
 from pydantic_models.config.logging_config import LoggingConfig
 from pydantic_models.config.service_provider_config import ServiceProviderConfig
@@ -20,6 +20,22 @@ from pydantic_models.config.structure_config import StructureConfig
 from pydantic_models.config.templates_config import TemplatesConfig
 
 ModelDict = Dict[str, EntityModelConfig]
+
+
+# Default-Pfad zur Konfigurationsdatei
+DEFAULT_CONFIG_PATH = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
+
+
+class ExpectedColumnsConfig(BaseModel):
+    """
+    Konfiguration der erwarteten Spalten für die Rechnungsverarbeitung,
+    aufgeteilt nach payer, client und general (invoice_data).
+    """
+
+    payer: list[FieldConfig] = []
+    client: list[FieldConfig] = []
+    general: list[FieldConfig] = []
+
 
 class Config:
     """
@@ -31,17 +47,21 @@ class Config:
 
     _instance: Optional["Config"] = None
 
-    def __new__(cls, config_path: Path):
+    def __new__(cls, config_path: Optional[Path] = None):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self, config_path: Path):
+    def __init__(self, config_path: Optional[Path] = None):
+        # Singleton: Nur einmal initialisieren
+        if getattr(self, "_initialized", False):
+            return
+
         # Fallback-Logger für Fehler beim Laden der Config
         logger.remove()
         logger.add(sys.stderr, level="WARNING")
-        self.config_path = config_path
+        self.config_path = config_path or DEFAULT_CONFIG_PATH
         try:
             self.raw_config: Dict[str, Any] = self._load_config()
             self.logging = self._parse_section(self.raw_config, "logging", LoggingConfig)
@@ -123,9 +143,7 @@ class Config:
                     )
                 # Typprüfung (optional, kann erweitert werden)
                 if field.type not in {"str", "float", "int", "bool", "currency"}:
-                    logger.error(
-                        f"Unbekannter Typ '{field.type}' für Feld '{field.name}' im Modell '{model_name}'."
-                    )
+                    logger.error(f"Unbekannter Typ '{field.type}' für Feld '{field.name}' im Modell '{model_name}'.")
                     raise ValueError(
                         f"Unbekannter Typ '{field.type}' für Feld '{field.name}' im Modell '{model_name}'."
                     )
@@ -221,9 +239,7 @@ class Config:
         logger.debug(f"Lese Secret '{key}' aus Umgebungsvariablen.")
         return os.getenv(key, default)
 
-    def get_decrypted_secret(
-        self, key: str, fernet_key_env: str = "FERNET_KEY", default: Any = None
-    ) -> Optional[str]:
+    def get_decrypted_secret(self, key: str, fernet_key_env: str = "FERNET_KEY", default: Any = None) -> Optional[str]:
         """
         Holt ein verschlüsseltes Secret aus der Umgebung und entschlüsselt es mit Fernet.
         """
@@ -242,10 +258,63 @@ class Config:
             logger.error(f"Entschlüsselung fehlgeschlagen: {e}")
             raise RuntimeError(f"Entschlüsselung fehlgeschlagen: {e}")
 
+    # -------------------------------------------------------------------------
+    # Convenience-Methoden für typisierten Zugriff
+    # -------------------------------------------------------------------------
+
+    def get_structure(self) -> StructureConfig:
+        """Gibt die Struktur-Konfiguration zurück."""
+        return self.structure
+
+    def get_currency(self) -> str:
+        """Gibt die konfigurierte Währung zurück (z.B. 'CHF')."""
+        return self.formatting.currency or "CHF"
+
+    def get_locale(self) -> str:
+        """Gibt das konfigurierte Locale zurück (z.B. 'de_CH')."""
+        return self.formatting.locale or "de_CH"
+
+    def get_db_path(self) -> Path:
+        """Gibt den vollständigen Pfad zur SQLite-Datenbank zurück."""
+        prj_root = Path(self.structure.prj_root)
+        data_path = prj_root / (self.structure.local_data_path or "data")
+        return data_path / (self.database.sqlite_db_name or "database.sqlite3")
+
+    def get_template_path(self, template_name: Optional[str] = None) -> Path:
+        """Gibt den Pfad zu einem Template zurück."""
+        prj_root = Path(self.structure.prj_root)
+        template_dir = prj_root / (self.structure.template_path or "templates")
+        if template_name:
+            return template_dir / template_name
+        return template_dir
+
+    def get_output_path(self) -> Path:
+        """Gibt den Output-Pfad zurück."""
+        prj_root = Path(self.structure.prj_root)
+        return prj_root / (self.structure.output_path or "output")
+
+    def get_tmp_path(self) -> Path:
+        """Gibt den temporären Pfad zurück."""
+        prj_root = Path(self.structure.prj_root)
+        return prj_root / (self.structure.tmp_path or ".tmp")
+
+    def get_expected_columns(self) -> ExpectedColumnsConfig:
+        """
+        Gibt die erwarteten Spalten für die Rechnungsverarbeitung zurück,
+        basierend auf den Entity-Definitionen in der Config.
+        """
+        payer_fields = self.models.get("payer", EntityModelConfig(fields=[])).fields
+        client_fields = self.models.get("client", EntityModelConfig(fields=[])).fields
+        invoice_fields = self.models.get("invoice_data", EntityModelConfig(fields=[])).fields
+        return ExpectedColumnsConfig(
+            payer=payer_fields,
+            client=client_fields,
+            general=invoice_fields,
+        )
+
+
 if __name__ == "__main__":
-    config_path = (
-        Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
-    )
+    config_path = Path(__file__).parent.parent.parent / ".config" / "wegpiraten_config.yaml"
     config = Config(config_path)
     logger.info("Projektwurzel: {}", config.structure.prj_root)
     # Validierung erfolgt beim Laden automatisch

@@ -1,0 +1,24 @@
+{
+  "include": [
+    "src/cli.py",
+    "src/shared_modules",
+    "src/pydantic_models",
+    "src/invoices",
+    "src/time_sheets",
+    "src/data_imports"
+  ],
+  "exclude": [
+    "src/unused",
+    "src/sandbox",
+    "**/__pycache__"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "standard",
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "none",
+  "reportOptionalMemberAccess": "warning",
+  "reportOptionalSubscript": "warning",
+  "extraPaths": ["src"]
+}

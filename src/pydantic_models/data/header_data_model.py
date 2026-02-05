@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from typing import Optional
+
 from pydantic import BaseModel
+
 
 class HeaderDataModel(BaseModel):
     """
@@ -9,6 +12,7 @@ class HeaderDataModel(BaseModel):
     im Importer (Auswertung ausgefüllter Sheets) verwendet und müssen mit
     den Entity-Definitionen aus der Config übereinstimmen.
     """
+
     client_id: str
     employee_id: str
     service_type: str

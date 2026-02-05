@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
-import sqlite3
 from loguru import logger
 from pydantic import ValidationError
 
@@ -49,7 +49,9 @@ class TimeSheetBatchProcessor:
         if not pw:
             pw = self.config.get_secret("SHEET_PASSWORD")
         if not pw:
-            logger.error("Excel-Blattschutz-Passwort nicht gesetzt! Bitte .env mit SHEET_PASSWORD_ENC oder SHEET_PASSWORD anlegen.")
+            logger.error(
+                "Excel-Blattschutz-Passwort nicht gesetzt! Bitte .env mit SHEET_PASSWORD_ENC oder SHEET_PASSWORD anlegen."
+            )
             raise RuntimeError("Excel-Blattschutz-Passwort fehlt.")
         return pw
 
@@ -83,13 +85,16 @@ class TimeSheetBatchProcessor:
         headers: List[HeaderDataModel] = []
         for idx, row in df.iterrows():
             try:
-                headers.append(HeaderDataModel(**row.to_dict()))
+                row_dict = row.to_dict()
+                headers.append(HeaderDataModel(**row_dict))  # type: ignore[arg-type]
             except ValidationError as exc:
                 logger.error(f"Ungültige Reporting-Daten in Zeile {idx}: {exc}")
 
         return headers
 
-    def run(self, reporting_month: str, output_path: Optional[Path] = None, template_path: Optional[Path] = None) -> None:
+    def run(
+        self, reporting_month: str, output_path: Optional[Path] = None, template_path: Optional[Path] = None
+    ) -> None:
         target_output = ensure_dir(output_path or self.output_dir)
         target_template = template_path or self.template_dir
 

@@ -62,12 +62,8 @@ class InvoiceProcessor:
         logger.debug(f"Temporäres Verzeichnis {tmp_path} geleert.")
 
         # Datenquelle und Blattname typisiert aus der Konfiguration
-        source = (
-            project_root
-            / (structure.data_path or "")
-            / (self.config.data.db_name or "")
-        )
-        sheet_name = getattr(self.config.data, "sheet_name", None)
+        source = self.config.get_db_path()
+        sheet_name = self.config.templates.sheet_name
         logger.debug(f"Lade Daten aus {source}, Blatt: {sheet_name or 'aktiv'}")
 
         invoice_data = self.data_loader.load_data(source, sheet_name)
@@ -88,12 +84,13 @@ class InvoiceProcessor:
         all_invoices: List[Path] = []
 
         # Jinja2-Environment mit typisierter Filter-Konfiguration initialisieren
+        formatting = self.config.formatting
         filter_config = FilterConfig(
-            locale=self.config.data.locale,
-            currency=self.config.data.currency,
-            currency_format=self.config.data.currency_format,
-            date_format=self.config.data.date_format,
-            numeric_format=self.config.data.numeric_format,
+            locale=formatting.locale or "de_CH",
+            currency=formatting.currency or "CHF",
+            currency_format=formatting.currency_format or "#,##0.00 ¤",
+            date_format=formatting.date_format or "dd.MM.yyyy",
+            numeric_format=formatting.numeric_format or "#,##0.00",
         )
         jinja_env = Environment()
         register_filters(jinja_env, filter_config)
@@ -207,17 +204,13 @@ class InvoiceProcessor:
                     )
                     with temporary_docx() as docx_path:
                         rendered_invoice.save(docx_path)
-                        named_pdf = DocumentUtils.docx_to_pdf(
-                            docx_path, docx_path.with_suffix(".pdf"), invoice_context
-                        )
+                        named_pdf = DocumentUtils.docx_to_pdf(docx_path, docx_path.with_suffix(".pdf"), invoice_context)
                         invoices_for_payer.append(named_pdf)
                         all_invoices.append(named_pdf)
                     invoice_list.append(invoice_context)
 
             with log_exceptions(f"Fehler beim Zusammenführen der PDFs für ZDNR {payer_id}"):
-                merged_pdf = DocumentUtils.merge_pdfs(
-                    invoices_for_payer, payer_context, output_path=output_path
-                )
+                merged_pdf = DocumentUtils.merge_pdfs(invoices_for_payer, payer_context, output_path=output_path)
                 logger.info(f"PDFs für ZDNR {payer_id} zusammengeführt in {merged_pdf.name}")
 
         with log_exceptions("Fehler beim Erstellen der Rechnungsübersicht"):

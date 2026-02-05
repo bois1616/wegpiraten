@@ -7,6 +7,7 @@ from pydantic_models.data.row_mapping import RowMapping
 from pydantic_models.data.table_range import TableRange
 from shared_modules.utils import derive_table_range
 
+
 class TimeSheetImportProfile(BaseModel):
     """
     Komplettes Import-Profil für Reporting-Sheets.
@@ -15,6 +16,7 @@ class TimeSheetImportProfile(BaseModel):
     - row_mapping: Spalten-Mapping für die Positionszeilen.
     - table_range: Bereich der Positionszeilen.
     """
+
     sheet_name: Optional[str]
     header_cells: HeaderCells
     row_mapping: RowMapping

@@ -4,6 +4,7 @@ from datetime import date
 from typing import Any, Dict, Iterable, Optional, Tuple, Type
 
 from pydantic import BaseModel, create_model
+
 from shared_modules.config import Config
 
 # YAML-Typ → Python-Typ
@@ -14,6 +15,7 @@ _PY_TYPE_MAP: Dict[str, Type[Any]] = {
     "bool": bool,
     "currency": float,  # optional: Decimal
 }
+
 
 def build_entity_model(
     *,
@@ -66,6 +68,7 @@ def build_entity_model(
 
 # Convenience-Builder für häufige Fälle
 
+
 def make_invoice_row_model(config: Config) -> Type[BaseModel]:
     """
     Positions-/Faktenzeile für invoice_data (Import/Export).
@@ -76,9 +79,16 @@ def make_invoice_row_model(config: Config) -> Type[BaseModel]:
         config=config,
         entity="invoice_data",
         include_fields={
-            "client_id", "service_date", "service_type",
-            "travel_time", "direct_time", "indirect_time",
-            "billable_hours", "hourly_rate", "total_hours", "total_costs",
+            "client_id",
+            "service_date",
+            "service_type",
+            "travel_time",
+            "direct_time",
+            "indirect_time",
+            "billable_hours",
+            "hourly_rate",
+            "total_hours",
+            "total_costs",
         },
         use_is_position=None,
         type_overrides={"service_date": date},

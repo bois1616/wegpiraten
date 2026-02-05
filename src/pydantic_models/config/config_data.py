@@ -1,14 +1,14 @@
-from typing import Optional, Dict, Any, List
+from typing import Dict, Optional
+
 from pydantic import BaseModel
 
-from .structure_config import StructureConfig
-from .logging_config import LoggingConfig
 from .database_config import DatabaseConfig
-from .templates_config import TemplatesConfig
-from .formatting_config import FormattingConfig
-from .service_provider_config import ServiceProviderConfig
 from .entity_model_config import EntityModelConfig
-
+from .formatting_config import FormattingConfig
+from .logging_config import LoggingConfig
+from .service_provider_config import ServiceProviderConfig
+from .structure_config import StructureConfig
+from .templates_config import TemplatesConfig as BaseTemplatesConfig
 
 
 class ConfigData(BaseModel):
@@ -16,16 +16,16 @@ class ConfigData(BaseModel):
     Modell für die gesamte Konfiguration des Projekts.
     Das sind die Sektionen in der Config-Datei.
     """
+
     structure: StructureConfig
     database: DatabaseConfig
     logging: LoggingConfig
-    templates: TemplatesConfig
+    templates: BaseTemplatesConfig
     formatting: FormattingConfig
     service_provider: ServiceProviderConfig
 
     models: Dict[str, EntityModelConfig]
     table_mappings: Dict[str, Dict[str, str]]
-
 
 
 class TimeSheetHeaderCells(BaseModel):
@@ -37,6 +37,7 @@ class TimeSheetHeaderCells(BaseModel):
     short_code: str
     client_id: str
 
+
 class TimeSheetRowMapping(BaseModel):
     service_time: str
     service_date: str
@@ -46,6 +47,7 @@ class TimeSheetRowMapping(BaseModel):
     indirect_time: str
     billable_hours: str
     notes: str
+
 
 class TemplatesConfig(BaseModel):
     invoice_template_name: str

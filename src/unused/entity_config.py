@@ -1,5 +1,7 @@
-from pydantic import BaseModel
 from typing import Optional
+
+from pydantic import BaseModel
+
 
 class Employee(BaseModel):
     emp_id: str
@@ -8,6 +10,7 @@ class Employee(BaseModel):
     fte: Optional[float]
     notes: Optional[str]
     # ...weitere Felder...
+
 
 class Payer(BaseModel):
     payer_id: str
@@ -19,10 +22,12 @@ class Payer(BaseModel):
     notes: Optional[str]
     # ...weitere Felder...
 
+
 class ServiceRequester(BaseModel):
     service_requester_id: str
     name: str
     # ...weitere Felder...
+
 
 class Client(BaseModel):
     client_id: str

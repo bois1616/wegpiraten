@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta
+
 from pydantic import BaseModel, field_validator
+
 
 class MonthPeriod(BaseModel):
     """
     Pydantic-Modell für einen Monatszeitraum.
     Sorgt für Typsicherheit und Validierung.
     """
+
     start: datetime
     end: datetime
 
@@ -25,6 +28,7 @@ class MonthPeriod(BaseModel):
         if start and v < start:
             raise ValueError("Enddatum muss nach dem Startdatum liegen.")
         return v
+
 
 def get_month_period(abrechnungsmonat: str) -> MonthPeriod:
     """

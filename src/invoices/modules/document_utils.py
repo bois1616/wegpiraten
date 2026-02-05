@@ -8,11 +8,10 @@ from loguru import logger
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
-from pydantic import ValidationError
 from PyPDF2 import PdfMerger
 
-from shared_modules.config import Config, ConfigData  # ConfigData ist das Pydantic-Modell
 from modules.invoice_context import InvoiceContext
+from shared_modules.config import Config
 
 
 class DocumentUtils:
@@ -75,9 +74,7 @@ class DocumentUtils:
         return target_pdf
 
     @staticmethod
-    def merge_pdfs(
-        pdf_files: List[Path], payer_context: InvoiceContext, output_path: Optional[Path] = None
-    ) -> Path:
+    def merge_pdfs(pdf_files: List[Path], payer_context: InvoiceContext, output_path: Optional[Path] = None) -> Path:
         """
         Führt mehrere PDF-Dateien zu einer einzigen zusammen.
 
@@ -131,16 +128,9 @@ class DocumentUtils:
             RuntimeError: Wenn die Datei nicht geschrieben werden kann.
         """
         # Zugriff auf die Pydantic-basierte Konfiguration
-        try:
-            config_data: ConfigData = config.data  # Typ: Pydantic-Modell
-        except ValidationError as e:
-            logger.error(f"Ungültige Konfiguration: {e}")
-            raise
-
-        # Die Pfade und Formate werden typisiert aus dem Pydantic-Modell gelesen
-        output_path: Path = Path(config_data.structure.output_path)
-        kosten_format: str = config_data.currency_format
-        datum_format: str = config_data.date_format
+        output_path: Path = config.get_output_path()
+        kosten_format: str = config.formatting.currency_format or "#,##0.00 ¤"
+        datum_format: str = config.formatting.date_format or "dd.MM.yyyy"
 
         # Nur die gewünschten Felder extrahieren
         summary_rows = []
@@ -163,17 +153,13 @@ class DocumentUtils:
         if len(invoice_months) == 1:
             invoice_month = invoice_months.pop()
         else:
-            logger.warning(
-                f"Mehrere Abrechnungsmonate in der Übersicht: {invoice_months}"
-            )
+            logger.warning(f"Mehrere Abrechnungsmonate in der Übersicht: {invoice_months}")
             invoice_month = "gemischt"
 
         summary_file = output_path / f"Rechnungsuebersicht_{invoice_month}.xlsx"
         try:
             with pd.ExcelWriter(summary_file, engine="openpyxl") as writer:
-                summary_df.to_excel(
-                    writer, index=False, sheet_name="Rechnungsübersicht"
-                )
+                summary_df.to_excel(writer, index=False, sheet_name="Rechnungsübersicht")
                 worksheet = writer.sheets["Rechnungsübersicht"]
                 end_col_idx = len(summary_df.columns)
                 end_col_letter = get_column_letter(end_col_idx)
@@ -189,35 +175,27 @@ class DocumentUtils:
                 worksheet.add_table(tab)
                 # Formatierung und Summen für die Rechnungsbetrag-Spalte
                 if "Rechnungsbetrag" in summary_df.columns:
-                    kosten_col_idx = (
-                        int(summary_df.columns.get_loc("Rechnungsbetrag")) + 1
-                    )
+                    loc = summary_df.columns.get_loc("Rechnungsbetrag")
+                    kosten_col_idx = int(loc) + 1  # type: ignore[arg-type]
                     kosten_col_letter = get_column_letter(kosten_col_idx)
                     # Format aus der Config holen
                     for row in range(2, len(summary_df) + 2):
-                        worksheet[
-                            f"{kosten_col_letter}{row}"
-                        ].number_format = kosten_format
+                        worksheet[f"{kosten_col_letter}{row}"].number_format = kosten_format
                     total_row_idx = len(summary_df) + 2
                     worksheet[f"A{total_row_idx}"] = "Gesamt"
                     worksheet[f"{kosten_col_letter}{total_row_idx}"] = (
                         f"=SUM({kosten_col_letter}2:{kosten_col_letter}{total_row_idx - 1})"
                     )
-                    worksheet[
-                        f"{kosten_col_letter}{total_row_idx}"
-                    ].number_format = kosten_format
+                    worksheet[f"{kosten_col_letter}{total_row_idx}"].number_format = kosten_format
                     bold_font = Font(bold=True)
                     for col in range(1, end_col_idx + 1):
                         worksheet.cell(row=total_row_idx, column=col).font = bold_font
                 if "Rechnungsdatum" in summary_df.columns:
-                    datum_col_idx = (
-                        int(summary_df.columns.get_loc("Rechnungsdatum")) + 1
-                    )
+                    loc = summary_df.columns.get_loc("Rechnungsdatum")
+                    datum_col_idx = int(loc) + 1  # type: ignore[arg-type]
                     datum_col_letter = get_column_letter(datum_col_idx)
                     for row in range(2, len(summary_df) + 2):
-                        worksheet[
-                            f"{datum_col_letter}{row}"
-                        ].number_format = datum_format
+                        worksheet[f"{datum_col_letter}{row}"].number_format = datum_format
         except Exception as e:
             logger.error(f"Fehler beim Schreiben der Excel-Datei: {e}")
             raise RuntimeError(f"Fehler beim Schreiben der Excel-Datei: {e}")

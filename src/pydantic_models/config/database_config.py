@@ -1,5 +1,7 @@
 from typing import Optional
+
 from pydantic import BaseModel
+
 
 class DatabaseConfig(BaseModel):
     """
@@ -10,6 +12,7 @@ class DatabaseConfig(BaseModel):
         db_name (Optional[str]): Name der Excel-Datenbankdatei.
         db_encrypted (Optional[bool]): Gibt an, ob die Datenbank verschlüsselt ist.
     """
-    sqlite_db_name: Optional[str] = 'Wegpiraten Datenbank.sqlite3'
-    db_name: Optional[str] = 'Wegpiraten Datenbank.xlsx'
+
+    sqlite_db_name: Optional[str] = "Wegpiraten Datenbank.sqlite3"
+    db_name: Optional[str] = "Wegpiraten Datenbank.xlsx"
     db_encrypted: Optional[bool] = False

@@ -12,6 +12,7 @@ class Entity(BaseModel):
     Nutzt Pydantic für Validierung und Typsicherheit.
     Alle Felder werden beim Initialisieren auf str gecastet, um Typfehler durch z.B. numerische PLZ zu vermeiden.
     """
+
     name: str = ""
     name_2: str = ""  # Ergänzung für zweiten Namen
     street: str = ""
@@ -59,11 +60,13 @@ class Entity(BaseModel):
         """
         return self.model_dump()
 
+
 class LegalPerson(Entity):
     """
     Juristische Person (z.B. Zahlungsdienstleister).
     Nutzt Pydantic für Typsicherheit und Validierung.
     """
+
     iban: Optional[str] = None
 
     @model_validator(mode="before")
@@ -75,11 +78,13 @@ class LegalPerson(Entity):
             data["iban"] = safe_str(data["iban"])
         return data
 
+
 class PrivatePerson(Entity):
     """
     Private Person (z.B. Klient).
     Nutzt Pydantic für Typsicherheit und Validierung.
     """
+
     first_name: str = ""
     last_name: str = ""
     birth_date: Optional[str] = None  # Datumsformatierung erfolgt im Template
@@ -112,4 +117,3 @@ class PrivatePerson(Entity):
         Gibt die Felder als Dictionary zurück, inkl. Felder aus Entity.
         """
         return self.model_dump()
-

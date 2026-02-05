@@ -1,11 +1,14 @@
-from typing import Optional, Any, List
+from typing import Any, List, Optional
+
 from pydantic import BaseModel
+
 
 class FieldConfig(BaseModel):
     """
     Modell für die Definition eines einzelnen Feldes in einem Entity-Modell.
     Enthält alle relevanten Metadaten für die spätere Verarbeitung und Validierung.
     """
+
     name: str
     type: str
     excel_column: Optional[str] = None
@@ -17,9 +20,11 @@ class FieldConfig(BaseModel):
     decimals: Optional[int] = None
     is_position: Optional[bool] = None
 
+
 class EntityModelConfig(BaseModel):
     """
     Modell für die Definition eines Entity-Modells in der Konfiguration.
     Enthält eine Liste von FieldConfig-Instanzen, die die Felder des Modells beschreiben.
     """
+
     fields: List[FieldConfig]

@@ -1,5 +1,7 @@
 from typing import Any, Dict
+
 from pydantic import BaseModel, Field, field_validator
+
 
 class InvoiceContext(BaseModel):
     """
@@ -7,6 +9,7 @@ class InvoiceContext(BaseModel):
     Enthält nur rohe Werte, keine formatierten Strings.
     Nutzt Pydantic für Typsicherheit, Validierung und Serialisierung.
     """
+
     data: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("data", mode="after")
