@@ -79,7 +79,15 @@ class TimeSheetFactory:
             raise ValueError("Entity 'client' fehlt in der Config.")
 
         entity_fields = {field.name for field in entity_cfg.fields}
-        required_fields = {"client_id", "employee_id", "service_type", "short_code", "allowed_hours_per_month"}
+        required_fields = {
+            "client_id",
+            "employee_id",
+            "service_type",
+            "short_code",
+            "travel_time",
+            "direct_efforts",
+            "indirect_efforts",
+        }
 
         if not required_fields.issubset(entity_fields):
             missing = required_fields - entity_fields
@@ -88,9 +96,11 @@ class TimeSheetFactory:
 
         model_fields = set(HeaderDataModel.model_fields)
 
+        allowed_computed_fields = {"allowed_hours_per_month"}
         extra_in_model = (
             model_fields
             - entity_fields
+            - allowed_computed_fields
             - {
                 "client_first_name",
                 "client_last_name",
@@ -123,7 +133,8 @@ class TimeSheetFactory:
         SELECT
             c.client_id,
             c.short_code,
-            c.allowed_hours_per_month,
+            (COALESCE(c.travel_time, 0) + COALESCE(c.direct_efforts, 0) + COALESCE(c.indirect_efforts, 0))
+                AS allowed_hours_per_month,
             c.employee_id,
             c.first_name AS client_first_name,
             c.last_name AS client_last_name,

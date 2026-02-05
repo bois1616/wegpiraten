@@ -1,6 +1,6 @@
 # importiere ein Batch von reporting sheets in die Datenbank
 # nutzt die config.py für die Pfade
-# Die Daten werden in invoice_data gespeichert, ohne Rechnungsnummer
+# Die Daten werden in service_data gespeichert (Rohdaten für die Rechnungserstellung)
 # Nutzt reporting_row_model.py für die Datenstruktur
 # #
 # Gemeinsames Profil: Die Klassen HeaderCells, RowMapping, TableRange und
@@ -27,8 +27,8 @@
 # Konsequent für Profil und Datenmodelle. Erweiterbar um weitere Felder (z.B. Notizen aus Spalte G/H).
 # Weiter normalisieren?
 # Ja, sinnvoll wäre eine Normalisierung der Positionen in eine eigene Tabelle
-# timesheet_entries, wenn invoice_data bereits Rechnungsbelege abbildet.
-#  Alternativ kann invoice_data als staging genutzt werden und ein nachgelagerter
+# timesheet_entries, wenn service_data bereits Rohdaten abbildet.
+#  Alternativ kann service_data als staging genutzt werden und ein nachgelagerter
 # Prozess normalisiert in ein Faktentableau.
 
 from __future__ import annotations
@@ -45,6 +45,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from pydantic import BaseModel, ValidationError
 
 from pydantic_models.data.invoice_row_model import InvoiceRowModel
+from pydantic_models.data.row_mapping import RowMapping
 from pydantic_models.data.timesheet_import_profile import TimeSheetImportProfile
 from shared_modules.config import Config
 from shared_modules.utils import (
@@ -68,9 +69,11 @@ class ImportedRowExport(BaseModel):
     service_date: date
     service_type: str
     travel_time: float
+    travel_distance: float = 0.0
     direct_time: float
     indirect_time: float
     billable_hours: float
+    notes: Optional[str] = None
     hourly_rate: Optional[float] = None
     total_hours: Optional[float] = None
     total_costs: Optional[float] = None
@@ -79,7 +82,7 @@ class ImportedRowExport(BaseModel):
 class TimeSheetsImporter:
     """
     Liest ausgefüllte Aufwandserfassungs-Sheets, validiert jede Positionszeile
-    gegen InvoiceRowModel, schreibt sie in die SQLite-DB und exportiert zusätzlich
+    gegen InvoiceRowModel, schreibt sie in service_data und exportiert zusätzlich
     eine Sammeldatei der importierten Daten.
     """
 
@@ -89,13 +92,34 @@ class TimeSheetsImporter:
         "service_date",
         "service_type",
         "travel_time",
+        "travel_distance",
         "direct_time",
         "indirect_time",
-        "billable_hours",
-        "hourly_rate",
-        "total_hours",
-        "total_costs",
+        "notes",
+        "source_file",
+        "reporting_month",
     )
+
+    _HEADER_LABELS_WITH_KM: Dict[str, str] = {
+        "service_time_col": "uhrzeit",
+        "service_date_col": "datum",
+        "travel_time_col": "fahrtzeit",
+        "travel_distance_col": "km",
+        "direct_time_col": "direkter fallkontakt",
+        "indirect_time_col": "indirekte fallbearbeitung",
+        "billable_hours_col": "stunden",
+        "notes_col": "notizen",
+    }
+
+    _HEADER_LABELS_NO_KM: Dict[str, str] = {
+        "service_time_col": "uhrzeit",
+        "service_date_col": "datum",
+        "travel_time_col": "fahrtzeit",
+        "travel_distance_col": "direkter fallkontakt",
+        "direct_time_col": "indirekte fallbearbeitung",
+        "indirect_time_col": "stunden",
+        "billable_hours_col": "notizen",
+    }
 
     def __init__(self, config: Config, profile: Optional[TimeSheetImportProfile] = None):
         self.config = config
@@ -109,25 +133,32 @@ class TimeSheetsImporter:
         cfg_imports_path = getattr(self.config.structure, "imports_path", None) or self.config.get(
             "structure.imports_path", None
         )
-        default_windows = Path(r"C:\Users\micro\OneDrive\Shared\Beatus\Wegpiraten Unterlagen\data_imports")
+        cfg_done_path = getattr(self.config.structure, "done_path", None) or self.config.get(
+            "structure.done_path", None
+        )
+        default_import = prj_root / "import"
         fallback_local = prj_root / "data_imports"
+        default_windows = Path(r"C:\Users\micro\OneDrive\Shared\Beatus\Wegpiraten Unterlagen\data_imports")
 
         # Kandidatenliste: nimm den ersten existierenden Pfad
         candidates: List[Optional[Path]] = [
             Path(cfg_imports_path) if cfg_imports_path else None,
-            default_windows,
+            default_import,
             fallback_local,
+            default_windows,
         ]
-        self.source_dir = ensure_dir(choose_existing_path(candidates, fallback_local))
-        self.imported_dir = ensure_dir(self.source_dir / "importiert")
+        self.source_dir = ensure_dir(choose_existing_path(candidates, default_import))
+        self.done_dir = ensure_dir(Path(cfg_done_path) if cfg_done_path else (prj_root / "done"))
 
         logger.info(f"DB: {self.db_path}")
         logger.info(f"Quelle: {self.source_dir}")
-        logger.info(f"Importiert-Ordner: {self.imported_dir}")
+        logger.info(f"Done-Ordner: {self.done_dir}")
         logger.info(
             f"Sheet: {self.profile.sheet_name}, Range: "
             f"{self.profile.table_range.start_row}-{self.profile.table_range.end_row}"
         )
+
+        self._ensure_service_data_table()
 
     @staticmethod
     def _build_profile_from_config(config: Config) -> TimeSheetImportProfile:
@@ -138,32 +169,141 @@ class TimeSheetsImporter:
         logger.info(f"{len(files)} Excel-Dateien entdeckt.")
         return files
 
+    def _ensure_service_data_table(self) -> None:
+        sql = """
+        CREATE TABLE IF NOT EXISTS service_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id TEXT NOT NULL,
+            employee_id TEXT,
+            service_date TEXT NOT NULL,
+            service_type TEXT NOT NULL,
+            travel_time REAL,
+            travel_distance REAL,
+            direct_time REAL,
+            indirect_time REAL,
+            notes TEXT,
+            source_file TEXT,
+            reporting_month TEXT,
+            FOREIGN KEY (client_id) REFERENCES clients(client_id),
+            FOREIGN KEY (employee_id) REFERENCES employees(emp_id)
+        )
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute(sql)
+            conn.commit()
+
+    @staticmethod
+    def _normalize_label(value: object) -> str:
+        return " ".join(str(value or "").strip().lower().split())
+
+    def _get_header_label(self, ws: Worksheet, column: str) -> str:
+        row_idx = self.profile.table_range.start_row
+        value = ws[f"{column}{row_idx}"].value
+        return self._normalize_label(value)
+
+    def _resolve_service_type(self, client_id: Optional[str]) -> Optional[str]:
+        if not client_id:
+            return None
+        sql = """
+        SELECT st.code
+        FROM clients c
+        LEFT JOIN service_types st ON c.service_type = st.service_type_id
+        WHERE c.client_id = ?
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(sql, (client_id,)).fetchone()
+        if row and row[0]:
+            return str(row[0]).strip()
+        return None
+
+    def _resolve_employee_id(self, client_id: Optional[str]) -> Optional[str]:
+        if not client_id:
+            return None
+        sql = "SELECT employee_id FROM clients WHERE client_id = ?"
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(sql, (client_id,)).fetchone()
+        if row and row[0]:
+            return str(row[0]).strip()
+        return None
+
+    def _determine_row_mapping(self, ws: Worksheet) -> Optional[tuple[RowMapping, bool]]:
+        mp = self.profile.row_mapping
+        labels = {key: self._get_header_label(ws, getattr(mp, key)) for key in self._HEADER_LABELS_WITH_KM.keys()}
+
+        if all(labels[key] == expected for key, expected in self._HEADER_LABELS_WITH_KM.items()):
+            return mp, True
+
+        if all(labels[key] == expected for key, expected in self._HEADER_LABELS_NO_KM.items()):
+            shifted = RowMapping(
+                service_time_col=mp.service_time_col,
+                service_date_col=mp.service_date_col,
+                travel_time_col=mp.travel_time_col,
+                travel_distance_col=mp.travel_distance_col,
+                direct_time_col=mp.travel_distance_col,
+                indirect_time_col=mp.direct_time_col,
+                billable_hours_col=mp.indirect_time_col,
+                notes_col=mp.billable_hours_col,
+            )
+            return shifted, False
+
+        logger.error(
+            "Header-Struktur nicht erkannt. Gefundene Labels: {}",
+            labels,
+        )
+        return None
+
     def _read_header(self, ws: Worksheet) -> Dict[str, object]:
         cells = self.profile.header_cells
+        employee_id = ws[cells.emp_id].value  # type: ignore[union-attr]
+        client_id = ws[cells.client_id].value  # type: ignore[union-attr]
+        allowed_hours = ws[cells.allowed_hours_per_month].value  # type: ignore[union-attr]
+
+        client_id_str = str(client_id).strip() if client_id is not None else ""
+        if not client_id_str:
+            client_id_str = ""
+
+        service_type = self._resolve_service_type(client_id_str or None)
+        resolved_employee_id = self._resolve_employee_id(client_id_str or None)
+        if not employee_id:
+            employee_id = resolved_employee_id
+        employee_id_str = str(employee_id).strip() if employee_id is not None else ""
+
         return {
             "employee_fullname": ws[cells.employee_name].value,  # type: ignore[union-attr]
-            "employee_id": ws[cells.emp_id].value,  # type: ignore[union-attr]
+            "employee_id": employee_id_str or None,
             "reporting_month": ws[cells.reporting_month].value,  # type: ignore[union-attr]
-            "allowed_hours_per_month": ws[cells.allowed_hours_per_month].value,  # type: ignore[union-attr]
-            "service_type": ws[cells.service_type].value,  # type: ignore[union-attr]
+            "allowed_hours_per_month": allowed_hours,
+            "service_type": service_type,
             "short_code": ws[cells.short_code].value,  # type: ignore[union-attr]
-            "client_id": ws[cells.client_id].value,  # type: ignore[union-attr]
+            "client_id": client_id_str or None,
         }
 
-    def _read_rows(self, ws: Worksheet, header: Dict[str, object]) -> List[InvoiceRowModel]:
+    def _read_rows(
+        self,
+        ws: Worksheet,
+        header: Dict[str, object],
+        row_mapping: RowMapping,
+        has_travel_distance: bool,
+        reporting_month: Optional[str],
+        source_file: str,
+    ) -> List[Dict[str, Any]]:
         rng = self.profile.table_range
-        mp = self.profile.row_mapping
+        mp = row_mapping
 
-        rows: List[InvoiceRowModel] = []
+        rows: List[Dict[str, Any]] = []
         for row_idx in range(rng.start_row, rng.end_row + 1):
             v_date = ws[f"{mp.service_date_col}{row_idx}"].value
             v_travel = ws[f"{mp.travel_time_col}{row_idx}"].value
+            v_distance = ws[f"{mp.travel_distance_col}{row_idx}"].value if has_travel_distance else None
             v_direct = ws[f"{mp.direct_time_col}{row_idx}"].value
             v_indirect = ws[f"{mp.indirect_time_col}{row_idx}"].value
             v_billable = ws[f"{mp.billable_hours_col}{row_idx}"].value
+            v_notes = ws[f"{mp.notes_col}{row_idx}"].value
 
             service_date = to_date(v_date)
             travel = to_float(v_travel) or 0.0
+            distance = to_float(v_distance) or 0.0
             direct = to_float(v_direct) or 0.0
             indirect = to_float(v_indirect) or 0.0
             billable = to_float(v_billable)
@@ -171,9 +311,11 @@ class TimeSheetsImporter:
             if service_date is None and (travel + direct + indirect) == 0.0:
                 continue
 
+            employee_id = header.get("employee_id")
+            employee_id_str = str(employee_id).strip() if employee_id is not None else ""
             payload = {
                 "client_id": str(header.get("client_id") or "").strip(),
-                "employee_id": str(header.get("employee_id") or "").strip(),
+                "employee_id": employee_id_str or "UNBEKANNT",
                 "service_date": service_date or date.today(),
                 "service_type": str(header.get("service_type") or "").strip(),
                 "travel_time": travel,
@@ -183,20 +325,37 @@ class TimeSheetsImporter:
             }
 
             try:
-                rows.append(InvoiceRowModel(**payload))
+                validated = InvoiceRowModel(**payload)
+                rows.append(
+                    {
+                        "client_id": validated.client_id,
+                        "employee_id": employee_id_str or None,
+                        "service_date": validated.service_date,
+                        "service_type": validated.service_type,
+                        "travel_time": validated.travel_time,
+                        "travel_distance": distance,
+                        "direct_time": validated.direct_time,
+                        "indirect_time": validated.indirect_time,
+                        "billable_hours": validated.billable_hours,
+                        "notes": str(v_notes).strip() if v_notes is not None else None,
+                        "source_file": source_file,
+                        "reporting_month": reporting_month or "",
+                    }
+                )
             except ValidationError as exc:
                 logger.error(f"Zeile {row_idx}: Validierungsfehler: {exc}")
 
         return rows
 
-    def _row_params(self, record: InvoiceRowModel) -> tuple[Any, ...]:
-        data = record.model_dump()
-        data["service_date"] = record.service_date.isoformat()
+    def _row_params(self, record: Dict[str, Any]) -> tuple[Any, ...]:
+        data = record.copy()
+        if isinstance(data.get("service_date"), date):
+            data["service_date"] = data["service_date"].isoformat()
         return tuple(data.get(column) for column in self._INSERT_FIELDS)
 
-    def _import_rows(self, rows: Iterable[InvoiceRowModel]) -> int:
+    def _import_rows(self, rows: Iterable[Dict[str, Any]]) -> int:
         sql = f"""
-        INSERT INTO invoice_data (
+        INSERT INTO service_data (
             {", ".join(self._INSERT_FIELDS)}
         ) VALUES ({", ".join(["?"] * len(self._INSERT_FIELDS))})
         """
@@ -214,15 +373,15 @@ class TimeSheetsImporter:
                 raise
         return count
 
-    def _move_to_imported(self, file_path: Path) -> Path:
+    def _move_to_done(self, file_path: Path) -> Path:
         """
-        Verschiebt die verarbeitete Datei in das Unterverzeichnis 'importiert'.
+        Verschiebt die verarbeitete Datei in das Verzeichnis 'done'.
         Bei Namenskollision wird ein Zeitstempel angehängt.
         """
-        target = self.imported_dir / file_path.name
+        target = self.done_dir / file_path.name
         if target.exists():
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            target = self.imported_dir / f"{file_path.stem}_{stamp}{file_path.suffix}"
+            target = self.done_dir / f"{file_path.stem}_{stamp}{file_path.suffix}"
         file_path.replace(target)
         return target
 
@@ -265,37 +424,36 @@ class TimeSheetsImporter:
 
         header = self._read_header(ws)
         month_str = to_year_month_str(header.get("reporting_month"))
+        mapping = self._determine_row_mapping(ws)
+        if mapping is None:
+            raise ValueError(f"Header-Struktur ungültig ({file_path.name})")
+        row_mapping, has_travel_distance = mapping
 
         # Minimalprüfung Header (prüfe einmal und dann traue)
-        assert header.get("client_id"), f"client_id im Header fehlt ({file_path.name})"
-        assert header.get("employee_id"), f"employee_id im Header fehlt ({file_path.name})"
-        assert header.get("service_type") is not None, f"service_type im Header fehlt ({file_path.name})"
+        if not header.get("client_id"):
+            raise ValueError(f"client_id im Header fehlt ({file_path.name})")
+        if not header.get("service_type"):
+            raise ValueError(f"service_type nicht aus DB ermittelbar ({file_path.name})")
+        if not header.get("employee_id"):
+            logger.warning("employee_id fehlt im Header – Import erfolgt ohne employee_id ({})", file_path.name)
 
         logger.info(
-            "Header: client_id=%s, employee_id=%s, service_type=%s, month=%s",
+            "Header: client_id={}, employee_id={}, service_type={}, month={}",
             header.get("client_id"),
             header.get("employee_id"),
             header.get("service_type"),
             month_str or header.get("reporting_month"),
         )
 
-        rows = self._read_rows(ws, header)
+        rows = self._read_rows(ws, header, row_mapping, has_travel_distance, month_str, file_path.name)
         if not rows:
-            logger.warning(f"Keine importierbaren Zeilen in {file_path.name} gefunden.")
-            moved = self._move_to_imported(file_path)
-            return 0, moved, [], month_str
+            logger.warning("Keine importierbaren Zeilen in {} gefunden – Datei bleibt im Import.", file_path.name)
+            return 0, file_path, [], month_str
 
         imported_count = self._import_rows(rows)
-        moved = self._move_to_imported(file_path)
+        moved = self._move_to_done(file_path)
 
-        export_rows = [
-            ImportedRowExport(
-                reporting_month=month_str or "",
-                source_file=file_path.name,
-                **row.model_dump(),
-            )
-            for row in rows
-        ]
+        export_rows = [ImportedRowExport(**row) for row in rows]
 
         logger.info(f"{imported_count} Zeilen importiert aus {file_path.name}. Verschoben nach {moved.name}")
         return imported_count, moved, export_rows, month_str
@@ -320,8 +478,8 @@ class TimeSheetsImporter:
                 all_export_rows.extend(export_rows)
                 if derived_month is None and month_str:
                     derived_month = month_str
-            except AssertionError as err:
-                logger.error(f"Plausibilitätsfehler bei {file_path.name}: {err}")
+            except ValueError as err:
+                logger.error(f"Strukturfehler bei {file_path.name}: {err}")
             except Exception as exc:
                 logger.exception(f"Unerwarteter Fehler bei {file_path.name}: {exc}")
 
@@ -331,7 +489,7 @@ class TimeSheetsImporter:
             if not derived_month:
                 derived_month = datetime.now().strftime("%Y-%m")
                 logger.warning(
-                    "reporting_month nicht bestimmbar – verwende %s für den Export-Dateinamen.",
+                    "reporting_month nicht bestimmbar – verwende {} für den Export-Dateinamen.",
                     derived_month,
                 )
             self._export_rows_to_excel(all_export_rows, derived_month)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ValidationInfo, field_validator
 
 
 class TableRange(BaseModel):
@@ -13,7 +13,10 @@ class TableRange(BaseModel):
 
     @field_validator("end_row")
     @classmethod
-    def end_after_start(cls, v, values):
-        start = values.get("start_row", 10)
-        assert v >= start, "end_row muss >= start_row sein"
+    def end_after_start(cls, v: int, info: ValidationInfo) -> int:
+        start = 10
+        if info.data and "start_row" in info.data:
+            start = int(info.data["start_row"])
+        if v < start:
+            raise ValueError("end_row muss >= start_row sein")
         return v

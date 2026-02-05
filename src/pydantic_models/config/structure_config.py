@@ -15,6 +15,8 @@ class StructureConfig(BaseModel):
         tmp_path (Optional[str]): Pfad zum temporären Verzeichnis (Standard: ".tmp").
         log_path (Optional[str]): Pfad zum Log-Verzeichnis relativ zu prj_root (Standard: ".logs").
         local_data_path (Optional[str]): Pfad zum lokalen Datenverzeichnis (Standard: "data").
+        imports_path (Optional[str]): Pfad zum Import-Verzeichnis (Standard: "import").
+        done_path (Optional[str]): Pfad zum Done-Verzeichnis (Standard: "done").
     """
 
     prj_root: str = "/home/stephan/projects/wegpiraten"
@@ -24,3 +26,5 @@ class StructureConfig(BaseModel):
     tmp_path: Optional[str] = ".tmp"
     log_path: Optional[str] = ".logs"
     local_data_path: Optional[str] = "data"
+    imports_path: Optional[str] = "import"
+    done_path: Optional[str] = "done"
