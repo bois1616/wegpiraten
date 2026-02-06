@@ -2,11 +2,12 @@ import sys
 from pathlib import Path
 
 from loguru import logger
-from modules.invoice_filter import InvoiceFilter  # Erwartet typisierte Filterdaten
-from modules.invoice_processor import InvoiceProcessor  # Erwartet Pydantic-Konfiguration
 
 # Importiere die Pydantic-basierte Singleton-Konfiguration
 from shared_modules.config import Config
+
+from .modules.invoice_filter import InvoiceFilter  # Erwartet typisierte Filterdaten
+from .modules.invoice_processor import InvoiceProcessor  # Erwartet Pydantic-Konfiguration
 
 
 def main() -> None:

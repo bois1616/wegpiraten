@@ -17,10 +17,10 @@ class TimeSheetRowMapping(BaseModel):
     service_time: str
     service_date: str
     travel_time: str
-    travel_distance: str
+    travel_distance: Optional[str] = None
     direct_time: str
     indirect_time: str
-    billable_hours: str
+    billable_hours: Optional[str] = None
     notes: str
 
 

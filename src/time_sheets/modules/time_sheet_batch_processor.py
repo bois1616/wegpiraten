@@ -77,6 +77,7 @@ class TimeSheetBatchProcessor:
         LEFT JOIN employees e ON c.employee_id = e.emp_id
         LEFT JOIN service_types st ON c.service_type = st.service_type_id
         WHERE (c.end_date IS NULL OR c.end_date >= ?)
+          AND COALESCE(c.is_active, 1) = 1
         """
 
         logger.info(f"Führe Client-Query für Monat {reporting_month} aus.")

@@ -27,23 +27,23 @@ templates:
 
   time_sheet_header_cells:
     employee_name: C5
-    emp_id: G5
+    emp_id: f5
     reporting_month: C6
     allowed_hours_per_month: C7
-    service_type: G7
+    service_type: F7
     short_code: C8
-    client_id: G8
+    client_id: F8
   time_sheet_data_start_cell: A10
-  time_sheet_data_end_cell: H28
+  time_sheet_data_end_cell: G28
   time_sheet_row_mapping:
     service_time: A
     service_date: B
     travel_time: C
-    travel_distance: D
-    direct_time: E
-    indirect_time: F
-    billable_hours: G # Summe aus travel_time, direct_time, indirect_time, information only
-    notes: H
+    # travel_distance: D
+    direct_time: D
+    indirect_time: E
+    # billable_hours: G # Summe aus travel_time, direct_time, indirect_time, information only
+    notes: G
 
   time_sheet_template: time_sheet_template.xlsx
   client_sheet_name: MD_Klienten # deprecated, use sqlite table name
@@ -59,9 +59,9 @@ formatting:
 
 service_provider:
   name: Wegpiraten GmbH
-  street: Alpenstrasse 2
+  street: Hauptstrasse 47
   zip_code: '3800'
-  city: Interlaken
+  city: Unterseen
   phone: +41 (0)76 790 67 56
   email: info@wegpiraten.ch
   website: www.wegpiraten.ch

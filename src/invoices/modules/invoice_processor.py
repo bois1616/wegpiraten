@@ -1,9 +1,13 @@
+import math
+import sqlite3
 from pathlib import Path
-from typing import List
+from typing import List, Optional
+from zipfile import ZipFile
 
 import pandas as pd
 from jinja2 import Environment
 from loguru import logger
+from pandas._typing import Scalar
 
 from shared_modules.config import Config
 from shared_modules.entity import LegalPerson, PrivatePerson
@@ -12,11 +16,10 @@ from shared_modules.utils import (
     clear_path,
     log_exceptions,
     safe_str,
-    temporary_docx,
+    to_float,
     zip_invoices,
 )
 
-from .data_loader import DataLoader
 from .document_utils import DocumentUtils
 from .filters import FilterConfig, register_filters
 from .invoice_context import InvoiceContext
@@ -42,8 +45,102 @@ class InvoiceProcessor:
         """
         self.config: Config = config
         self.filter: InvoiceFilter = filter
-        self.data_loader: DataLoader = DataLoader(config, filter)
         self.invoice_factory: InvoiceFactory = InvoiceFactory(config)
+
+    @staticmethod
+    def _normalize_rounding(value: Optional[float]) -> float:
+        """
+        Normalisiert Rundung auf Minutenbasis.
+        - Wenn rundung < 1, wird von Stunden ausgegangen und in Minuten umgerechnet.
+        - Fallback auf 1 Minute bei ungültigen Werten.
+        """
+        step = to_float(value) or 0.0
+        if step <= 0:
+            return 1.0
+        if step < 1:
+            step = step * 60.0
+        return step
+
+    @classmethod
+    def _round_minutes(cls, hours_value: Optional[float], rounding: Optional[float]) -> int:
+        minutes_raw = (to_float(hours_value) or 0.0) * 60.0
+        step = cls._normalize_rounding(rounding)
+        if step <= 0:
+            return int(round(minutes_raw))
+        rounded = math.ceil(minutes_raw / step) * step
+        return int(round(rounded))
+
+    def _load_service_data(self, period: MonthPeriod) -> pd.DataFrame:
+        """
+        Lädt service_data aus der SQLite-DB und reichert sie mit Stammdaten an.
+        Filtert nach dem Abrechnungsmonat und optionalen Filterkriterien.
+        """
+        db_path = self.config.get_db_path()
+        start_date = period.start.date().isoformat()
+        end_date = period.end.date().isoformat()
+
+        sql = """
+        SELECT
+            sd.client_id,
+            sd.service_date,
+            sd.travel_time,
+            sd.direct_time,
+            sd.indirect_time,
+            sd.notes,
+            sd.service_type AS service_type_raw,
+            c.first_name AS client_first_name,
+            c.last_name AS client_last_name,
+            c.social_security_number AS client_social_security_number,
+            c.payer_id AS payer_id,
+            c.service_requester_id AS service_requester_id,
+            c.service_type AS service_type_id,
+            p.name AS payer_name,
+            p.name2 AS payer_name2,
+            p.street AS payer_street,
+            p.zip_code AS payer_zip,
+            p.city AS payer_city,
+            sr.name AS service_requester_name,
+            COALESCE(st_code.code, st_id.code) AS service_type_code,
+            COALESCE(st_code.description, st_id.description) AS service_type_description,
+            COALESCE(st_code.hourly_rate, st_id.hourly_rate) AS hourly_rate,
+            COALESCE(st_code.rundung, st_id.rundung) AS rundung
+        FROM service_data sd
+        JOIN clients c ON sd.client_id = c.client_id
+        LEFT JOIN payer p ON c.payer_id = p.payer_id
+        LEFT JOIN service_requester sr ON c.service_requester_id = sr.service_requester_id
+        LEFT JOIN service_types st_code ON sd.service_type = st_code.code
+        LEFT JOIN service_types st_id ON c.service_type = st_id.service_type_id
+        WHERE sd.service_date BETWEEN ? AND ?
+        """
+        params: List[Scalar] = [start_date, end_date]
+
+        if self.filter.payer:
+            sql += " AND c.payer_id = ?"
+            params.append(self.filter.payer)
+        if self.filter.client:
+            sql += " AND sd.client_id = ?"
+            params.append(self.filter.client)
+        if self.filter.service_requester:
+            sql += " AND (c.service_requester_id = ? OR sr.name = ?)"
+            params.extend([self.filter.service_requester, self.filter.service_requester])
+        if self.filter.payer_list:
+            placeholders = ", ".join(["?"] * len(self.filter.payer_list))
+            sql += f" AND c.payer_id IN ({placeholders})"
+            params.extend(self.filter.payer_list)
+        if self.filter.client_list:
+            placeholders = ", ".join(["?"] * len(self.filter.client_list))
+            sql += f" AND sd.client_id IN ({placeholders})"
+            params.extend(self.filter.client_list)
+
+        sql += " ORDER BY c.payer_id, sd.client_id, sd.service_date"
+
+        with sqlite3.connect(db_path) as conn:
+            df = pd.read_sql_query(sql, conn, params=params)
+
+        if "service_date" in df.columns:
+            df["service_date"] = pd.to_datetime(df["service_date"], errors="coerce").dt.date
+
+        return df
 
     def run(self) -> None:
         """
@@ -61,27 +158,23 @@ class InvoiceProcessor:
         clear_path(tmp_path)
         logger.debug(f"Temporäres Verzeichnis {tmp_path} geleert.")
 
-        # Datenquelle und Blattname typisiert aus der Konfiguration
-        source = self.config.get_db_path()
-        sheet_name = self.config.templates.sheet_name
-        logger.debug(f"Lade Daten aus {source}, Blatt: {sheet_name or 'aktiv'}")
-
-        invoice_data = self.data_loader.load_data(source, sheet_name)
-        logger.info(f"{len(invoice_data)} Datensätze nach Filterung gefunden.")
-
-        self.data_loader.check_data_consistency(invoice_data)
-        logger.info("Daten erfolgreich geladen und geprüft.")
-
-        service_provider_obj: LegalPerson = self.invoice_factory.provider
-        logger.debug(f"Empfänger der Rechnungen: {service_provider_obj}")
-
         # Zeitraum für den gesamten Rechnungsprozess als MonthPeriod berechnen
         period: MonthPeriod = get_month_period(self.filter.invoice_month)
         start_inv_period: str = period.start.strftime("%d.%m.%Y")
         end_inv_period: str = period.end.strftime("%d.%m.%Y")
 
+        invoice_data = self._load_service_data(period)
+        if invoice_data.empty:
+            logger.warning("Keine service_data im Abrechnungsmonat gefunden.")
+            return
+        logger.info(f"{len(invoice_data)} Leistungsdatensätze geladen.")
+
+        service_provider_obj: LegalPerson = self.invoice_factory.provider
+        logger.debug(f"Empfänger der Rechnungen: {service_provider_obj}")
+
         invoice_list: List[InvoiceContext] = []
         all_invoices: List[Path] = []
+        all_docx: List[Path] = []
 
         # Jinja2-Environment mit typisierter Filter-Konfiguration initialisieren
         formatting = self.config.formatting
@@ -95,36 +188,23 @@ class InvoiceProcessor:
         jinja_env = Environment()
         register_filters(jinja_env, filter_config)
 
-        # Positionsspalten und Summenfelder typisiert aus der Konfiguration extrahieren
-        expected_columns = self.config.get_expected_columns()
-        # expected_columns ist ein Pydantic-Modell mit Attributen payer, client, general (jeweils Liste von ColumnConfig)
-        position_columns = [
-            col.name
-            for section in [expected_columns.payer, expected_columns.client, expected_columns.general]
-            for col in section
-            if getattr(col, "is_position", False)
-        ]
-        sum_columns = [
-            col.name
-            for section in [expected_columns.payer, expected_columns.client, expected_columns.general]
-            for col in section
-            if getattr(col, "is_position", False) and getattr(col, "sum", False)
-        ]
-
         # Gruppierung nach Zahlungsdienstleister (ZDNR)
-        for payer_id, payer_data in invoice_data.groupby("ZDNR"):
+        for payer_id, payer_data in invoice_data.groupby("payer_id"):
+            if payer_id is None or pd.isna(payer_id):
+                logger.error("Fehlende payer_id in service_data – überspringe Gruppe.")
+                continue
             payer_row = payer_data.iloc[0]
 
             invoices_for_payer: List[Path] = []
 
             # LegalPerson wird mit typisierten Feldern aus der DataFrame-Zeile erstellt
             payer_obj = LegalPerson(
-                name=safe_str(payer_row.get("ZD_Name")),
-                name_2=safe_str(payer_row.get("ZD_Name2")),
-                street=safe_str(payer_row.get("ZD_Strasse")),
-                zip=safe_str(payer_row.get("ZD_PLZ")),
-                city=safe_str(payer_row.get("ZD_Ort")),
-                iban=safe_str(payer_row.get("ZD_IBAN")),
+                name=safe_str(payer_row.get("payer_name")),
+                name_2=safe_str(payer_row.get("payer_name2")),
+                street=safe_str(payer_row.get("payer_street")),
+                zip=safe_str(payer_row.get("payer_zip")),
+                city=safe_str(payer_row.get("payer_city")),
+                iban=None,
                 key=safe_str(payer_id),
             )
 
@@ -143,18 +223,29 @@ class InvoiceProcessor:
                 }
             )
 
-            for client_id, client_details in payer_data.groupby("Klient-Nr."):
+            for client_id, client_details in payer_data.groupby("client_id"):
+                if client_id is None or pd.isna(client_id):
+                    logger.error("Fehlende client_id in service_data – überspringe Datensätze.")
+                    continue
                 client_row = client_details.iloc[0]
 
                 # PrivatePerson wird mit typisierten Feldern aus der DataFrame-Zeile erstellt
                 client_obj = PrivatePerson(
-                    first_name=safe_str(client_row.get("CL_Vorname")),
-                    last_name=safe_str(client_row.get("CL_Nachname")),
-                    street=safe_str(client_row.get("CL_Strasse")),
-                    zip_city=safe_str(client_row.get("CL_PLZ_Ort")),
-                    birth_date=safe_str(client_row.get("CL_Geburtsdatum")),
-                    social_security_number=safe_str(client_row.get("CL_SozVersNr")),
+                    first_name=safe_str(client_row.get("client_first_name")),
+                    last_name=safe_str(client_row.get("client_last_name")),
+                    street="",
+                    zip_city="",
+                    birth_date="",
+                    social_security_number=safe_str(client_row.get("client_social_security_number")),
                     key=safe_str(client_id),
+                )
+                client_name = ", ".join(
+                    part
+                    for part in [
+                        safe_str(client_obj.last_name),
+                        safe_str(client_obj.first_name),
+                    ]
+                    if part
                 )
 
                 logger.debug(
@@ -162,21 +253,69 @@ class InvoiceProcessor:
                 )
 
                 # Leistungsbesteller und Betreuungstyp aus den Daten holen
-                service_requester = client_row.get("Leistungsbesteller", "")
-                care_type = client_row.get("Betreuungstyp", "")
+                service_requester = client_row.get("service_requester_name", "")
+                service_type = client_row.get("service_type_code") or client_row.get("service_type_raw") or ""
+                service_type_description = client_row.get("service_type_description") or ""
 
                 invoice_id = self.invoice_factory.create_invoice_id(
                     client_id=str(client_id), invoice_month=self.filter.invoice_month
                 )
 
-                # Nur Felder mit is_position=True aus der Config
-                positions = client_details[position_columns].to_dict("records")
+                positions = []
+                sum_fahrtzeit = 0
+                sum_direkt = 0
+                sum_indirekt = 0
+                sum_stunden = 0
+                sum_kosten = 0.0
 
-                # Summenfelder: Nur Felder, die sowohl is_position=True als auch sum=True haben
+                for _, row in client_details.sort_values("service_date").iterrows():
+                    service_date = row.get("service_date")
+                    if service_date is None or pd.isna(service_date):
+                        logger.error("Fehlendes Leistungsdatum bei Client {} – Zeile ignoriert.", client_id)
+                        continue
+                    hourly_rate = to_float(row.get("hourly_rate"))
+                    if hourly_rate is None:
+                        logger.error(
+                            "Kein Stundensatz für Client {} ({}) am {} – Zeile ignoriert.",
+                            client_obj.name,
+                            client_id,
+                            service_date,
+                        )
+                        continue
+                    rundung = row.get("rundung")
+                    fahrtzeit = self._round_minutes(row.get("travel_time"), rundung)
+                    direkt = self._round_minutes(row.get("direct_time"), rundung)
+                    indirekt = self._round_minutes(row.get("indirect_time"), rundung)
+                    minuten_total = fahrtzeit + direkt + indirekt
+                    kosten = (minuten_total / 60.0) * hourly_rate
+
+                    positions.append(
+                        {
+                            "Leistungsdatum": service_date,
+                            "Fahrtzeit": fahrtzeit,
+                            "Direkt": direkt,
+                            "Indirekt": indirekt,
+                            "Stunden": minuten_total,
+                            "Kosten": kosten,
+                        }
+                    )
+
+                    sum_fahrtzeit += fahrtzeit
+                    sum_direkt += direkt
+                    sum_indirekt += indirekt
+                    sum_stunden += minuten_total
+                    sum_kosten += kosten
+
+                if not positions:
+                    logger.warning("Keine gültigen Positionen für Client {} – Rechnung übersprungen.", client_id)
+                    continue
+
                 totals = {
-                    f"summe_{col.lower()}": client_details[col].sum()
-                    for col in sum_columns
-                    if col in client_details.columns
+                    "summe_fahrtzeit": sum_fahrtzeit,
+                    "summe_direkt": sum_direkt,
+                    "summe_indirekt": sum_indirekt,
+                    "summe_stunden": sum_stunden,
+                    "summe_kosten": sum_kosten,
                 }
 
                 invoice_context = InvoiceContext(
@@ -188,9 +327,13 @@ class InvoiceProcessor:
                         "end_inv_period": end_inv_period,
                         "service_date_range": period,  # MonthPeriod für Templates und weitere Verarbeitung
                         "service_requester": service_requester,
-                        "care_type": care_type,
+                        "service_type": service_type,
+                        "care_type": service_type,
                         "payer": payer_obj,
                         "service_provider": service_provider_obj,
+                        "provider_city": safe_str(service_provider_obj.city),
+                        "client_name": client_name or safe_str(client_obj.name),
+                        "service_type_description": service_type_description,
                         "client": client_obj,
                         "positions": positions,
                         **totals,
@@ -202,11 +345,13 @@ class InvoiceProcessor:
                         invoice_context=invoice_context,
                         jinja_env=jinja_env,
                     )
-                    with temporary_docx() as docx_path:
-                        rendered_invoice.save(docx_path)
-                        named_pdf = DocumentUtils.docx_to_pdf(docx_path, docx_path.with_suffix(".pdf"), invoice_context)
-                        invoices_for_payer.append(named_pdf)
-                        all_invoices.append(named_pdf)
+                    docx_name = f"Rechnung_{payer_id}_{client_id}_{self.filter.invoice_month}.docx"
+                    docx_path = output_path / docx_name
+                    rendered_invoice.save(docx_path)
+                    all_docx.append(docx_path)
+                    named_pdf = DocumentUtils.docx_to_pdf(docx_path, docx_path.with_suffix(".pdf"), invoice_context)
+                    invoices_for_payer.append(named_pdf)
+                    all_invoices.append(named_pdf)
                     invoice_list.append(invoice_context)
 
             with log_exceptions(f"Fehler beim Zusammenführen der PDFs für ZDNR {payer_id}"):
@@ -226,6 +371,16 @@ class InvoiceProcessor:
                 output_path / f"Rechnungen_{start_inv_period}_bis_{end_inv_period}.zip",
             )
             logger.success("Alle Rechnungsdokumente wurden erfolgreich archiviert.")
+
+        if all_docx:
+            docx_zip = output_path / f"Rechnungen_DOCX_{start_inv_period}_bis_{end_inv_period}.zip"
+            with ZipFile(docx_zip, "w") as zipf:
+                for file in all_docx:
+                    if file.exists():
+                        zipf.write(file, arcname=file.name)
+                    else:
+                        logger.warning("DOCX fehlt und wird nicht gezippt: {}", file)
+            logger.success(f"DOCX-Archiv erstellt: {docx_zip.name}")
 
 
 if __name__ == "__main__":

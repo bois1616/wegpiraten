@@ -1,20 +1,21 @@
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import qrcode
+from babel.numbers import format_decimal
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage
 from jinja2 import Environment
 from PIL import Image, ImageDraw, ImageFont
-from rich import print
 
-from modules.invoice_context import InvoiceContext
 from shared_modules.config import Config
 from shared_modules.entity import LegalPerson
 from shared_modules.utils import (
     safe_str,  # Zentrale String-Konvertierung für Typensicherheit
 )
+
+from .invoice_context import InvoiceContext
 
 
 class InvoiceFactory:
@@ -87,19 +88,24 @@ class InvoiceFactory:
         provider_name = safe_str(getattr(service_provider, "name", ""))
         provider_street = safe_str(getattr(service_provider, "street", ""))
         provider_zip_city = safe_str(getattr(service_provider, "zip_city", ""))
+        provider_zip = safe_str(getattr(service_provider, "zip", ""))
+        provider_city = safe_str(getattr(service_provider, "city", ""))
         provider_iban = safe_str(getattr(service_provider, "iban", ""))
 
         payer_name = safe_str(getattr(payer, "name", ""))
         payer_street = safe_str(getattr(payer, "street", ""))
         payer_zip_city = safe_str(getattr(payer, "zip_city", ""))
+        payer_zip = safe_str(getattr(payer, "zip", ""))
+        payer_city = safe_str(getattr(payer, "city", ""))
 
-        # Betragsformatierung mit Babel (hier als float)
         currency = self.config.get_currency()
-        total_str = f"{invoice_context.data.get('summe_kosten', -999):.2f}"
         invoice_id = safe_str(invoice_context.data.get("invoice_id", "-ReNr-"))
+        total_amount = invoice_context.data.get("summe_kosten", None)
+        total_display = self._format_amount_display(total_amount)
 
         # Linien
-        draw.line([(width // 2, 60), (width // 2, height - 60)], fill="black", width=3)
+        divider_x = 600
+        draw.line([(divider_x, 60), (divider_x, height - 60)], fill="black", width=3)
         draw.line([(60, 60), (width - 60, 60)], fill="black", width=2)
 
         # Linker Bereich: Empfangsschein
@@ -114,8 +120,6 @@ class InvoiceFactory:
             ("Zahlbar durch", payer_name),
             ("", payer_street),
             ("", payer_zip_city),
-            ("Währung", currency),
-            ("Betrag", total_str),
         ]:
             if label:
                 y1 += 10
@@ -124,9 +128,15 @@ class InvoiceFactory:
             draw.text((x1, y1), safe_str(value), font=font, fill="black")
             y1 += 40
 
-        # Rechter Bereich: Zahlteil
-        x2, y2 = width // 2 + 80, 100
-        draw.text((x2, y2), "Zahlteil", font=font_bold, fill="black")
+        y1 += 10
+        self._draw_amount_block(draw, x1, y1, currency, total_display, font_small_bold, font)
+
+        # Rechter Bereich: Zahlteil (QR links, Textblock rechts)
+        qr_size = 418
+        qr_x = divider_x + 40
+        qr_y = (height - qr_size) // 2
+        x2, y2 = qr_x + qr_size + 40, 100
+        draw.text((qr_x, 100), "Zahlteil", font=font_bold, fill="black")
         y2 += 60
         for label, value in [
             ("Konto / Zahlbar an", provider_iban),
@@ -137,8 +147,6 @@ class InvoiceFactory:
             ("Zahlbar durch", payer_name),
             ("", payer_street),
             ("", payer_zip_city),
-            ("Währung", currency),
-            ("Betrag", total_str),
         ]:
             if label:
                 y2 += 10
@@ -148,16 +156,135 @@ class InvoiceFactory:
             y2 += 40
 
         # QR-Code-Daten aus Kontext
-        qr_data = (
-            f"SPC\n0200\n1\n{provider_iban}\n{provider_name}\n{provider_street}\n{provider_zip_city}\n"
-            f"{total_str}\n{currency}\nNON\n{invoice_id}\n"
-            f"{payer_name}\n{payer_street}\n{payer_zip_city}\n"
+        qr_data = self._build_spc_payload(
+            provider_name=provider_name,
+            provider_street=provider_street,
+            provider_zip=provider_zip,
+            provider_city=provider_city,
+            provider_iban=provider_iban,
+            payer_name=payer_name,
+            payer_street=payer_street,
+            payer_zip=payer_zip,
+            payer_city=payer_city,
+            amount=total_amount,
+            currency=currency,
+            additional_info=invoice_id,
         )
         qr_img = qrcode.make(qr_data)
         # qrcode mit PIL-Backend gibt ein PIL.Image zurück
-        qr_img = qr_img.get_image().convert("RGB").resize((300, 300))  # type: ignore[union-attr]
-        img.paste(qr_img, (width - 350, height // 2 - 150))
+        qr_img = qr_img.get_image().convert("RGB").resize((qr_size, qr_size))  # type: ignore[union-attr]
+        img.paste(qr_img, (qr_x, qr_y))
+        amount_y = qr_y + qr_size + 20
+        self._draw_amount_block(draw, qr_x, amount_y, currency, total_display, font_small_bold, font)
         img.save(output_png)
+
+    @staticmethod
+    def _split_street(street: str) -> Tuple[str, str]:
+        cleaned = safe_str(street)
+        parts = cleaned.split()
+        if not parts:
+            return "", ""
+        last = parts[-1]
+        if any(ch.isdigit() for ch in last):
+            return " ".join(parts[:-1]).strip() or cleaned, last
+        return cleaned, ""
+
+    @staticmethod
+    def _format_amount(amount: Optional[float]) -> str:
+        if amount is None:
+            return ""
+        try:
+            return f"{float(amount):.2f}"
+        except (TypeError, ValueError):
+            return ""
+
+    def _format_amount_display(self, amount: Optional[float]) -> str:
+        if amount is None:
+            return ""
+        try:
+            numeric_format = self.config.formatting.numeric_format or "#,##0.00"
+            locale = self.config.formatting.locale or "de_CH"
+            return format_decimal(float(amount), format=numeric_format, locale=locale)
+        except Exception:
+            return self._format_amount(amount)
+
+    @staticmethod
+    def _draw_amount_block(
+        draw: ImageDraw.ImageDraw,
+        x: int,
+        y: int,
+        currency: str,
+        amount: str,
+        font_label: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+        font_value: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    ) -> None:
+        col_gap = 180
+        draw.text((x, y), "Währung", font=font_label, fill="black")
+        draw.text((x + col_gap, y), "Betrag", font=font_label, fill="black")
+        y += 32
+        draw.text((x, y), safe_str(currency), font=font_value, fill="black")
+        draw.text((x + col_gap, y), safe_str(amount), font=font_value, fill="black")
+
+    def _address_lines_structured(self, name: str, street: str, zip_code: str, city: str) -> List[str]:
+        if not name:
+            return [""] * 7
+        street_name, house_no = self._split_street(street)
+        return [
+            name,
+            "S",
+            street_name,
+            house_no,
+            zip_code,
+            city,
+            "CH",
+        ]
+
+    def _build_spc_payload(
+        self,
+        provider_name: str,
+        provider_street: str,
+        provider_zip: str,
+        provider_city: str,
+        provider_iban: str,
+        payer_name: str,
+        payer_street: str,
+        payer_zip: str,
+        payer_city: str,
+        amount: Optional[float],
+        currency: str,
+        additional_info: str,
+    ) -> str:
+        """
+        Erzeugt den QR-Referenzstring gemäss SPS (SPC) Version 2.3 mit Adresstyp S.
+        """
+        creditor_lines = self._address_lines_structured(provider_name, provider_street, provider_zip, provider_city)
+        debtor_lines = self._address_lines_structured(payer_name, payer_street, payer_zip, payer_city)
+        amount_str = self._format_amount(amount)
+
+        lines = [
+            "SPC",
+            "0200",
+            "1",
+            provider_iban,
+            *creditor_lines,
+            "",  # Ultimate creditor name
+            "",  # Ultimate creditor address type
+            "",  # Ultimate creditor street
+            "",  # Ultimate creditor house number
+            "",  # Ultimate creditor postal code
+            "",  # Ultimate creditor city
+            "",  # Ultimate creditor country
+            amount_str,
+            currency,
+            *debtor_lines,
+            "NON",
+            "",
+            safe_str(additional_info),
+            "EPD",
+            "",
+            "",
+        ]
+        return "\n".join(lines)
 
     def render_invoice(
         self,

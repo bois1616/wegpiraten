@@ -36,6 +36,30 @@ def babel_decimal(value: Any, locale: str = "de_CH", numeric_format: Optional[st
     return format_decimal(value, format=numeric_format, locale=locale)
 
 
+def babel_minutes(value: Any, locale: str = "de_CH") -> str:
+    """Jinja2-Filter für Minutenwerte ohne Dezimalstellen."""
+    if value is None or isinstance(value, Undefined):
+        return ""
+    try:
+        minutes = int(round(float(value)))
+    except (TypeError, ValueError):
+        return str(value)
+    formatted = format_decimal(minutes, format="#,##0", locale=locale)
+    return f"{formatted} min"
+
+
+def format_hhmm(value: Any) -> str:
+    """Jinja2-Filter für Minutenwerte im Format XhYYm."""
+    if value is None or isinstance(value, Undefined):
+        return ""
+    try:
+        minutes = int(round(float(value)))
+    except (TypeError, ValueError):
+        return str(value)
+    hours, mins = divmod(minutes, 60)
+    return f"{hours}h{mins:02d}m"
+
+
 def babel_date(value: Any, locale: str = "de_CH", date_format: Optional[str] = None) -> str:
     """Jinja2-Filter für Datumsformatierung mit Babel."""
     if value is None:
@@ -56,3 +80,5 @@ def register_filters(env: Environment, config: FilterConfig) -> None:
     env.filters["currency"] = lambda v: babel_currency(v, config.currency, config.locale, config.currency_format)
     env.filters["decimal"] = lambda v: babel_decimal(v, config.locale, config.numeric_format)
     env.filters["date"] = lambda v: babel_date(v, config.locale, config.date_format)
+    env.filters["minutes"] = lambda v: babel_minutes(v, config.locale)
+    env.filters["hhmm"] = format_hhmm

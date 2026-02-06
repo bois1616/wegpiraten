@@ -5,9 +5,11 @@ Die Quelldatei (Excel) wird aus shared_data_path geladen.
 Verwendet zentrale Config, Entity-Modelle aus der Config.
 """
 
+import shutil
 import sqlite3
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import openpyxl
 import pandas as pd
@@ -15,6 +17,7 @@ from loguru import logger
 
 from pydantic_models.config.entity_model_config import FieldConfig
 from shared_modules.config import Config
+from shared_modules.utils import ensure_dir
 
 
 def sql_type(py_type: str) -> str:
@@ -112,6 +115,9 @@ def create_target_tables(
             primary_keys.append(col_name)
         columns.append(f"{col_name} {col_type}")
 
+    if "is_active" not in {field.name for field in fields}:
+        columns.append("is_active INTEGER NOT NULL DEFAULT 1")
+
     columns_sql = ",\n    ".join(columns)
     pk_sql = ""
     if primary_keys:
@@ -138,7 +144,7 @@ def import_entity_data(
     target_table: str,
     fields: list[FieldConfig],
     foreign_keys: Optional[list[tuple[str, str, str]]] = None,
-) -> int:
+) -> Tuple[int, int, int, Dict[str, List[str]]]:
     """
     Liest alle Daten aus der angegebenen Excel-Tabelle, mappt die Felder und schreibt sie in die Zieltabelle.
     Gibt die Anzahl der importierten Datensätze zurück.
@@ -148,19 +154,28 @@ def import_entity_data(
         excel_table = read_excel_table(source_excel, excel_table_name)
     except Exception as e:
         logger.error(f"Fehler beim Lesen der Excel-Tabelle {excel_table_name}: {e}")
-        return 0
+        return 0, 0, 0, {"inserted": [], "updated": [], "deactivated": []}
 
     # Mapping: excel_column → FieldConfig
     mapping = {f.excel_column: f for f in fields if f.excel_column}
     required_fields = [f.name for f in fields]
 
     pk_fields = [field.name for field in fields if field.primary_key]
-    records = []
+    records: List[Dict[str, Any]] = []
+    seen_keys: set[Tuple[Any, ...]] = set()
     for _, row in excel_table.iterrows():
         if row.isnull().all():
             continue
         try:
             mapped = map_row(row, mapping, required_fields)
+            pk_key = _pk_key(mapped, pk_fields)
+            if pk_key is None:
+                logger.error("Datensatz ohne Primärschlüssel in {} übersprungen.", target_table)
+                continue
+            if pk_key in seen_keys:
+                logger.error("Doppelter Primärschlüssel in {} übersprungen: {}", target_table, _format_pk(pk_key))
+                continue
+            seen_keys.add(pk_key)
             if foreign_keys:
                 missing_fk_fields = []
                 for column, _, _ in foreign_keys:
@@ -180,19 +195,94 @@ def import_entity_data(
         except Exception as e:
             logger.error(f"Fehler beim Validieren eines Datensatzes: {e}")
 
-    if records:
-        df_target = pd.DataFrame(records)
-        try:
-            df_target.to_sql(target_table, target_conn, if_exists="append", index=False)
-            logger.success(f"{len(df_target)} Datensätze in {target_table} importiert.")
-            return len(df_target)
-        except Exception as e:
-            logger.exception(f"Fehler beim Schreiben in {target_table}: {e}")
-            _log_import_diagnostics(target_conn, target_table, df_target, fields)
-            return 0
-    else:
+    if not records:
         logger.warning(f"Keine gültigen Datensätze für {target_table} gefunden.")
-        return 0
+        return 0, 0, 0, {"inserted": [], "updated": [], "deactivated": []}
+
+    select_cols = [field.name for field in fields]
+    if "is_active" not in select_cols:
+        select_cols.append("is_active")
+
+    existing_rows = _load_existing_rows(target_conn, target_table, select_cols, pk_fields)
+    existing_by_key = {row["_pk_key"]: row for row in existing_rows}
+
+    incoming_by_key: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+    for row in records:
+        key = _pk_key(row, pk_fields)
+        if key is None:
+            continue
+        incoming_by_key[key] = row
+
+    inserted: List[str] = []
+    updated: List[str] = []
+    deactivated: List[str] = []
+
+    inserted_count = 0
+    updated_count = 0
+    deactivated_count = 0
+
+    # Inserts
+    insert_cols = [field.name for field in fields] + ["is_active"]
+    insert_sql = f"INSERT INTO {target_table} ({', '.join(insert_cols)}) VALUES ({', '.join(['?'] * len(insert_cols))})"
+    insert_values: List[Tuple[Any, ...]] = []
+
+    for key, row in incoming_by_key.items():
+        if key not in existing_by_key:
+            values = [row.get(col) for col in insert_cols if col != "is_active"] + [1]
+            insert_values.append(tuple(values))
+            inserted.append(_format_pk(key))
+
+    # Updates / Reactivations
+    update_keys = set(incoming_by_key.keys()) & set(existing_by_key.keys())
+    for key in update_keys:
+        incoming = incoming_by_key[key]
+        existing = existing_by_key[key]
+        changes = _diff_row(existing, incoming, fields)
+        set_cols = list(changes.keys())
+        set_values = [incoming.get(col) for col in set_cols]
+        if existing.get("is_active") != 1:
+            set_cols.append("is_active")
+            set_values.append(1)
+            changes.setdefault("is_active", f"{existing.get('is_active')} → 1")
+
+        if set_cols:
+            set_clause = ", ".join([f"{col}=?" for col in set_cols])
+            where_clause, where_values = _pk_where_clause(pk_fields, key)
+            sql = f"UPDATE {target_table} SET {set_clause} WHERE {where_clause}"
+            target_conn.execute(sql, (*set_values, *where_values))
+            updated.append(_format_pk(key) + _format_changes(changes))
+            updated_count += 1
+
+    # Deactivate missing
+    missing_keys = set(existing_by_key.keys()) - set(incoming_by_key.keys())
+    for key in missing_keys:
+        existing = existing_by_key.get(key, {})
+        if existing.get("is_active") == 0:
+            continue
+        where_clause, where_values = _pk_where_clause(pk_fields, key)
+        sql = f"UPDATE {target_table} SET is_active = 0 WHERE {where_clause}"
+        target_conn.execute(sql, where_values)
+        deactivated.append(_format_pk(key))
+        deactivated_count += 1
+
+    if insert_values:
+        target_conn.executemany(insert_sql, insert_values)
+        inserted_count = len(insert_values)
+
+    logger.success(
+        f"{inserted_count} eingefügt, {updated_count} aktualisiert, {deactivated_count} deaktiviert in {target_table}."
+    )
+
+    return (
+        inserted_count,
+        updated_count,
+        deactivated_count,
+        {
+            "inserted": inserted,
+            "updated": updated,
+            "deactivated": deactivated,
+        },
+    )
 
 
 # Standard-Tabellen-Mapping (Excel-Tabellenname → SQLite-Tabelle, Entity-Name)
@@ -296,6 +386,7 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
     # Pfade aus Config
     prj_root = Path(config.structure.prj_root)
     shared_data_path = Path(config.structure.shared_data_path or "")
+    imports_path = Path(getattr(config.structure, "imports_path", None) or "import")
     local_data_path = config.structure.local_data_path or "data"
 
     # Dateinamen
@@ -303,10 +394,23 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
     db_name = config.database.db_name or "Wegpiraten Datenbank.xlsx"
 
     # Quelldatei und Ziel-DB
+    if not shared_data_path.is_absolute():
+        shared_data_path = prj_root / shared_data_path
+    if not imports_path.is_absolute():
+        imports_path = prj_root / imports_path
+
+    source_from_imports = False
     if source_override:
         source_excel_path = source_override
     else:
         source_excel_path = shared_data_path / db_name
+        if not source_excel_path.exists():
+            import_candidate = imports_path / db_name
+            if not import_candidate.exists() and Path(db_name).suffix.lower() == ".xlsx":
+                import_candidate = imports_path / f"{Path(db_name).stem}.xls"
+            if import_candidate.exists():
+                source_excel_path = import_candidate
+                source_from_imports = True
 
     target_db_path = prj_root / local_data_path / sqlite_db_name
 
@@ -316,6 +420,7 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
     logger.info(f"Importiere Stammdaten von {source_excel_path} nach {target_db_path}")
 
     total_imported = 0
+    report: Dict[str, Dict[str, List[str]]] = {}
     with sqlite3.connect(target_db_path) as target_conn:
         target_conn.execute("PRAGMA foreign_keys = ON")
         for excel_table, table_cfg in DEFAULT_TABLE_MAPPINGS.items():
@@ -341,7 +446,7 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
 
             # Daten importieren
             try:
-                count = import_entity_data(
+                inserted, updated, deactivated, details = import_entity_data(
                     source_excel=source_excel_path,
                     target_conn=target_conn,
                     excel_table_name=excel_table,
@@ -349,12 +454,136 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
                     fields=fields,
                     foreign_keys=FOREIGN_KEY_MAPPINGS.get(target_table),
                 )
-                total_imported += count
+                total_imported += inserted + updated
+                report[entity_name] = details
             except Exception as e:
                 logger.error(f"Fehler beim Import von {excel_table}: {e}")
 
+        _write_report(config, report)
+
+    if source_from_imports:
+        done_dir = ensure_dir(prj_root / (config.structure.done_path or "done"))
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        target_name = f"{source_excel_path.stem}_{timestamp}{source_excel_path.suffix}"
+        target_path = done_dir / target_name
+        shutil.move(str(source_excel_path), str(target_path))
+        logger.info(f"Stammdatendatei verschoben nach: {target_path}")
+
     logger.info(f"Stammdaten-Import abgeschlossen. {total_imported} Datensätze importiert.")
     return total_imported
+
+
+def _normalize_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, float) and pd.isna(value):
+        return None
+    if isinstance(value, str):
+        normalized = value.strip()
+        return normalized if normalized else None
+    return value
+
+
+def _values_equal(a: Any, b: Any) -> bool:
+    na = _normalize_value(a)
+    nb = _normalize_value(b)
+    if isinstance(na, (int, float)) and isinstance(nb, (int, float)):
+        return float(na) == float(nb)
+    return na == nb
+
+
+def _diff_row(existing: Dict[str, Any], incoming: Dict[str, Any], fields: list[FieldConfig]) -> Dict[str, str]:
+    changes: Dict[str, str] = {}
+    for field in fields:
+        if field.primary_key:
+            continue
+        col = field.name
+        if not _values_equal(existing.get(col), incoming.get(col)):
+            changes[col] = f"{existing.get(col)} → {incoming.get(col)}"
+    return changes
+
+
+def _pk_key(row: Dict[str, Any], pk_fields: list[str]) -> Optional[Tuple[Any, ...]]:
+    if not pk_fields:
+        return None
+    values = tuple(row.get(pk) for pk in pk_fields)
+    if any(v is None or (isinstance(v, str) and v.strip() == "") for v in values):
+        return None
+    return values
+
+
+def _format_pk(pk: Tuple[Any, ...]) -> str:
+    if len(pk) == 1:
+        return str(pk[0])
+    return "|".join(str(value) for value in pk)
+
+
+def _format_changes(changes: Dict[str, str]) -> str:
+    if not changes:
+        return ""
+    parts = [f"{field}: {delta}" for field, delta in changes.items()]
+    return f" ({'; '.join(parts)})"
+
+
+def _pk_where_clause(pk_fields: list[str], pk: Tuple[Any, ...]) -> Tuple[str, Tuple[Any, ...]]:
+    clause = " AND ".join([f"{field}=?" for field in pk_fields])
+    return clause, pk
+
+
+def _load_existing_rows(
+    conn: sqlite3.Connection, target_table: str, select_cols: list[str], pk_fields: list[str]
+) -> List[Dict[str, Any]]:
+    sql = f"SELECT {', '.join(select_cols)} FROM {target_table}"
+    cur = conn.execute(sql)
+    rows = []
+    for raw in cur.fetchall():
+        row = dict(zip(select_cols, raw))
+        key = _pk_key(row, pk_fields)
+        if key is not None:
+            row["_pk_key"] = key
+            rows.append(row)
+    return rows
+
+
+def _write_report(config: Config, report: Dict[str, Dict[str, List[str]]]) -> None:
+    if not report:
+        return
+    log_dir = ensure_dir(Path(config.structure.prj_root) / (config.structure.log_path or ".logs"))
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    report_path = log_dir / f"stammdaten_import_report_{stamp}.md"
+
+    lines = [
+        "# Stammdaten-Import Report",
+        "",
+        f"Zeitpunkt: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
+        "",
+    ]
+
+    for entity, details in report.items():
+        inserted = details.get("inserted", [])
+        updated = details.get("updated", [])
+        deactivated = details.get("deactivated", [])
+
+        lines.extend(
+            [
+                f"## {entity}",
+                f"Eingefügt: {len(inserted)}",
+                f"Aktualisiert: {len(updated)}",
+                f"Deaktiviert: {len(deactivated)}",
+                "",
+            ]
+        )
+
+        if inserted:
+            lines.append(f"Eingefügt IDs: {', '.join(f'`{pk}`' for pk in inserted)}")
+        if updated:
+            lines.append("Aktualisiert: " + "; ".join(updated))
+        if deactivated:
+            lines.append(f"Deaktiviert IDs: {', '.join(f'`{pk}`' for pk in deactivated)}")
+        lines.append("")
+
+    report_path.write_text("\n".join(lines), encoding="utf-8")
+    logger.info(f"Import-Report geschrieben: {report_path}")
 
 
 def main() -> None:

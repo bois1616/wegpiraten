@@ -124,6 +124,7 @@ class TimeSheetsImporter:
     def __init__(self, config: Config, profile: Optional[TimeSheetImportProfile] = None):
         self.config = config
         self.profile = profile or self._build_profile_from_config(config)
+        self.masterdata_stem = Path(self.config.database.db_name or "").stem
 
         prj_root = Path(self.config.structure.prj_root)
         data_dir = prj_root / (getattr(self.config.structure, "local_data_path", None) or "data")
@@ -165,7 +166,12 @@ class TimeSheetsImporter:
         return TimeSheetImportProfile.from_config(config.templates)
 
     def discover_excel_files(self) -> List[Path]:
-        files = sorted(p for p in self.source_dir.glob("*.xlsx") if p.is_file())
+        files: List[Path] = []
+        for path in sorted(p for p in self.source_dir.glob("*.xlsx") if p.is_file()):
+            if self.masterdata_stem and path.stem.startswith(self.masterdata_stem):
+                logger.info(f"Überspringe Stammdatendatei im Import: {path.name}")
+                continue
+            files.append(path)
         logger.info(f"{len(files)} Excel-Dateien entdeckt.")
         return files
 
@@ -229,23 +235,56 @@ class TimeSheetsImporter:
 
     def _determine_row_mapping(self, ws: Worksheet) -> Optional[tuple[RowMapping, bool]]:
         mp = self.profile.row_mapping
-        labels = {key: self._get_header_label(ws, getattr(mp, key)) for key in self._HEADER_LABELS_WITH_KM.keys()}
 
-        if all(labels[key] == expected for key, expected in self._HEADER_LABELS_WITH_KM.items()):
-            return mp, True
+        def read_labels(expected: Dict[str, str]) -> Dict[str, str]:
+            labels: Dict[str, str] = {}
+            for key in expected:
+                column = getattr(mp, key, None)
+                if not column:
+                    continue
+                labels[key] = self._get_header_label(ws, column)
+            return labels
 
-        if all(labels[key] == expected for key, expected in self._HEADER_LABELS_NO_KM.items()):
-            shifted = RowMapping(
-                service_time_col=mp.service_time_col,
-                service_date_col=mp.service_date_col,
-                travel_time_col=mp.travel_time_col,
-                travel_distance_col=mp.travel_distance_col,
-                direct_time_col=mp.travel_distance_col,
-                indirect_time_col=mp.direct_time_col,
-                billable_hours_col=mp.indirect_time_col,
-                notes_col=mp.billable_hours_col,
-            )
-            return shifted, False
+        def matches(labels: Dict[str, str], expected: Dict[str, str]) -> bool:
+            for key, expected_label in expected.items():
+                column = getattr(mp, key, None)
+                if not column:
+                    continue
+                if labels.get(key) != expected_label:
+                    return False
+            return True
+
+        expected = {
+            "service_time_col": "uhrzeit",
+            "service_date_col": "datum",
+            "travel_time_col": "fahrtzeit",
+            "direct_time_col": "direkter fallkontakt",
+            "indirect_time_col": "indirekte fallbearbeitung",
+            "notes_col": "notizen",
+        }
+        if mp.travel_distance_col:
+            expected["travel_distance_col"] = "km"
+        if mp.billable_hours_col:
+            expected["billable_hours_col"] = "stunden"
+
+        labels = read_labels(expected)
+        if matches(labels, expected):
+            return mp, bool(mp.travel_distance_col)
+
+        if mp.travel_distance_col and mp.billable_hours_col:
+            legacy_labels = read_labels(self._HEADER_LABELS_NO_KM)
+            if matches(legacy_labels, self._HEADER_LABELS_NO_KM):
+                shifted = RowMapping(
+                    service_time_col=mp.service_time_col,
+                    service_date_col=mp.service_date_col,
+                    travel_time_col=mp.travel_time_col,
+                    travel_distance_col=mp.travel_distance_col,
+                    direct_time_col=mp.travel_distance_col,
+                    indirect_time_col=mp.direct_time_col,
+                    billable_hours_col=mp.indirect_time_col,
+                    notes_col=mp.billable_hours_col,
+                )
+                return shifted, False
 
         logger.error(
             "Header-Struktur nicht erkannt. Gefundene Labels: {}",
@@ -295,11 +334,15 @@ class TimeSheetsImporter:
         for row_idx in range(rng.start_row, rng.end_row + 1):
             v_date = ws[f"{mp.service_date_col}{row_idx}"].value
             v_travel = ws[f"{mp.travel_time_col}{row_idx}"].value
-            v_distance = ws[f"{mp.travel_distance_col}{row_idx}"].value if has_travel_distance else None
+            v_distance = (
+                ws[f"{mp.travel_distance_col}{row_idx}"].value
+                if has_travel_distance and mp.travel_distance_col
+                else None
+            )
             v_direct = ws[f"{mp.direct_time_col}{row_idx}"].value
             v_indirect = ws[f"{mp.indirect_time_col}{row_idx}"].value
-            v_billable = ws[f"{mp.billable_hours_col}{row_idx}"].value
-            v_notes = ws[f"{mp.notes_col}{row_idx}"].value
+            v_billable = ws[f"{mp.billable_hours_col}{row_idx}"].value if mp.billable_hours_col else None
+            v_notes = ws[f"{mp.notes_col}{row_idx}"].value if mp.notes_col else None
 
             service_date = to_date(v_date)
             travel = to_float(v_travel) or 0.0

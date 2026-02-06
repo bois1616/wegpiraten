@@ -33,19 +33,25 @@ class MonthPeriod(BaseModel):
 def get_month_period(abrechnungsmonat: str) -> MonthPeriod:
     """
     Gibt den ersten und letzten Tag eines Abrechnungsmonats als Pydantic-Modell zurück.
-    Erwartet das Format MM.YYYY oder MM-YYYY.
+    Erwartet das Format MM.YYYY, MM-YYYY oder YYYY-MM.
 
     Args:
-        abrechnungsmonat (str): Monat im Format MM.YYYY oder MM-YYYY.
+        abrechnungsmonat (str): Monat im Format MM.YYYY, MM-YYYY oder YYYY-MM.
 
     Returns:
         MonthPeriod: Pydantic-Modell mit Start- und Enddatum.
     """
-    # Erlaubt sowohl MM.YYYY als auch MM-YYYY als Eingabe
     abrechnungsmonat = abrechnungsmonat.replace("-", ".")
-    monat, jahr = abrechnungsmonat.split(".")
-    monat = int(monat)
-    jahr = int(jahr)
+    parts = abrechnungsmonat.split(".")
+    if len(parts) != 2:
+        raise ValueError("Abrechnungsmonat muss MM.YYYY, MM-YYYY oder YYYY-MM sein.")
+    first, second = parts
+    if len(first) == 4 and len(second) in (1, 2):
+        jahr_str, monat_str = first, second
+    else:
+        monat_str, jahr_str = first, second
+    monat = int(monat_str)
+    jahr = int(jahr_str)
     start = datetime(jahr, monat, 1)
     if monat == 12:
         end = datetime(jahr, 12, 31)

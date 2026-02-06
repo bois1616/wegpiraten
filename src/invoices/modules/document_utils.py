@@ -10,8 +10,9 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from PyPDF2 import PdfMerger
 
-from modules.invoice_context import InvoiceContext
 from shared_modules.config import Config
+
+from .invoice_context import InvoiceContext
 
 
 class DocumentUtils:
