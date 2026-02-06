@@ -58,6 +58,13 @@ def map_row(row: pd.Series, mapping: Dict[str, FieldConfig], required_fields: li
                 value = None  # Für numerische Felder bleibt es None!
         else:
             try:
+                if field_type is str:
+                    if isinstance(value, float) and value.is_integer():
+                        value = str(int(value))
+                    elif isinstance(value, (int, bool)):
+                        value = str(value)
+                    else:
+                        value = str(value)
                 # Spezialfall: float auf int, falls nötig
                 if field_type is int and isinstance(value, float) and value.is_integer():
                     value = int(value)
