@@ -194,9 +194,24 @@ class TimeSheetsImporter:
             FOREIGN KEY (employee_id) REFERENCES employees(emp_id)
         )
         """
+        deduplicate_sql = """
+        DELETE FROM service_data
+        WHERE id NOT IN (
+            SELECT MAX(id)
+            FROM service_data
+            GROUP BY client_id, service_date
+        )
+        """
+        unique_index_sql = """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_service_data_client_date
+        ON service_data (client_id, service_date)
+        """
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute(sql)
+            # Bestehende Dubletten bereinigen, bevor der eindeutige Index gesetzt wird.
+            conn.execute(deduplicate_sql)
+            conn.execute(unique_index_sql)
             conn.commit()
 
     @staticmethod
@@ -401,6 +416,16 @@ class TimeSheetsImporter:
         INSERT INTO service_data (
             {", ".join(self._INSERT_FIELDS)}
         ) VALUES ({", ".join(["?"] * len(self._INSERT_FIELDS))})
+        ON CONFLICT(client_id, service_date) DO UPDATE SET
+            employee_id = excluded.employee_id,
+            service_type = excluded.service_type,
+            travel_time = excluded.travel_time,
+            travel_distance = excluded.travel_distance,
+            direct_time = excluded.direct_time,
+            indirect_time = excluded.indirect_time,
+            notes = excluded.notes,
+            source_file = excluded.source_file,
+            reporting_month = excluded.reporting_month
         """
         count = 0
         with sqlite3.connect(self.db_path) as conn:
