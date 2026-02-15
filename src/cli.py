@@ -170,14 +170,16 @@ def import_masterdata(
         None,
         "--source",
         "-s",
-        help="Pfad zur Excel-Quelldatei (überschreibt Config)",
+        help="Pfad zur Excel-Quelldatei (optional, überschreibt Import-Ordner aus Config)",
     ),
 ) -> None:
     """
     Importiert Stammdaten aus Excel in die SQLite-Datenbank.
 
     Importiert Mitarbeiter, Klienten, Zahlungsdienstleister und
-    Leistungsbesteller aus der konfigurierten Excel-Datenbank.
+    Leistungsbesteller aus der Excel-Datei im Import-Ordner
+    (structure.imports_path, standardmässig ``import``).
+    Die verarbeitete Datei wird anschliessend nach ``done`` verschoben.
     """
     console.print("[bold blue]Importiere Stammdaten...[/bold blue]")
 

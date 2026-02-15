@@ -79,6 +79,16 @@ class ImportedRowExport(BaseModel):
     total_costs: Optional[float] = None
 
 
+class ImportErrorEntry(BaseModel):
+    """Ein einzelner Fehlerfall für das Import-Fehlerprotokoll."""
+
+    timestamp: str
+    source_file: str
+    category: str
+    message: str
+    row_number: Optional[int] = None
+
+
 class TimeSheetsImporter:
     """
     Liest ausgefüllte Aufwandserfassungs-Sheets, validiert jede Positionszeile
@@ -159,11 +169,131 @@ class TimeSheetsImporter:
             f"{self.profile.table_range.start_row}-{self.profile.table_range.end_row}"
         )
 
+        self._error_entries: List[ImportErrorEntry] = []
+        self._valid_client_ids: set[str] = set()
+        self._valid_employee_ids: set[str] = set()
+
         self._ensure_service_data_table()
+        self._refresh_fk_cache()
 
     @staticmethod
     def _build_profile_from_config(config: Config) -> TimeSheetImportProfile:
         return TimeSheetImportProfile.from_config(config.templates)
+
+    def _record_error(
+        self,
+        source_file: str,
+        category: str,
+        message: str,
+        row_number: Optional[int] = None,
+    ) -> None:
+        entry = ImportErrorEntry(
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            source_file=source_file,
+            category=category,
+            message=message,
+            row_number=row_number,
+        )
+        self._error_entries.append(entry)
+        row_suffix = f" (Zeile {row_number})" if row_number is not None else ""
+        logger.error("{}{}: {}", source_file, row_suffix, message)
+
+    def _fetch_reference_values(self, table: str, column: str) -> set[str]:
+        sql = f"SELECT {column} FROM {table} WHERE {column} IS NOT NULL"
+        values: set[str] = set()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                for row in conn.execute(sql):
+                    value = row[0]
+                    if value is None:
+                        continue
+                    normalized = str(value).strip()
+                    if normalized:
+                        values.add(normalized)
+        except sqlite3.OperationalError as exc:
+            self._record_error(
+                "SYSTEM",
+                "Referenzdaten",
+                f"Referenztabelle {table}.{column} nicht lesbar: {exc}",
+            )
+        return values
+
+    def _refresh_fk_cache(self) -> None:
+        self._valid_client_ids = self._fetch_reference_values("clients", "client_id")
+        self._valid_employee_ids = self._fetch_reference_values("employees", "emp_id")
+
+    def _validate_header_foreign_keys(self, header: Dict[str, object], source_file: str) -> bool:
+        client_id = str(header.get("client_id") or "").strip()
+        if not client_id:
+            self._record_error(source_file, "Header", "client_id fehlt im Header.")
+            return False
+        if client_id not in self._valid_client_ids:
+            self._record_error(
+                source_file,
+                "FK-Fehler",
+                f"client_id '{client_id}' existiert nicht in den Stammdaten (clients.client_id).",
+            )
+            return False
+
+        employee_id = str(header.get("employee_id") or "").strip()
+        if employee_id and employee_id not in self._valid_employee_ids:
+            self._record_error(
+                source_file,
+                "FK-Fehler",
+                f"employee_id '{employee_id}' existiert nicht in den Stammdaten (employees.emp_id).",
+            )
+            return False
+
+        service_type = str(header.get("service_type") or "").strip()
+        if not service_type:
+            self._record_error(
+                source_file,
+                "FK-Fehler",
+                "service_type konnte für den Client nicht aus den Stammdaten ermittelt werden.",
+            )
+            return False
+        return True
+
+    def _write_error_report(self) -> Optional[Path]:
+        if not self._error_entries:
+            return None
+        stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        report_path = self.output_dir / f"timesheet_import_fehler_{stamp}.md"
+        report_xlsx_path = self.output_dir / f"timesheet_import_fehler_{stamp}.xlsx"
+        lines: List[str] = [
+            "# Fehlerprotokoll Timesheet-Import",
+            "",
+            f"- Zeitpunkt: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"- Anzahl Fehler: {len(self._error_entries)}",
+            "",
+            "| Zeitpunkt | Datei | Zeile | Kategorie | Fehler |",
+            "|---|---|---:|---|---|",
+        ]
+        for entry in self._error_entries:
+            row_number = str(entry.row_number) if entry.row_number is not None else "-"
+            safe_message = entry.message.replace("\n", " ").replace("|", "/")
+            lines.append(
+                f"| {entry.timestamp} | {entry.source_file} | {row_number} | {entry.category} | {safe_message} |"
+            )
+        report_path.write_text("\n".join(lines), encoding="utf-8")
+        df_errors = pd.DataFrame(
+            [
+                {
+                    "zeitpunkt": entry.timestamp,
+                    "datei": entry.source_file,
+                    "zeile": entry.row_number,
+                    "kategorie": entry.category,
+                    "fehler": entry.message,
+                }
+                for entry in self._error_entries
+            ]
+        )
+        with pd.ExcelWriter(report_xlsx_path, engine="openpyxl") as writer:
+            df_errors.to_excel(writer, sheet_name="fehlerprotokoll", index=False)
+
+        logger.warning("Fehlerprotokoll geschrieben: {}", report_path)
+        logger.warning("Fehlerprotokoll geschrieben: {}", report_xlsx_path)
+        return report_path
 
     def discover_excel_files(self) -> List[Path]:
         files: List[Path] = []
@@ -199,18 +329,22 @@ class TimeSheetsImporter:
         WHERE id NOT IN (
             SELECT MAX(id)
             FROM service_data
-            GROUP BY client_id, service_date
+            GROUP BY client_id, service_date, employee_id
         )
         """
+        drop_legacy_unique_index_sql = """
+        DROP INDEX IF EXISTS idx_service_data_client_date
+        """
         unique_index_sql = """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_service_data_client_date
-        ON service_data (client_id, service_date)
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_service_data_client_date_employee
+        ON service_data (client_id, service_date, employee_id)
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute(sql)
             # Bestehende Dubletten bereinigen, bevor der eindeutige Index gesetzt wird.
             conn.execute(deduplicate_sql)
+            conn.execute(drop_legacy_unique_index_sql)
             conn.execute(unique_index_sql)
             conn.commit()
 
@@ -398,10 +532,20 @@ class TimeSheetsImporter:
                         "notes": str(v_notes).strip() if v_notes is not None else None,
                         "source_file": source_file,
                         "reporting_month": reporting_month or "",
+                        "_source_row": row_idx,
                     }
                 )
             except ValidationError as exc:
-                logger.error(f"Zeile {row_idx}: Validierungsfehler: {exc}")
+                short_errors = "; ".join(
+                    f"{'.'.join(str(loc) for loc in error.get('loc', []))}: {error.get('msg', 'ungültig')}"
+                    for error in exc.errors()
+                )
+                self._record_error(
+                    source_file,
+                    "Validierung",
+                    f"Validierungsfehler: {short_errors or str(exc)}",
+                    row_number=row_idx,
+                )
 
         return rows
 
@@ -411,12 +555,12 @@ class TimeSheetsImporter:
             data["service_date"] = data["service_date"].isoformat()
         return tuple(data.get(column) for column in self._INSERT_FIELDS)
 
-    def _import_rows(self, rows: Iterable[Dict[str, Any]]) -> int:
+    def _import_rows(self, rows: Iterable[Dict[str, Any]], source_file: str) -> tuple[int, List[Dict[str, Any]]]:
         sql = f"""
         INSERT INTO service_data (
             {", ".join(self._INSERT_FIELDS)}
         ) VALUES ({", ".join(["?"] * len(self._INSERT_FIELDS))})
-        ON CONFLICT(client_id, service_date) DO UPDATE SET
+        ON CONFLICT(client_id, service_date, employee_id) DO UPDATE SET
             employee_id = excluded.employee_id,
             service_type = excluded.service_type,
             travel_time = excluded.travel_time,
@@ -428,18 +572,31 @@ class TimeSheetsImporter:
             reporting_month = excluded.reporting_month
         """
         count = 0
+        imported_rows: List[Dict[str, Any]] = []
         with sqlite3.connect(self.db_path) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
             cur = conn.cursor()
-            try:
-                for record in rows:
+            for record in rows:
+                try:
                     cur.execute(sql, self._row_params(record))
                     count += 1
-                conn.commit()
-            except Exception:
-                conn.rollback()
-                logger.exception("Import fehlgeschlagen, Transaktion zurückgerollt.")
-                raise
-        return count
+                    imported_rows.append(record)
+                except sqlite3.IntegrityError as exc:
+                    self._record_error(
+                        source_file,
+                        "FK-Fehler",
+                        f"Datenbank-Constraint verletzt: {exc}",
+                        row_number=record.get("_source_row"),
+                    )
+                except sqlite3.DatabaseError as exc:
+                    self._record_error(
+                        source_file,
+                        "DB-Fehler",
+                        f"Zeile konnte nicht gespeichert werden: {exc}",
+                        row_number=record.get("_source_row"),
+                    )
+            conn.commit()
+        return count, imported_rows
 
     def _move_to_done(self, file_path: Path) -> Path:
         """
@@ -479,29 +636,38 @@ class TimeSheetsImporter:
 
     def process_file(self, file_path: Path) -> tuple[int, Path, List[ImportedRowExport], Optional[str]]:
         logger.info(f"Verarbeite: {file_path.name}")
-        wb = load_workbook(file_path, data_only=True)
+        try:
+            wb = load_workbook(file_path, data_only=True)
+        except Exception as exc:
+            self._record_error(file_path.name, "Datei", f"Datei konnte nicht gelesen werden: {exc}")
+            return 0, file_path, [], None
         if self.profile.sheet_name:
-            assert self.profile.sheet_name in wb.sheetnames, (
-                f"Sheet '{self.profile.sheet_name}' fehlt in {file_path.name}."
-            )
+            if self.profile.sheet_name not in wb.sheetnames:
+                self._record_error(
+                    file_path.name,
+                    "Struktur",
+                    f"Sheet '{self.profile.sheet_name}' fehlt in der Datei.",
+                )
+                return 0, file_path, [], None
             ws = wb[self.profile.sheet_name]
         else:
             ws = wb.active
             if ws is None:
-                raise ValueError(f"Kein aktives Sheet in {file_path.name}")
+                self._record_error(file_path.name, "Struktur", "Kein aktives Sheet gefunden.")
+                return 0, file_path, [], None
 
         header = self._read_header(ws)
         month_str = to_year_month_str(header.get("reporting_month"))
         mapping = self._determine_row_mapping(ws)
         if mapping is None:
-            raise ValueError(f"Header-Struktur ungültig ({file_path.name})")
+            self._record_error(file_path.name, "Struktur", "Header-Struktur ungültig.")
+            return 0, file_path, [], month_str
         row_mapping, has_travel_distance = mapping
 
-        # Minimalprüfung Header (prüfe einmal und dann traue)
-        if not header.get("client_id"):
-            raise ValueError(f"client_id im Header fehlt ({file_path.name})")
-        if not header.get("service_type"):
-            raise ValueError(f"service_type nicht aus DB ermittelbar ({file_path.name})")
+        if not self._validate_header_foreign_keys(header, file_path.name):
+            logger.warning("Datei {} wegen Header-/FK-Fehlern übersprungen.", file_path.name)
+            return 0, file_path, [], month_str
+
         if not header.get("employee_id"):
             logger.warning("employee_id fehlt im Header – Import erfolgt ohne employee_id ({})", file_path.name)
 
@@ -518,10 +684,15 @@ class TimeSheetsImporter:
             logger.warning("Keine importierbaren Zeilen in {} gefunden – Datei bleibt im Import.", file_path.name)
             return 0, file_path, [], month_str
 
-        imported_count = self._import_rows(rows)
+        imported_count, imported_rows = self._import_rows(rows, file_path.name)
+        if imported_count == 0:
+            logger.warning("Keine gültigen Zeilen aus {} gespeichert – Datei bleibt im Import.", file_path.name)
+            return 0, file_path, [], month_str
         moved = self._move_to_done(file_path)
 
-        export_rows = [ImportedRowExport(**row) for row in rows]
+        export_rows = [
+            ImportedRowExport(**{k: v for k, v in row.items() if k != "_source_row"}) for row in imported_rows
+        ]
 
         logger.info(f"{imported_count} Zeilen importiert aus {file_path.name}. Verschoben nach {moved.name}")
         return imported_count, moved, export_rows, month_str
@@ -547,9 +718,9 @@ class TimeSheetsImporter:
                 if derived_month is None and month_str:
                     derived_month = month_str
             except ValueError as err:
-                logger.error(f"Strukturfehler bei {file_path.name}: {err}")
+                self._record_error(file_path.name, "Struktur", str(err))
             except Exception as exc:
-                logger.exception(f"Unerwarteter Fehler bei {file_path.name}: {exc}")
+                self._record_error(file_path.name, "Unerwartet", f"Datei konnte nicht verarbeitet werden: {exc}")
 
         logger.info(f"Batch abgeschlossen. Gesamt importiert: {total}")
 
@@ -561,6 +732,7 @@ class TimeSheetsImporter:
                     derived_month,
                 )
             self._export_rows_to_excel(all_export_rows, derived_month)
+        self._write_error_report()
 
         return total
 

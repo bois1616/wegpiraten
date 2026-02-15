@@ -1,7 +1,7 @@
 """
 Importiert Stammdaten aus einer bestehenden Excel-Datei (mit mehreren Tabellen/Excel-Tabellen) in die Projekt-SQLite-DB.
 Die Ziel-DB wird automatisch im local_data_path unterhalb des Projekt-Roots angelegt (Pfad und Name aus Config).
-Die Quelldatei (Excel) wird aus shared_data_path geladen.
+Die Quelldatei (Excel) wird aus dem Import-Verzeichnis geladen.
 Verwendet zentrale Config, Entity-Modelle aus der Config.
 """
 
@@ -392,32 +392,24 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
     """
     # Pfade aus Config
     prj_root = Path(config.structure.prj_root)
-    shared_data_path = Path(config.structure.shared_data_path or "")
     imports_path = Path(getattr(config.structure, "imports_path", None) or "import")
     local_data_path = config.structure.local_data_path or "data"
+    done_path_cfg = getattr(config.structure, "done_path", None) or "done"
 
     # Dateinamen
     sqlite_db_name = config.database.sqlite_db_name or "Wegpiraten Datenbank.sqlite3"
     db_name = config.database.db_name or "Wegpiraten Datenbank.xlsx"
 
     # Quelldatei und Ziel-DB
-    if not shared_data_path.is_absolute():
-        shared_data_path = prj_root / shared_data_path
     if not imports_path.is_absolute():
         imports_path = prj_root / imports_path
 
-    source_from_imports = False
     if source_override:
         source_excel_path = source_override
     else:
-        source_excel_path = shared_data_path / db_name
-        if not source_excel_path.exists():
-            import_candidate = imports_path / db_name
-            if not import_candidate.exists() and Path(db_name).suffix.lower() == ".xlsx":
-                import_candidate = imports_path / f"{Path(db_name).stem}.xls"
-            if import_candidate.exists():
-                source_excel_path = import_candidate
-                source_from_imports = True
+        source_excel_path = imports_path / db_name
+        if not source_excel_path.exists() and Path(db_name).suffix.lower() == ".xlsx":
+            source_excel_path = imports_path / f"{Path(db_name).stem}.xls"
 
     target_db_path = prj_root / local_data_path / sqlite_db_name
 
@@ -468,8 +460,9 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
 
         _write_report(config, report)
 
-    if source_from_imports:
-        done_dir = ensure_dir(prj_root / (config.structure.done_path or "done"))
+    if source_excel_path.parent.resolve() == imports_path.resolve():
+        done_dir_base = Path(done_path_cfg)
+        done_dir = ensure_dir(done_dir_base if done_dir_base.is_absolute() else (prj_root / done_dir_base))
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         target_name = f"{source_excel_path.stem}_{timestamp}{source_excel_path.suffix}"
         target_path = done_dir / target_name
