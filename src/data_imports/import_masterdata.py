@@ -139,9 +139,24 @@ def create_target_tables(
     sql = f"CREATE TABLE IF NOT EXISTS {target_table} (\n    {columns_sql}{pk_sql}{fk_sql}\n)"
     logger.debug(f"Erstelle Tabelle {target_table}: {sql}")
     cur.execute(sql)
+
+    if table_exists:
+        existing_columns = {row[1] for row in cur.execute(f"PRAGMA table_info({target_table})").fetchall()}
+        desired_columns = [(field.name, sql_type(field.type)) for field in fields]
+        if "is_active" not in {field.name for field in fields}:
+            desired_columns.append(("is_active", "INTEGER NOT NULL DEFAULT 1"))
+
+        for col_name, col_type in desired_columns:
+            if col_name in existing_columns:
+                continue
+            alter_sql = f"ALTER TABLE {target_table} ADD COLUMN {col_name} {col_type}"
+            logger.info("Erweitere Tabelle {} um Spalte {} ({})", target_table, col_name, col_type)
+            cur.execute(alter_sql)
+
+        if foreign_keys:
+            logger.warning(f"Tabelle {target_table} existiert bereits. Foreign Keys wurden nicht nachträglich gesetzt.")
+
     conn.commit()
-    if table_exists and foreign_keys:
-        logger.warning(f"Tabelle {target_table} existiert bereits. Foreign Keys wurden nicht nachträglich gesetzt.")
 
 
 def import_entity_data(
@@ -297,6 +312,7 @@ DEFAULT_TABLE_MAPPINGS = {
     "masterdata_employee": {"target": "employees", "entity": "employee"},
     "masterdata_payer": {"target": "payer", "entity": "payer"},
     "masterdata_service_requester": {"target": "service_requester", "entity": "service_requester"},
+    "masterdata_tenant": {"target": "masterdata_tenant", "entity": "tenant"},
     "service_types": {"target": "service_types", "entity": "service_type"},
     "masterdata_client": {"target": "clients", "entity": "client"},
 }
@@ -304,6 +320,7 @@ DEFAULT_TABLE_MAPPINGS = {
 FOREIGN_KEY_MAPPINGS: Dict[str, list[tuple[str, str, str]]] = {
     "clients": [
         ("employee_id", "employees", "emp_id"),
+        ("tenant_id", "masterdata_tenant", "tenant_id"),
         ("payer_id", "payer", "payer_id"),
         ("service_requester_id", "service_requester", "service_requester_id"),
         ("service_type", "service_types", "service_type_id"),

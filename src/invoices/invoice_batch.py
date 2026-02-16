@@ -25,7 +25,7 @@ def main() -> None:
         invoice_month: str = sys.argv[1]
     else:
         print("Bitte Abrechnungsmonat als Argument übergeben (z.B. 08.2025)")
-        invoice_month = "08.2025"
+        invoice_month = "02.2026"
         # sys.exit(1)
 
     # Filter-Objekt für die Rechnungsverarbeitung (kann später erweitert werden)

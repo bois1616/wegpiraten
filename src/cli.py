@@ -199,15 +199,20 @@ def import_masterdata(
 
 @app.command("import-sheets")
 def import_timesheets(
-    month: Optional[str] = typer.Argument(
-        None,
-        help="Erfassungsmonat der zu importierenden Bögen im Format YYYY-MM (optional)",
+    month: str = typer.Argument(
+        ...,
+        help="Leistungsmonat im Format MM.YYYY, MM-YYYY oder YYYY-MM (verbindlich)",
     ),
     config_path: Optional[Path] = typer.Option(
         None,
         "--config",
         "-c",
         help="Pfad zur Konfigurationsdatei",
+    ),
+    no_reset: bool = typer.Option(
+        False,
+        "--no-reset",
+        help="Setzt service_data vor dem Import nicht zurück (Standard: Reset aktiv).",
     ),
 ) -> None:
     """
@@ -216,7 +221,11 @@ def import_timesheets(
     Liest alle Excel-Dateien aus dem Eingabeverzeichnis und
     importiert die Leistungsdaten in die SQLite-Datenbank.
     """
-    console.print("[bold blue]Importiere Zeiterfassungsbögen...[/bold blue]")
+    reset_mode = not no_reset
+    console.print(
+        f"[bold blue]Importiere Zeiterfassungsbögen für {month} "
+        f"({'mit Reset' if reset_mode else 'ohne Reset'})...[/bold blue]"
+    )
 
     try:
         config = get_config(config_path)
@@ -224,7 +233,7 @@ def import_timesheets(
         from data_imports.batch_import_timesheets import TimeSheetsImporter
 
         importer = TimeSheetsImporter(config)
-        count = importer.run(reporting_month=month)
+        count = importer.run(reporting_month=month, reset=reset_mode)
 
         console.print(f"[bold green]{count} Einträge importiert.[/bold green]")
     except Exception as e:

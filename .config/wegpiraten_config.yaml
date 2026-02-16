@@ -34,7 +34,7 @@ templates:
     short_code: C8
     client_id: F8
   time_sheet_data_start_cell: A10
-  time_sheet_data_end_cell: G28
+  time_sheet_data_end_cell: h28
   time_sheet_row_mapping:
     service_time: A
     service_date: B
@@ -43,7 +43,7 @@ templates:
     direct_time: D
     indirect_time: E
     # billable_hours: G # Summe aus travel_time, direct_time, indirect_time, information only
-    notes: G
+    notes: h
 
   time_sheet_template: time_sheet_template.xlsx
   client_sheet_name: MD_Klienten # deprecated, use sqlite table name
@@ -92,6 +92,25 @@ entities:
         excel_column: notes
         optional: true
 
+  tenant:
+    fields:
+      - name: tenant_id
+        type: str
+        primary_key: true
+        excel_column: tenant_id
+      - name: tenant_street
+        type: str
+        excel_column: tenant_street
+      - name: tenant_zip
+        type: str
+        excel_column: tenant_zip
+      - name: tenant_city
+        type: str
+        excel_column: tenant_city
+      - name: tenant_iban
+        type: str
+        excel_column: tenant_iban
+
   client:
     fields:
       - name: client_id
@@ -110,6 +129,9 @@ entities:
       - name: short_code
         type: str
         excel_column: short_code
+      - name: tenant_id
+        type: str
+        excel_column: tenant_id
       - name: payer_id
         type: str
         excel_column: payer_id
@@ -318,6 +340,9 @@ table_mappings:
   masterdata_payer:
     entity: payer
     target: payer
+  masterdata_tenant:
+    entity: tenant
+    target: masterdata_tenant
   masterdata_client:
     entity: client
     target: clients

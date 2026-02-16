@@ -63,11 +63,14 @@ class InvoiceProcessor:
 
     @classmethod
     def _round_minutes(cls, hours_value: Optional[float], rounding: Optional[float]) -> int:
-        minutes_raw = (to_float(hours_value) or 0.0) * 60.0
+        # Stabilisierung gegen Float-Artefakte aus gespeicherten Dezimalstunden.
+        minutes_raw = round((to_float(hours_value) or 0.0) * 60.0, 6)
         step = cls._normalize_rounding(rounding)
         if step <= 0:
             return int(round(minutes_raw))
-        rounded = math.ceil(minutes_raw / step) * step
+        step = round(step, 6)
+        epsilon = 1e-6
+        rounded = math.ceil((minutes_raw / step) - epsilon) * step
         return int(round(rounded))
 
     def _load_service_data(self, period: MonthPeriod) -> pd.DataFrame:
@@ -79,7 +82,56 @@ class InvoiceProcessor:
         start_date = period.start.date().isoformat()
         end_date = period.end.date().isoformat()
 
-        sql = """
+        tenant_select_sql = """
+            NULL AS tenant_id,
+            NULL AS tenant_street,
+            NULL AS tenant_zip,
+            NULL AS tenant_city,
+            NULL AS tenant_iban,
+        """
+        tenant_join_sql = ""
+        tenant_source_expr = "NULL"
+
+        with sqlite3.connect(db_path) as conn:
+            service_data_columns = {row[1] for row in conn.execute("PRAGMA table_info(service_data)").fetchall()}
+            client_columns = {row[1] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
+            has_service_data_tenant = "tenant_id" in service_data_columns
+            has_client_tenant = "tenant_id" in client_columns
+
+            if has_service_data_tenant and has_client_tenant:
+                tenant_source_expr = "COALESCE(sd.tenant_id, c.tenant_id)"
+            elif has_service_data_tenant:
+                tenant_source_expr = "sd.tenant_id"
+            elif has_client_tenant:
+                tenant_source_expr = "c.tenant_id"
+
+            if has_service_data_tenant or has_client_tenant:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS masterdata_tenant (
+                        tenant_id TEXT PRIMARY KEY,
+                        tenant_street TEXT,
+                        tenant_zip TEXT,
+                        tenant_city TEXT,
+                        tenant_iban TEXT,
+                        is_active INTEGER NOT NULL DEFAULT 1
+                    )
+                    """
+                )
+                tenant_select_sql = f"""
+                    {tenant_source_expr} AS tenant_id,
+                    t.tenant_street AS tenant_street,
+                    t.tenant_zip AS tenant_zip,
+                    t.tenant_city AS tenant_city,
+                    t.tenant_iban AS tenant_iban,
+                """
+                tenant_join_sql = f"LEFT JOIN masterdata_tenant t ON {tenant_source_expr} = t.tenant_id"
+            else:
+                logger.warning(
+                    "Spalte tenant_id fehlt in service_data und clients. Tenant-Daten bleiben für die Faktura leer."
+                )
+
+            sql = f"""
         SELECT
             sd.client_id,
             sd.service_date,
@@ -91,6 +143,7 @@ class InvoiceProcessor:
             c.first_name AS client_first_name,
             c.last_name AS client_last_name,
             c.social_security_number AS client_social_security_number,
+            {tenant_select_sql}
             c.payer_id AS payer_id,
             c.service_requester_id AS service_requester_id,
             c.service_type AS service_type_id,
@@ -100,41 +153,47 @@ class InvoiceProcessor:
             p.zip_code AS payer_zip,
             p.city AS payer_city,
             sr.name AS service_requester_name,
-            COALESCE(st_code.code, st_id.code) AS service_type_code,
-            COALESCE(st_code.description, st_id.description) AS service_type_description,
-            COALESCE(st_code.hourly_rate, st_id.hourly_rate) AS hourly_rate,
-            COALESCE(st_code.rundung, st_id.rundung) AS rundung
+            COALESCE(st_id.code, st_code.code) AS service_type_code,
+            COALESCE(st_id.description, st_code.description) AS service_type_description,
+            COALESCE(st_id.hourly_rate, st_code.hourly_rate) AS hourly_rate,
+            COALESCE(st_id.rundung, st_code.rundung) AS rundung
         FROM service_data sd
         JOIN clients c ON sd.client_id = c.client_id
         LEFT JOIN payer p ON c.payer_id = p.payer_id
+        {tenant_join_sql}
         LEFT JOIN service_requester sr ON c.service_requester_id = sr.service_requester_id
-        LEFT JOIN service_types st_code ON sd.service_type = st_code.code
+        LEFT JOIN service_types st_code
+            ON st_code.rowid = (
+                SELECT stc.rowid
+                FROM service_types stc
+                WHERE stc.code = sd.service_type
+                ORDER BY stc.is_active DESC, COALESCE(stc.from_date, '') DESC, stc.rowid DESC
+                LIMIT 1
+            )
         LEFT JOIN service_types st_id ON c.service_type = st_id.service_type_id
         WHERE sd.service_date BETWEEN ? AND ?
         """
-        params: List[Scalar] = [start_date, end_date]
+            params: List[Scalar] = [start_date, end_date]
 
-        if self.filter.payer:
-            sql += " AND c.payer_id = ?"
-            params.append(self.filter.payer)
-        if self.filter.client:
-            sql += " AND sd.client_id = ?"
-            params.append(self.filter.client)
-        if self.filter.service_requester:
-            sql += " AND (c.service_requester_id = ? OR sr.name = ?)"
-            params.extend([self.filter.service_requester, self.filter.service_requester])
-        if self.filter.payer_list:
-            placeholders = ", ".join(["?"] * len(self.filter.payer_list))
-            sql += f" AND c.payer_id IN ({placeholders})"
-            params.extend(self.filter.payer_list)
-        if self.filter.client_list:
-            placeholders = ", ".join(["?"] * len(self.filter.client_list))
-            sql += f" AND sd.client_id IN ({placeholders})"
-            params.extend(self.filter.client_list)
+            if self.filter.payer:
+                sql += " AND c.payer_id = ?"
+                params.append(self.filter.payer)
+            if self.filter.client:
+                sql += " AND sd.client_id = ?"
+                params.append(self.filter.client)
+            if self.filter.service_requester:
+                sql += " AND (c.service_requester_id = ? OR sr.name = ?)"
+                params.extend([self.filter.service_requester, self.filter.service_requester])
+            if self.filter.payer_list:
+                placeholders = ", ".join(["?"] * len(self.filter.payer_list))
+                sql += f" AND c.payer_id IN ({placeholders})"
+                params.extend(self.filter.payer_list)
+            if self.filter.client_list:
+                placeholders = ", ".join(["?"] * len(self.filter.client_list))
+                sql += f" AND sd.client_id IN ({placeholders})"
+                params.extend(self.filter.client_list)
 
-        sql += " ORDER BY c.payer_id, sd.client_id, sd.service_date"
-
-        with sqlite3.connect(db_path) as conn:
+            sql += " ORDER BY c.payer_id, sd.client_id, sd.service_date"
             df = pd.read_sql_query(sql, conn, params=params)
 
         if "service_date" in df.columns:
@@ -332,6 +391,11 @@ class InvoiceProcessor:
                         "payer": payer_obj,
                         "service_provider": service_provider_obj,
                         "provider_city": safe_str(service_provider_obj.city),
+                        "tenant_id": safe_str(client_row.get("tenant_id")),
+                        "tenant_street": safe_str(client_row.get("tenant_street")),
+                        "tenant_zip": safe_str(client_row.get("tenant_zip")),
+                        "tenant_city": safe_str(client_row.get("tenant_city")),
+                        "tenant_iban": safe_str(client_row.get("tenant_iban")),
                         "client_name": client_name or safe_str(client_obj.name),
                         "service_type_description": service_type_description,
                         "client": client_obj,
@@ -345,7 +409,8 @@ class InvoiceProcessor:
                         invoice_context=invoice_context,
                         jinja_env=jinja_env,
                     )
-                    docx_name = f"Rechnung_{payer_id}_{client_id}_{self.filter.invoice_month}.docx"
+                    # docx_name = f"Rechnung_{payer_id}_{client_id}_{self.filter.invoice_month}.docx"
+                    docx_name = f"RE {client_obj.key} - {client_obj.first_name} {client_obj.last_name} ({self.filter.invoice_month}).docx"
                     docx_path = output_path / docx_name
                     rendered_invoice.save(docx_path)
                     all_docx.append(docx_path)
@@ -354,9 +419,9 @@ class InvoiceProcessor:
                     all_invoices.append(named_pdf)
                     invoice_list.append(invoice_context)
 
-            with log_exceptions(f"Fehler beim Zusammenführen der PDFs für ZDNR {payer_id}"):
+            with log_exceptions(f"Fehler beim Zusammenführen der PDFs für Kostenträger {payer_id}"):
                 merged_pdf = DocumentUtils.merge_pdfs(invoices_for_payer, payer_context, output_path=output_path)
-                logger.info(f"PDFs für ZDNR {payer_id} zusammengeführt in {merged_pdf.name}")
+                logger.info(f"PDFs für Kostenträger {payer_id} zusammengeführt in {merged_pdf.name}")
 
         with log_exceptions("Fehler beim Erstellen der Rechnungsübersicht"):
             summary_file = DocumentUtils.create_summary(

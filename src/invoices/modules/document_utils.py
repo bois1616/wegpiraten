@@ -1,7 +1,6 @@
-import os
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import pandas as pd
 from loguru import logger
@@ -57,17 +56,12 @@ class DocumentUtils:
             logger.error(f"PDF-Konvertierung fehlgeschlagen: {e}")
             raise RuntimeError(f"PDF-Konvertierung fehlgeschlagen: {e}")
 
+        _ = invoice_context
         generated_pdf = docx_path.with_suffix(".pdf")
-        # Dateinamen mit Entitäten und Leistungszeitraum
-        payer = invoice_context.data.get("payer")
-        client = invoice_context.data.get("client")
-        payer_id = getattr(payer, "key", "n.a") if payer else "n.a"
-        client_id = getattr(client, "key", "n.a") if client else "n.a"
-        invoice_month = invoice_context.data.get("invoice_month", "unbekannt")
-        target_name = f"Rechnung_{payer_id}_{client_id}_{invoice_month}.pdf"
-        target_pdf = pdf_path.parent / target_name
+        target_pdf = pdf_path
         try:
-            os.rename(generated_pdf, target_pdf)
+            if generated_pdf.resolve() != target_pdf.resolve():
+                generated_pdf.replace(target_pdf)
         except Exception as e:
             logger.error(f"PDF konnte nicht umbenannt werden: {e}")
             raise RuntimeError(f"PDF konnte nicht umbenannt werden: {e}")
@@ -133,6 +127,19 @@ class DocumentUtils:
         kosten_format: str = config.formatting.currency_format or "#,##0.00 ¤"
         datum_format: str = config.formatting.date_format or "dd.MM.yyyy"
 
+        def to_minutes(value: Any) -> int:
+            """
+            Normalisiert Zeitwerte für die Übersicht auf Minuten als Ganzzahl.
+            Falls Dezimalstunden vorliegen (z.B. 0.5), werden diese in Minuten umgerechnet.
+            """
+            try:
+                numeric = float(value) if value is not None else 0.0
+            except (TypeError, ValueError):
+                return 0
+            if not numeric.is_integer():
+                return int(round(numeric * 60))
+            return int(round(numeric))
+
         # Nur die gewünschten Felder extrahieren
         summary_rows = []
         for invoice in invoice_list:
@@ -144,7 +151,9 @@ class DocumentUtils:
                     "Rechnungsdatum": data.get("invoice_date"),
                     "ZD-Nr": getattr(payer, "key", "n.a") if payer else "n.a",
                     "Klienten-Nr": getattr(client, "key", "n.a") if client else "n.a",
+                    "Tenant-ID": data.get("tenant_id", ""),
                     "Abrechnungsmonat": data.get("invoice_month", "unbekannt"),
+                    "Leistungszeit (Min)": to_minutes(data.get("summe_stunden")),
                     "Rechnungsbetrag": data.get("summe_kosten", -999),
                 }
             )
@@ -191,6 +200,17 @@ class DocumentUtils:
                     bold_font = Font(bold=True)
                     for col in range(1, end_col_idx + 1):
                         worksheet.cell(row=total_row_idx, column=col).font = bold_font
+                if "Leistungszeit (Min)" in summary_df.columns:
+                    loc = summary_df.columns.get_loc("Leistungszeit (Min)")
+                    min_col_idx = int(loc) + 1  # type: ignore[arg-type]
+                    min_col_letter = get_column_letter(min_col_idx)
+                    for row in range(2, len(summary_df) + 2):
+                        worksheet[f"{min_col_letter}{row}"].number_format = "0"
+                    total_row_idx = len(summary_df) + 2
+                    worksheet[f"{min_col_letter}{total_row_idx}"] = (
+                        f"=SUM({min_col_letter}2:{min_col_letter}{total_row_idx - 1})"
+                    )
+                    worksheet[f"{min_col_letter}{total_row_idx}"].number_format = "0"
                 if "Rechnungsdatum" in summary_df.columns:
                     loc = summary_df.columns.get_loc("Rechnungsdatum")
                     datum_col_idx = int(loc) + 1  # type: ignore[arg-type]

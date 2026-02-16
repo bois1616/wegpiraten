@@ -33,7 +33,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 import sqlite3
+from copy import copy
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -41,6 +44,7 @@ from typing import Any, Dict, Iterable, List, Optional
 import pandas as pd
 from loguru import logger
 from openpyxl import load_workbook
+from openpyxl.styles import Protection
 from openpyxl.worksheet.worksheet import Worksheet
 from pydantic import BaseModel, ValidationError
 
@@ -48,12 +52,12 @@ from pydantic_models.data.invoice_row_model import InvoiceRowModel
 from pydantic_models.data.row_mapping import RowMapping
 from pydantic_models.data.timesheet_import_profile import TimeSheetImportProfile
 from shared_modules.config import Config
+from shared_modules.month_period import MonthPeriod, get_month_period
 from shared_modules.utils import (
     choose_existing_path,
     ensure_dir,
     to_date,
     to_float,
-    to_year_month_str,
 )
 
 
@@ -64,6 +68,7 @@ class ImportedRowExport(BaseModel):
 
     reporting_month: str
     source_file: str
+    tenant_id: Optional[str] = None
     client_id: str
     employee_id: str
     service_date: date
@@ -98,6 +103,7 @@ class TimeSheetsImporter:
 
     _INSERT_FIELDS: tuple[str, ...] = (
         "client_id",
+        "tenant_id",
         "employee_id",
         "service_date",
         "service_type",
@@ -130,6 +136,9 @@ class TimeSheetsImporter:
         "indirect_time_col": "stunden",
         "billable_hours_col": "notizen",
     }
+    _MINUTES_PER_HOUR: float = 60.0
+    _TIME_ROUND_DIGITS: int = 6
+    _SHORT_DATE_PATTERN = re.compile(r"^\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]?\s*$")
 
     def __init__(self, config: Config, profile: Optional[TimeSheetImportProfile] = None):
         self.config = config
@@ -140,6 +149,7 @@ class TimeSheetsImporter:
         data_dir = prj_root / (getattr(self.config.structure, "local_data_path", None) or "data")
         self.db_path = data_dir / self.config.database.sqlite_db_name
         self.output_dir = ensure_dir(prj_root / (getattr(self.config.structure, "output_path", None) or "output"))
+        self.log_dir = ensure_dir(prj_root / (getattr(self.config.structure, "log_path", None) or ".logs"))
 
         cfg_imports_path = getattr(self.config.structure, "imports_path", None) or self.config.get(
             "structure.imports_path", None
@@ -164,6 +174,8 @@ class TimeSheetsImporter:
         logger.info(f"DB: {self.db_path}")
         logger.info(f"Quelle: {self.source_dir}")
         logger.info(f"Done-Ordner: {self.done_dir}")
+        logger.info(f"Fehler-Log-Ordner: {self.log_dir}")
+        logger.info("Zeiterfassung-Import: Zeitwerte werden als Minuten gelesen und in Stunden gespeichert.")
         logger.info(
             f"Sheet: {self.profile.sheet_name}, Range: "
             f"{self.profile.table_range.start_row}-{self.profile.table_range.end_row}"
@@ -179,6 +191,13 @@ class TimeSheetsImporter:
     @staticmethod
     def _build_profile_from_config(config: Config) -> TimeSheetImportProfile:
         return TimeSheetImportProfile.from_config(config.templates)
+
+    @classmethod
+    def _minutes_to_hours(cls, value: Optional[float]) -> Optional[float]:
+        """Konvertiert Minutenwerte in Dezimalstunden (20 -> 0.3333...)."""
+        if value is None:
+            return None
+        return value / cls._MINUTES_PER_HOUR
 
     def _record_error(
         self,
@@ -258,8 +277,8 @@ class TimeSheetsImporter:
         if not self._error_entries:
             return None
         stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        report_path = self.output_dir / f"timesheet_import_fehler_{stamp}.md"
-        report_xlsx_path = self.output_dir / f"timesheet_import_fehler_{stamp}.xlsx"
+        report_path = self.log_dir / f"timesheet_import_fehler_{stamp}.md"
+        report_xlsx_path = self.log_dir / f"timesheet_import_fehler_{stamp}.xlsx"
         lines: List[str] = [
             "# Fehlerprotokoll Timesheet-Import",
             "",
@@ -298,6 +317,9 @@ class TimeSheetsImporter:
     def discover_excel_files(self) -> List[Path]:
         files: List[Path] = []
         for path in sorted(p for p in self.source_dir.glob("*.xlsx") if p.is_file()):
+            if path.name.startswith("~"):
+                logger.info(f"Überspringe temporäre Datei im Import: {path.name}")
+                continue
             if self.masterdata_stem and path.stem.startswith(self.masterdata_stem):
                 logger.info(f"Überspringe Stammdatendatei im Import: {path.name}")
                 continue
@@ -310,6 +332,7 @@ class TimeSheetsImporter:
         CREATE TABLE IF NOT EXISTS service_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id TEXT NOT NULL,
+            tenant_id TEXT,
             employee_id TEXT,
             service_date TEXT NOT NULL,
             service_type TEXT NOT NULL,
@@ -324,29 +347,76 @@ class TimeSheetsImporter:
             FOREIGN KEY (employee_id) REFERENCES employees(emp_id)
         )
         """
+        dedup_signature_table_sql = """
+        CREATE TABLE IF NOT EXISTS service_data_import_dedup (
+            dedup_signature TEXT PRIMARY KEY,
+            service_data_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (service_data_id) REFERENCES service_data(id)
+        )
+        """
         deduplicate_sql = """
         DELETE FROM service_data
-        WHERE id NOT IN (
+        WHERE COALESCE(TRIM(employee_id), '') <> ''
+          AND id NOT IN (
             SELECT MAX(id)
             FROM service_data
+            WHERE COALESCE(TRIM(employee_id), '') <> ''
             GROUP BY client_id, service_date, employee_id
         )
         """
-        drop_legacy_unique_index_sql = """
+        dedup_signature_cleanup_sql = """
+        DELETE FROM service_data_import_dedup
+        WHERE service_data_id IN (
+            SELECT id
+            FROM service_data
+            WHERE COALESCE(TRIM(employee_id), '') <> ''
+              AND id NOT IN (
+                SELECT MAX(id)
+                FROM service_data
+                WHERE COALESCE(TRIM(employee_id), '') <> ''
+                GROUP BY client_id, service_date, employee_id
+            )
+        )
+        """
+        drop_legacy_client_date_index_sql = """
         DROP INDEX IF EXISTS idx_service_data_client_date
         """
-        unique_index_sql = """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_service_data_client_date_employee
-        ON service_data (client_id, service_date, employee_id)
+        drop_legacy_employee_unique_index_sql = """
+        DROP INDEX IF EXISTS idx_service_data_client_date_employee
+        """
+        client_date_index_sql = """
+        CREATE INDEX IF NOT EXISTS idx_service_data_client_date
+        ON service_data (client_id, service_date)
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute(sql)
+            conn.execute(dedup_signature_table_sql)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(service_data)").fetchall()}
+            if "tenant_id" not in columns:
+                conn.execute("ALTER TABLE service_data ADD COLUMN tenant_id TEXT")
+                logger.info("Tabelle service_data um Spalte tenant_id erweitert.")
+            # Vor der Dublettenbereinigung zuerst abhängige Dedup-Referenzen entfernen,
+            # sonst schlagen DELETEs auf service_data wegen FK fehl.
+            conn.execute(dedup_signature_cleanup_sql)
             # Bestehende Dubletten bereinigen, bevor der eindeutige Index gesetzt wird.
             conn.execute(deduplicate_sql)
-            conn.execute(drop_legacy_unique_index_sql)
-            conn.execute(unique_index_sql)
+            conn.execute(drop_legacy_client_date_index_sql)
+            conn.execute(drop_legacy_employee_unique_index_sql)
+            conn.execute(client_date_index_sql)
             conn.commit()
+
+    def _reset_service_data(self) -> None:
+        """
+        Leert service_data und die Dedup-Signaturen für einen sauberen Batch-Lauf.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute("DELETE FROM service_data_import_dedup")
+            conn.execute("DELETE FROM service_data")
+            conn.commit()
+        logger.warning("service_data wurde vor dem Import zurückgesetzt.")
 
     @staticmethod
     def _normalize_label(value: object) -> str:
@@ -356,6 +426,15 @@ class TimeSheetsImporter:
         row_idx = self.profile.table_range.start_row
         value = ws[f"{column}{row_idx}"].value
         return self._normalize_label(value)
+
+    def _detect_notes_column(self, ws: Worksheet) -> Optional[str]:
+        """Ermittelt die Notizspalte robust über den Header-Text."""
+        row_idx = self.profile.table_range.start_row
+        for column in ("H", "G", "F"):
+            value = self._normalize_label(ws[f"{column}{row_idx}"].value)
+            if value == "notizen":
+                return column
+        return None
 
     def _resolve_service_type(self, client_id: Optional[str]) -> Optional[str]:
         if not client_id:
@@ -382,8 +461,37 @@ class TimeSheetsImporter:
             return str(row[0]).strip()
         return None
 
+    def _resolve_tenant_id(self, client_id: Optional[str]) -> Optional[str]:
+        if not client_id:
+            return None
+        sql = "SELECT tenant_id FROM clients WHERE client_id = ?"
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(sql, (client_id,)).fetchone()
+        if row and row[0]:
+            return str(row[0]).strip()
+        return None
+
     def _determine_row_mapping(self, ws: Worksheet) -> Optional[tuple[RowMapping, bool]]:
         mp = self.profile.row_mapping
+        detected_notes_col = self._detect_notes_column(ws)
+        effective_notes_col = mp.notes_col
+        if detected_notes_col and detected_notes_col != mp.notes_col:
+            logger.info(
+                "Notizspalte automatisch erkannt: {} (statt konfiguriert {}).",
+                detected_notes_col,
+                mp.notes_col,
+            )
+            effective_notes_col = detected_notes_col
+            mp = RowMapping(
+                service_time_col=mp.service_time_col,
+                service_date_col=mp.service_date_col,
+                travel_time_col=mp.travel_time_col,
+                travel_distance_col=mp.travel_distance_col,
+                direct_time_col=mp.direct_time_col,
+                indirect_time_col=mp.indirect_time_col,
+                billable_hours_col=mp.billable_hours_col,
+                notes_col=effective_notes_col,
+            )
 
         def read_labels(expected: Dict[str, str]) -> Dict[str, str]:
             labels: Dict[str, str] = {}
@@ -409,8 +517,12 @@ class TimeSheetsImporter:
             "travel_time_col": "fahrtzeit",
             "direct_time_col": "direkter fallkontakt",
             "indirect_time_col": "indirekte fallbearbeitung",
-            "notes_col": "notizen",
         }
+        notes_label = self._get_header_label(ws, mp.notes_col) if mp.notes_col else ""
+        if mp.notes_col and (detected_notes_col or notes_label == "notizen"):
+            expected["notes_col"] = "notizen"
+        elif mp.notes_col:
+            logger.info("Notizspalte im Header nicht gefunden – Import läuft ohne Header-Prüfung für Notizen.")
         if mp.travel_distance_col:
             expected["travel_distance_col"] = "km"
         if mp.billable_hours_col:
@@ -453,6 +565,7 @@ class TimeSheetsImporter:
 
         service_type = self._resolve_service_type(client_id_str or None)
         resolved_employee_id = self._resolve_employee_id(client_id_str or None)
+        resolved_tenant_id = self._resolve_tenant_id(client_id_str or None)
         if not employee_id:
             employee_id = resolved_employee_id
         employee_id_str = str(employee_id).strip() if employee_id is not None else ""
@@ -465,6 +578,7 @@ class TimeSheetsImporter:
             "service_type": service_type,
             "short_code": ws[cells.short_code].value,  # type: ignore[union-attr]
             "client_id": client_id_str or None,
+            "tenant_id": resolved_tenant_id,
         }
 
     def _read_rows(
@@ -473,7 +587,8 @@ class TimeSheetsImporter:
         header: Dict[str, object],
         row_mapping: RowMapping,
         has_travel_distance: bool,
-        reporting_month: Optional[str],
+        reporting_month: str,
+        reporting_period: MonthPeriod,
         source_file: str,
     ) -> List[Dict[str, Any]]:
         rng = self.profile.table_range
@@ -494,11 +609,29 @@ class TimeSheetsImporter:
             v_notes = ws[f"{mp.notes_col}{row_idx}"].value if mp.notes_col else None
 
             service_date = to_date(v_date)
-            travel = to_float(v_travel) or 0.0
+            if service_date is None:
+                service_date = self._parse_partial_service_date(v_date, reporting_period.start.year)
+                if service_date is not None:
+                    logger.info(
+                        "Partielles Datum korrigiert in {} Zeile {}: '{}' -> {}",
+                        source_file,
+                        row_idx,
+                        v_date,
+                        service_date.isoformat(),
+                    )
+            if service_date is not None and not self._is_within_reporting_period(service_date, reporting_period):
+                logger.warning(
+                    "Leistungsdatum ausserhalb Leistungsmonat in {} Zeile {}: {} (Leistungsmonat: {}).",
+                    source_file,
+                    row_idx,
+                    service_date.isoformat(),
+                    reporting_month,
+                )
+            travel = self._minutes_to_hours(to_float(v_travel)) or 0.0
             distance = to_float(v_distance) or 0.0
-            direct = to_float(v_direct) or 0.0
-            indirect = to_float(v_indirect) or 0.0
-            billable = to_float(v_billable)
+            direct = self._minutes_to_hours(to_float(v_direct)) or 0.0
+            indirect = self._minutes_to_hours(to_float(v_indirect)) or 0.0
+            billable = self._minutes_to_hours(to_float(v_billable))
 
             if service_date is None and (travel + direct + indirect) == 0.0:
                 continue
@@ -521,6 +654,7 @@ class TimeSheetsImporter:
                 rows.append(
                     {
                         "client_id": validated.client_id,
+                        "tenant_id": str(header.get("tenant_id") or "").strip() or None,
                         "employee_id": employee_id_str or None,
                         "service_date": validated.service_date,
                         "service_type": validated.service_type,
@@ -531,7 +665,7 @@ class TimeSheetsImporter:
                         "billable_hours": validated.billable_hours,
                         "notes": str(v_notes).strip() if v_notes is not None else None,
                         "source_file": source_file,
-                        "reporting_month": reporting_month or "",
+                        "reporting_month": reporting_month,
                         "_source_row": row_idx,
                     }
                 )
@@ -555,21 +689,66 @@ class TimeSheetsImporter:
             data["service_date"] = data["service_date"].isoformat()
         return tuple(data.get(column) for column in self._INSERT_FIELDS)
 
+    def _parse_partial_service_date(self, raw_value: object, reporting_year: int) -> Optional[date]:
+        """
+        Interpretiert tt.mm. bzw. t.m. als Datum mit Jahr aus dem CLI-Leistungsmonat.
+        """
+        if not isinstance(raw_value, str):
+            return None
+        match = self._SHORT_DATE_PATTERN.match(raw_value)
+        if not match:
+            return None
+
+        day = int(match.group(1))
+        month = int(match.group(2))
+        try:
+            return date(reporting_year, month, day)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _is_within_reporting_period(service_date: date, reporting_period: MonthPeriod) -> bool:
+        start_date = reporting_period.start.date()
+        end_date = reporting_period.end.date()
+        return start_date <= service_date <= end_date
+
+    @classmethod
+    def _normalized_time_value(cls, value: object) -> float:
+        numeric_value = to_float(value) or 0.0
+        return round(numeric_value, cls._TIME_ROUND_DIGITS)
+
+    def _dedup_signature(self, record: Dict[str, Any]) -> str:
+        """
+        Bildet eine stabile Signatur gemäß fachlicher Doubletten-Regel:
+        employee_id + client_id + service_date + (fahrzeit, direkt, indirekt).
+        """
+        service_date_value = record.get("service_date")
+        if isinstance(service_date_value, date):
+            service_date_str = service_date_value.isoformat()
+        else:
+            service_date_str = str(service_date_value or "").strip()
+
+        payload = "|".join(
+            [
+                str(record.get("employee_id") or "").strip(),
+                str(record.get("client_id") or "").strip(),
+                service_date_str,
+                f"{self._normalized_time_value(record.get('travel_time')):.6f}",
+                f"{self._normalized_time_value(record.get('direct_time')):.6f}",
+                f"{self._normalized_time_value(record.get('indirect_time')):.6f}",
+            ]
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _is_missing_employee_id(value: object) -> bool:
+        return not str(value or "").strip()
+
     def _import_rows(self, rows: Iterable[Dict[str, Any]], source_file: str) -> tuple[int, List[Dict[str, Any]]]:
-        sql = f"""
+        insert_sql = f"""
         INSERT INTO service_data (
             {", ".join(self._INSERT_FIELDS)}
         ) VALUES ({", ".join(["?"] * len(self._INSERT_FIELDS))})
-        ON CONFLICT(client_id, service_date, employee_id) DO UPDATE SET
-            employee_id = excluded.employee_id,
-            service_type = excluded.service_type,
-            travel_time = excluded.travel_time,
-            travel_distance = excluded.travel_distance,
-            direct_time = excluded.direct_time,
-            indirect_time = excluded.indirect_time,
-            notes = excluded.notes,
-            source_file = excluded.source_file,
-            reporting_month = excluded.reporting_month
         """
         count = 0
         imported_rows: List[Dict[str, Any]] = []
@@ -578,7 +757,112 @@ class TimeSheetsImporter:
             cur = conn.cursor()
             for record in rows:
                 try:
-                    cur.execute(sql, self._row_params(record))
+                    dedup_signature = self._dedup_signature(record)
+                    existing_signature = cur.execute(
+                        "SELECT 1 FROM service_data_import_dedup WHERE dedup_signature = ? LIMIT 1",
+                        (dedup_signature,),
+                    ).fetchone()
+                    if existing_signature:
+                        logger.info(
+                            "Doublette übersprungen (client_id={}, employee_id={}, service_date={}, Datei={}, Zeile={}).",
+                            record.get("client_id"),
+                            record.get("employee_id"),
+                            record.get("service_date"),
+                            source_file,
+                            record.get("_source_row"),
+                        )
+                        continue
+
+                    service_date_value = record.get("service_date")
+                    if isinstance(service_date_value, date):
+                        service_date_value = service_date_value.isoformat()
+
+                    employee_id_str = str(record.get("employee_id") or "").strip()
+
+                    if self._is_missing_employee_id(record.get("employee_id")):
+                        existing_without_employee = cur.execute(
+                            """
+                            SELECT COUNT(*)
+                            FROM service_data
+                            WHERE client_id = ?
+                              AND service_date = ?
+                              AND COALESCE(TRIM(employee_id), '') = ''
+                            """,
+                            (record.get("client_id"), service_date_value),
+                        ).fetchone()
+                        existing_count = int(existing_without_employee[0]) if existing_without_employee else 0
+                        if existing_count > 0:
+                            logger.info(
+                                "Nachkontrolle: weiterer Import ohne employee_id für client_id={} am {} "
+                                "(vorhandene Einträge ohne employee_id: {}, Datei: {}, Zeile: {}).",
+                                record.get("client_id"),
+                                service_date_value,
+                                existing_count,
+                                source_file,
+                                record.get("_source_row"),
+                            )
+
+                    merge_target = cur.execute(
+                        """
+                        SELECT id
+                        FROM service_data
+                        WHERE client_id = ?
+                          AND service_date = ?
+                          AND COALESCE(TRIM(employee_id), '') <> ''
+                          AND TRIM(employee_id) <> ?
+                        ORDER BY id ASC
+                        LIMIT 1
+                        """,
+                        (record.get("client_id"), service_date_value, employee_id_str),
+                    ).fetchone()
+
+                    if merge_target:
+                        target_id = int(merge_target[0])
+                        cur.execute(
+                            """
+                            UPDATE service_data
+                            SET travel_time = COALESCE(travel_time, 0.0) + ?,
+                                direct_time = COALESCE(direct_time, 0.0) + ?,
+                                indirect_time = COALESCE(indirect_time, 0.0) + ?,
+                                source_file = ?,
+                                reporting_month = ?
+                            WHERE id = ?
+                            """,
+                            (
+                                self._normalized_time_value(record.get("travel_time")),
+                                self._normalized_time_value(record.get("direct_time")),
+                                self._normalized_time_value(record.get("indirect_time")),
+                                record.get("source_file"),
+                                record.get("reporting_month"),
+                                target_id,
+                            ),
+                        )
+                        cur.execute(
+                            """
+                            INSERT INTO service_data_import_dedup (dedup_signature, service_data_id)
+                            VALUES (?, ?)
+                            """,
+                            (dedup_signature, target_id),
+                        )
+                        logger.info(
+                            "Zeiten aufsummiert für client_id={} am {} (neue employee_id={} in bestehende Position übernommen).",
+                            record.get("client_id"),
+                            service_date_value,
+                            employee_id_str or "UNBEKANNT",
+                        )
+                    else:
+                        cur.execute(insert_sql, self._row_params(record))
+                        if cur.lastrowid is None:
+                            raise sqlite3.DatabaseError("INSERT in service_data lieferte keine lastrowid.")
+                        target_id = int(cur.lastrowid)
+                        cur.execute(
+                            """
+                            INSERT INTO service_data_import_dedup (dedup_signature, service_data_id)
+                            VALUES (?, ?)
+                            """,
+                            (dedup_signature, target_id),
+                        )
+
                     count += 1
                     imported_rows.append(record)
                 except sqlite3.IntegrityError as exc:
@@ -610,6 +894,34 @@ class TimeSheetsImporter:
         file_path.replace(target)
         return target
 
+    def _remove_sheet_protection(self, file_path: Path) -> None:
+        """
+        Entfernt den Blattschutz auf allen Tabellenblättern einer Excel-Datei.
+        Zusätzlich werden die relevanten Eingabebereiche explizit entsperrt.
+        """
+        try:
+            wb = load_workbook(file_path)
+            for ws in wb.worksheets:
+                ws.protection.sheet = False
+                for row in ws["C5:F8"]:
+                    for cell in row:
+                        base_protection = copy(cell.protection) if cell.protection is not None else Protection()
+                        base_protection.locked = False
+                        cell.protection = base_protection
+                for row in ws["A12:H29"]:
+                    for cell in row:
+                        base_protection = copy(cell.protection) if cell.protection is not None else Protection()
+                        base_protection.locked = False
+                        cell.protection = base_protection
+            wb.save(file_path)
+            logger.info("Blattschutz entfernt und Zellbereiche entsperrt: {}", file_path.name)
+        except Exception as exc:
+            self._record_error(
+                file_path.name,
+                "Datei",
+                f"Blattschutz konnte nicht entfernt werden: {exc}",
+            )
+
     def _export_rows_to_excel(self, export_rows: List[ImportedRowExport], reporting_month: str) -> Path:
         """
         Schreibt alle importierten Zeilen als Sammeldatei ins Output-Verzeichnis.
@@ -629,18 +941,37 @@ class TimeSheetsImporter:
                 for row in export_rows
             ]
         )
+        # Für die Exportliste Zeitspalten von Dezimalstunden in ganze Minuten umrechnen.
+        for time_column in ("travel_time", "direct_time", "indirect_time", "total_hours"):
+            if time_column in df.columns:
+                df[time_column] = (
+                    pd.to_numeric(df[time_column], errors="coerce").fillna(0.0).mul(60.0).round().astype(int)
+                )
+        if {"travel_time", "direct_time", "indirect_time"}.issubset(df.columns):
+            df["billable_minutes"] = (
+                pd.to_numeric(df["travel_time"], errors="coerce").fillna(0).astype(int)
+                + pd.to_numeric(df["direct_time"], errors="coerce").fillna(0).astype(int)
+                + pd.to_numeric(df["indirect_time"], errors="coerce").fillna(0).astype(int)
+            )
+        if "billable_hours" in df.columns:
+            df = df.drop(columns=["billable_hours"])
         with pd.ExcelWriter(out_file, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name="importierte_daten", index=False)
         logger.info(f"Export-Datei geschrieben: {out_file}")
         return out_file
 
-    def process_file(self, file_path: Path) -> tuple[int, Path, List[ImportedRowExport], Optional[str]]:
+    def process_file(
+        self,
+        file_path: Path,
+        reporting_month: str,
+        reporting_period: MonthPeriod,
+    ) -> tuple[int, Path, List[ImportedRowExport], str]:
         logger.info(f"Verarbeite: {file_path.name}")
         try:
             wb = load_workbook(file_path, data_only=True)
         except Exception as exc:
             self._record_error(file_path.name, "Datei", f"Datei konnte nicht gelesen werden: {exc}")
-            return 0, file_path, [], None
+            return 0, file_path, [], reporting_month
         if self.profile.sheet_name:
             if self.profile.sheet_name not in wb.sheetnames:
                 self._record_error(
@@ -648,25 +979,24 @@ class TimeSheetsImporter:
                     "Struktur",
                     f"Sheet '{self.profile.sheet_name}' fehlt in der Datei.",
                 )
-                return 0, file_path, [], None
+                return 0, file_path, [], reporting_month
             ws = wb[self.profile.sheet_name]
         else:
             ws = wb.active
             if ws is None:
                 self._record_error(file_path.name, "Struktur", "Kein aktives Sheet gefunden.")
-                return 0, file_path, [], None
+                return 0, file_path, [], reporting_month
 
         header = self._read_header(ws)
-        month_str = to_year_month_str(header.get("reporting_month"))
         mapping = self._determine_row_mapping(ws)
         if mapping is None:
             self._record_error(file_path.name, "Struktur", "Header-Struktur ungültig.")
-            return 0, file_path, [], month_str
+            return 0, file_path, [], reporting_month
         row_mapping, has_travel_distance = mapping
 
         if not self._validate_header_foreign_keys(header, file_path.name):
             logger.warning("Datei {} wegen Header-/FK-Fehlern übersprungen.", file_path.name)
-            return 0, file_path, [], month_str
+            return 0, file_path, [], reporting_month
 
         if not header.get("employee_id"):
             logger.warning("employee_id fehlt im Header – Import erfolgt ohne employee_id ({})", file_path.name)
@@ -676,47 +1006,63 @@ class TimeSheetsImporter:
             header.get("client_id"),
             header.get("employee_id"),
             header.get("service_type"),
-            month_str or header.get("reporting_month"),
+            reporting_month,
         )
 
-        rows = self._read_rows(ws, header, row_mapping, has_travel_distance, month_str, file_path.name)
+        rows = self._read_rows(
+            ws,
+            header,
+            row_mapping,
+            has_travel_distance,
+            reporting_month,
+            reporting_period,
+            file_path.name,
+        )
         if not rows:
             logger.warning("Keine importierbaren Zeilen in {} gefunden – Datei bleibt im Import.", file_path.name)
-            return 0, file_path, [], month_str
+            return 0, file_path, [], reporting_month
 
         imported_count, imported_rows = self._import_rows(rows, file_path.name)
         if imported_count == 0:
             logger.warning("Keine gültigen Zeilen aus {} gespeichert – Datei bleibt im Import.", file_path.name)
-            return 0, file_path, [], month_str
+            return 0, file_path, [], reporting_month
         moved = self._move_to_done(file_path)
+        self._remove_sheet_protection(moved)
 
         export_rows = [
             ImportedRowExport(**{k: v for k, v in row.items() if k != "_source_row"}) for row in imported_rows
         ]
 
         logger.info(f"{imported_count} Zeilen importiert aus {file_path.name}. Verschoben nach {moved.name}")
-        return imported_count, moved, export_rows, month_str
+        return imported_count, moved, export_rows, reporting_month
 
-    def run(self, reporting_month: Optional[str] = None) -> int:
+    def run(self, reporting_month: str, reset: bool = True) -> int:
         """
         Führt den Batch-Import aus und schreibt eine Sammel-Excel-Datei ins Output-Verzeichnis:
         output/importierte_daten_{reporting_month}.xlsx
 
-        - Wenn reporting_month None ist, wird er aus der ersten verarbeiteten Datei (Header) abgeleitet.
+        - reporting_month ist verbindlich und wird für Datumsinterpretation/Prüfung genutzt.
+        - Wenn reset=True, wird service_data vor dem Lauf geleert.
         - Gibt die Gesamtanzahl importierter Zeilen zurück.
         """
+        reporting_period = get_month_period(reporting_month)
+        normalized_reporting_month = reporting_period.start.strftime("%Y-%m")
+        if reset:
+            self._reset_service_data()
+
         files = self.discover_excel_files()
         total = 0
         all_export_rows: List[ImportedRowExport] = []
-        derived_month: Optional[str] = reporting_month
 
         for file_path in files:
             try:
-                count, _, export_rows, month_str = self.process_file(file_path)
+                count, _, export_rows, _ = self.process_file(
+                    file_path=file_path,
+                    reporting_month=normalized_reporting_month,
+                    reporting_period=reporting_period,
+                )
                 total += count
                 all_export_rows.extend(export_rows)
-                if derived_month is None and month_str:
-                    derived_month = month_str
             except ValueError as err:
                 self._record_error(file_path.name, "Struktur", str(err))
             except Exception as exc:
@@ -725,13 +1071,7 @@ class TimeSheetsImporter:
         logger.info(f"Batch abgeschlossen. Gesamt importiert: {total}")
 
         if all_export_rows:
-            if not derived_month:
-                derived_month = datetime.now().strftime("%Y-%m")
-                logger.warning(
-                    "reporting_month nicht bestimmbar – verwende {} für den Export-Dateinamen.",
-                    derived_month,
-                )
-            self._export_rows_to_excel(all_export_rows, derived_month)
+            self._export_rows_to_excel(all_export_rows, normalized_reporting_month)
         self._write_error_report()
 
         return total
@@ -748,7 +1088,7 @@ def main() -> None:
     config = Config(config_path)  # Singleton, lädt und validiert, setzt Logging
 
     importer = TimeSheetsImporter(config)
-    importer.run()  # optional: importer.run("2025-10")
+    importer.run("2025-10")  # optional: importer.run("2025-10", reset=False)
 
 
 if __name__ == "__main__":
