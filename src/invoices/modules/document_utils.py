@@ -4,7 +4,8 @@ from typing import List, Optional
 
 import pandas as pd
 from loguru import logger
-from openpyxl.styles import Font
+from openpyxl.formatting.rule import FormulaRule
+from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from PyPDF2 import PdfMerger
@@ -150,15 +151,14 @@ class DocumentUtils:
                     ),
                     "Büro": data.get("tenant_city", ""),
                     "Abrechnungsmonat": data.get("invoice_month", "unbekannt"),
-                    "Soll F": soll_f,
+                    "Max F": soll_f,
                     "Ist F": ist_f,
-                    "Soll D": soll_d,
+                    "Max D": soll_d,
                     "Ist D": ist_d,
-                    "Soll I": soll_i,
+                    "Max I": soll_i,
                     "Ist I": ist_i,
-                    "Max Total (Soll)": soll_f + soll_d + soll_i,
-                    "Max Total (Ist)": int(data.get("summe_stunden") or 0),
-                    "Leistungszeit (Min)": int(data.get("summe_stunden") or 0),
+                    "Max Total": soll_f + soll_d + soll_i,
+                    "Summe Ist": int(data.get("summe_stunden") or 0),
                     "Rechnungsbetrag": data.get("summe_kosten", -999),
                 }
             )
@@ -207,15 +207,14 @@ class DocumentUtils:
 
                 # Integer-Minuten-Spalten formatieren und summieren
                 int_min_cols = [
-                    "Soll F",
+                    "Max F",
                     "Ist F",
-                    "Soll D",
+                    "Max D",
                     "Ist D",
-                    "Soll I",
+                    "Max I",
                     "Ist I",
-                    "Max Total (Soll)",
-                    "Max Total (Ist)",
-                    "Leistungszeit (Min)",
+                    "Max Total",
+                    "Summe Ist",
                 ]
                 for col_name in int_min_cols:
                     if col_name in summary_df.columns:
@@ -227,6 +226,23 @@ class DocumentUtils:
                             f"=SUM({col_letter}2:{col_letter}{total_row_idx - 1})"
                         )
                         worksheet[f"{col_letter}{total_row_idx}"].number_format = "0"
+
+                # Bedingte Formatierung: hellrot wenn Ist > Max
+                red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+                data_row_count = len(summary_df)
+                if data_row_count > 0:
+                    for max_col, ist_col in [
+                        ("Max F", "Ist F"),
+                        ("Max D", "Ist D"),
+                        ("Max I", "Ist I"),
+                        ("Max Total", "Summe Ist"),
+                    ]:
+                        if max_col in summary_df.columns and ist_col in summary_df.columns:
+                            max_letter = get_column_letter(int(summary_df.columns.get_loc(max_col)) + 1)  # type: ignore[arg-type]
+                            ist_letter = get_column_letter(int(summary_df.columns.get_loc(ist_col)) + 1)  # type: ignore[arg-type]
+                            cell_range = f"{max_letter}2:{ist_letter}{data_row_count + 1}"
+                            rule = FormulaRule(formula=[f"${ist_letter}2>${max_letter}2"], fill=red_fill)
+                            worksheet.conditional_formatting.add(cell_range, rule)
 
                 # Datumsspalte formatieren
                 if "Rechnungsdatum" in summary_df.columns:

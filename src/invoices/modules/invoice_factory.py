@@ -73,13 +73,27 @@ class InvoiceFactory:
         width, height = 1800, 900
         img = Image.new("RGB", (width, height), "white")
         draw = ImageDraw.Draw(img)
-        try:
-            font = ImageFont.truetype(str(Path(font_dir) / "calibri.ttf"), 36)
-            font_bold = ImageFont.truetype(str(Path(font_dir) / "calibrib.ttf"), 48)
-            font_small = ImageFont.truetype(str(Path(font_dir) / "calibri.ttf"), 28)
-            font_small_bold = ImageFont.truetype(str(Path(font_dir) / "calibrib.ttf"), 28)
-        except Exception:
-            font = font_bold = font_small = font_small_bold = ImageFont.load_default()  # noqa: F841
+        _FONT_CANDIDATES = [
+            (str(Path(font_dir) / "calibri.ttf"), str(Path(font_dir) / "calibrib.ttf")),
+            ("/mnt/c/Windows/Fonts/calibri.ttf", "/mnt/c/Windows/Fonts/calibrib.ttf"),
+            (
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            ),
+            (
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            ),
+        ]
+        font = font_bold = font_small_bold = ImageFont.load_default()
+        for _regular, _bold in _FONT_CANDIDATES:
+            try:
+                font = ImageFont.truetype(_regular, 36)
+                font_bold = ImageFont.truetype(_bold, 48)
+                font_small_bold = ImageFont.truetype(_bold, 28)
+                break
+            except Exception:
+                continue
 
         # Service Provider aus typisiertem Entity-Objekt
         service_provider: LegalPerson = self.provider

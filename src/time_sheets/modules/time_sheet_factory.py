@@ -84,9 +84,9 @@ class TimeSheetFactory:
             "employee_id",
             "service_type",
             "short_code",
-            "travel_time",
-            "direct_efforts",
-            "indirect_efforts",
+            "allowed_travel_time",
+            "allowed_direct_effort",
+            "allowed_indirect_effort",
         }
 
         if not required_fields.issubset(entity_fields):
@@ -133,7 +133,7 @@ class TimeSheetFactory:
         SELECT
             c.client_id,
             c.short_code,
-            (COALESCE(c.travel_time, 0) + COALESCE(c.direct_efforts, 0) + COALESCE(c.indirect_efforts, 0))
+            (COALESCE(c.allowed_travel_time, 0) + COALESCE(c.allowed_direct_effort, 0) + COALESCE(c.allowed_indirect_effort, 0))
                 AS allowed_hours_per_month,
             c.employee_id,
             c.first_name AS client_first_name,

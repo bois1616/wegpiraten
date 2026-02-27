@@ -931,12 +931,10 @@ class TimeSheetsImporter:
                 for row in export_rows
             ]
         )
-        # Für die Exportliste Zeitspalten von Dezimalstunden in ganze Minuten umrechnen.
+        # Zeitspalten sind bereits in ganzen Minuten gespeichert – nur in int konvertieren.
         for time_column in ("travel_time", "direct_time", "indirect_time", "total_hours"):
             if time_column in df.columns:
-                df[time_column] = (
-                    pd.to_numeric(df[time_column], errors="coerce").fillna(0.0).mul(60.0).round().astype(int)
-                )
+                df[time_column] = pd.to_numeric(df[time_column], errors="coerce").fillna(0).round().astype(int)
         if {"travel_time", "direct_time", "indirect_time"}.issubset(df.columns):
             df["billable_minutes"] = (
                 pd.to_numeric(df["travel_time"], errors="coerce").fillna(0).astype(int)
