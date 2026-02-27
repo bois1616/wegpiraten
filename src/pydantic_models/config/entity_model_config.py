@@ -19,6 +19,7 @@ class FieldConfig(BaseModel):
     sum: Optional[bool] = False
     decimals: Optional[int] = None
     is_position: Optional[bool] = None
+    multiply_by: Optional[float] = None
 
 
 class EntityModelConfig(BaseModel):

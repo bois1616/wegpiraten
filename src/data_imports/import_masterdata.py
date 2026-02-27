@@ -70,6 +70,8 @@ def map_row(row: pd.Series, mapping: Dict[str, FieldConfig], required_fields: li
                     value = int(value)
                 else:
                     value = field_type(value)
+                if entry.multiply_by is not None and value is not None:
+                    value = int(round(float(value) * entry.multiply_by))
             except Exception:
                 logger.warning(f"Typkonvertierung für Feld '{field_name}' fehlgeschlagen, Wert: {value}")
         result[field_name] = value

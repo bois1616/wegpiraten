@@ -19,13 +19,13 @@ class InvoiceRowModel(BaseModel):
     service_date: date
     service_type: str
 
-    travel_time: float = 0.0
-    direct_time: float = 0.0
-    indirect_time: float = 0.0
-    billable_hours: Optional[float] = None
+    travel_time: int = 0
+    direct_time: int = 0
+    indirect_time: int = 0
+    billable_hours: Optional[int] = None
 
     hourly_rate: Optional[float] = None
-    total_hours: Optional[float] = None
+    total_hours: Optional[int] = None
     total_costs: Optional[float] = None
 
     @model_validator(mode="after")
@@ -46,6 +46,6 @@ class InvoiceRowModel(BaseModel):
 
         # total_costs
         if self.total_costs is None and self.hourly_rate is not None:
-            self.total_costs = (self.billable_hours or 0.0) * self.hourly_rate
+            self.total_costs = ((self.billable_hours or 0) / 60.0) * self.hourly_rate
 
         return self

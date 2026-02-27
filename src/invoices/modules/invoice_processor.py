@@ -62,9 +62,9 @@ class InvoiceProcessor:
         return step
 
     @classmethod
-    def _round_minutes(cls, hours_value: Optional[float], rounding: Optional[float]) -> int:
-        # Stabilisierung gegen Float-Artefakte aus gespeicherten Dezimalstunden.
-        minutes_raw = round((to_float(hours_value) or 0.0) * 60.0, 6)
+    def _round_minutes(cls, minutes_value: Optional[float], rounding: Optional[float]) -> int:
+        # Werte sind bereits als Integer-Minuten gespeichert.
+        minutes_raw = round(to_float(minutes_value) or 0.0, 6)
         step = cls._normalize_rounding(rounding)
         if step <= 0:
             return int(round(minutes_raw))
@@ -144,6 +144,9 @@ class InvoiceProcessor:
             c.last_name AS client_last_name,
             c.social_security_number AS client_social_security_number,
             {tenant_select_sql}
+            COALESCE(c.allowed_travel_time, 0) AS allowed_travel_time,
+            COALESCE(c.allowed_direct_effort, 0) AS allowed_direct_effort,
+            COALESCE(c.allowed_indirect_effort, 0) AS allowed_indirect_effort,
             c.payer_id AS payer_id,
             c.service_requester_id AS service_requester_id,
             c.service_type AS service_type_id,
@@ -399,6 +402,9 @@ class InvoiceProcessor:
                         "client_name": client_name or safe_str(client_obj.name),
                         "service_type_description": service_type_description,
                         "client": client_obj,
+                        "allowed_travel_time": int(client_row.get("allowed_travel_time") or 0),
+                        "allowed_direct_effort": int(client_row.get("allowed_direct_effort") or 0),
+                        "allowed_indirect_effort": int(client_row.get("allowed_indirect_effort") or 0),
                         "positions": positions,
                         **totals,
                     }

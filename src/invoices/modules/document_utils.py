@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import pandas as pd
 from loguru import logger
@@ -127,33 +127,38 @@ class DocumentUtils:
         kosten_format: str = config.formatting.currency_format or "#,##0.00 ¤"
         datum_format: str = config.formatting.date_format or "dd.MM.yyyy"
 
-        def to_minutes(value: Any) -> int:
-            """
-            Normalisiert Zeitwerte für die Übersicht auf Minuten als Ganzzahl.
-            Falls Dezimalstunden vorliegen (z.B. 0.5), werden diese in Minuten umgerechnet.
-            """
-            try:
-                numeric = float(value) if value is not None else 0.0
-            except (TypeError, ValueError):
-                return 0
-            if not numeric.is_integer():
-                return int(round(numeric * 60))
-            return int(round(numeric))
-
         # Nur die gewünschten Felder extrahieren
         summary_rows = []
         for invoice in invoice_list:
             data = invoice.as_dict()
             payer = data.get("payer")
             client = data.get("client")
+            soll_f = int(data.get("allowed_travel_time") or 0)
+            soll_d = int(data.get("allowed_direct_effort") or 0)
+            soll_i = int(data.get("allowed_indirect_effort") or 0)
+            ist_f = int(data.get("summe_fahrtzeit") or 0)
+            ist_d = int(data.get("summe_direkt") or 0)
+            ist_i = int(data.get("summe_indirekt") or 0)
             summary_rows.append(
                 {
                     "Rechnungsdatum": data.get("invoice_date"),
-                    "ZD-Nr": getattr(payer, "key", "n.a") if payer else "n.a",
-                    "Klienten-Nr": getattr(client, "key", "n.a") if client else "n.a",
-                    "Tenant-ID": data.get("tenant_id", ""),
+                    "Zahlungsträger": getattr(payer, "name", "n.a") if payer else "n.a",
+                    "Klient": (
+                        ", ".join(p for p in [getattr(client, "last_name", ""), getattr(client, "first_name", "")] if p)
+                        if client
+                        else "n.a"
+                    ),
+                    "Büro": data.get("tenant_city", ""),
                     "Abrechnungsmonat": data.get("invoice_month", "unbekannt"),
-                    "Leistungszeit (Min)": to_minutes(data.get("summe_stunden")),
+                    "Soll F": soll_f,
+                    "Ist F": ist_f,
+                    "Soll D": soll_d,
+                    "Ist D": ist_d,
+                    "Soll I": soll_i,
+                    "Ist I": ist_i,
+                    "Max Total (Soll)": soll_f + soll_d + soll_i,
+                    "Max Total (Ist)": int(data.get("summe_stunden") or 0),
+                    "Leistungszeit (Min)": int(data.get("summe_stunden") or 0),
                     "Rechnungsbetrag": data.get("summe_kosten", -999),
                 }
             )
@@ -183,38 +188,50 @@ class DocumentUtils:
                     showColumnStripes=False,
                 )
                 worksheet.add_table(tab)
-                # Formatierung und Summen für die Rechnungsbetrag-Spalte
+                total_row_idx = len(summary_df) + 2
+                worksheet[f"A{total_row_idx}"] = "Gesamt"
+                bold_font = Font(bold=True)
+                for col in range(1, end_col_idx + 1):
+                    worksheet.cell(row=total_row_idx, column=col).font = bold_font
+
+                # Währungsspalte formatieren und summieren
                 if "Rechnungsbetrag" in summary_df.columns:
                     loc = summary_df.columns.get_loc("Rechnungsbetrag")
-                    kosten_col_idx = int(loc) + 1  # type: ignore[arg-type]
-                    kosten_col_letter = get_column_letter(kosten_col_idx)
-                    # Format aus der Config holen
+                    kosten_col_letter = get_column_letter(int(loc) + 1)  # type: ignore[arg-type]
                     for row in range(2, len(summary_df) + 2):
                         worksheet[f"{kosten_col_letter}{row}"].number_format = kosten_format
-                    total_row_idx = len(summary_df) + 2
-                    worksheet[f"A{total_row_idx}"] = "Gesamt"
                     worksheet[f"{kosten_col_letter}{total_row_idx}"] = (
                         f"=SUM({kosten_col_letter}2:{kosten_col_letter}{total_row_idx - 1})"
                     )
                     worksheet[f"{kosten_col_letter}{total_row_idx}"].number_format = kosten_format
-                    bold_font = Font(bold=True)
-                    for col in range(1, end_col_idx + 1):
-                        worksheet.cell(row=total_row_idx, column=col).font = bold_font
-                if "Leistungszeit (Min)" in summary_df.columns:
-                    loc = summary_df.columns.get_loc("Leistungszeit (Min)")
-                    min_col_idx = int(loc) + 1  # type: ignore[arg-type]
-                    min_col_letter = get_column_letter(min_col_idx)
-                    for row in range(2, len(summary_df) + 2):
-                        worksheet[f"{min_col_letter}{row}"].number_format = "0"
-                    total_row_idx = len(summary_df) + 2
-                    worksheet[f"{min_col_letter}{total_row_idx}"] = (
-                        f"=SUM({min_col_letter}2:{min_col_letter}{total_row_idx - 1})"
-                    )
-                    worksheet[f"{min_col_letter}{total_row_idx}"].number_format = "0"
+
+                # Integer-Minuten-Spalten formatieren und summieren
+                int_min_cols = [
+                    "Soll F",
+                    "Ist F",
+                    "Soll D",
+                    "Ist D",
+                    "Soll I",
+                    "Ist I",
+                    "Max Total (Soll)",
+                    "Max Total (Ist)",
+                    "Leistungszeit (Min)",
+                ]
+                for col_name in int_min_cols:
+                    if col_name in summary_df.columns:
+                        loc = summary_df.columns.get_loc(col_name)
+                        col_letter = get_column_letter(int(loc) + 1)  # type: ignore[arg-type]
+                        for row in range(2, len(summary_df) + 2):
+                            worksheet[f"{col_letter}{row}"].number_format = "0"
+                        worksheet[f"{col_letter}{total_row_idx}"] = (
+                            f"=SUM({col_letter}2:{col_letter}{total_row_idx - 1})"
+                        )
+                        worksheet[f"{col_letter}{total_row_idx}"].number_format = "0"
+
+                # Datumsspalte formatieren
                 if "Rechnungsdatum" in summary_df.columns:
                     loc = summary_df.columns.get_loc("Rechnungsdatum")
-                    datum_col_idx = int(loc) + 1  # type: ignore[arg-type]
-                    datum_col_letter = get_column_letter(datum_col_idx)
+                    datum_col_letter = get_column_letter(int(loc) + 1)  # type: ignore[arg-type]
                     for row in range(2, len(summary_df) + 2):
                         worksheet[f"{datum_col_letter}{row}"].number_format = datum_format
         except Exception as e:

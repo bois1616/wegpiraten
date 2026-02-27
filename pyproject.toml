@@ -43,6 +43,9 @@ dev = [
 [project.scripts]
 wegpiraten = "cli:main"
 
+[tool.uv]
+package = true
+
 [tool.ruff]
 line-length = 120
 target-version = "py313"

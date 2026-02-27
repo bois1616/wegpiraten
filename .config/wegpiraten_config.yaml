@@ -150,21 +150,21 @@ entities:
       - name: employee_id # foreign key
         type: str
         excel_column: employee_id
-      - name: travel_time
-        type: float
+      - name: allowed_travel_time
+        type: int
         optional: true
-        excel_column: travel_time
-        format: ${numeric_format}
-      - name: direct_efforts
-        type: float
+        excel_column: allowed_travel_time
+        multiply_by: 60
+      - name: allowed_direct_effort
+        type: int
         optional: true
-        excel_column: direct_efforts
-        format: ${numeric_format}
-      - name: indirect_efforts
-        type: float
+        excel_column: allowed_direct_effort
+        multiply_by: 60
+      - name: allowed_indirect_effort
+        type: int
         optional: true
-        excel_column: indirect_efforts
-        format: ${numeric_format}
+        excel_column: allowed_indirect_effort
+        multiply_by: 60
       - name: service_type
         type: str
         excel_column: service_type_id

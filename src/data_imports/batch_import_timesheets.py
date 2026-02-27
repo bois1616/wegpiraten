@@ -136,8 +136,6 @@ class TimeSheetsImporter:
         "indirect_time_col": "stunden",
         "billable_hours_col": "notizen",
     }
-    _MINUTES_PER_HOUR: float = 60.0
-    _TIME_ROUND_DIGITS: int = 6
     _SHORT_DATE_PATTERN = re.compile(r"^\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]?\s*$")
 
     def __init__(self, config: Config, profile: Optional[TimeSheetImportProfile] = None):
@@ -191,13 +189,6 @@ class TimeSheetsImporter:
     @staticmethod
     def _build_profile_from_config(config: Config) -> TimeSheetImportProfile:
         return TimeSheetImportProfile.from_config(config.templates)
-
-    @classmethod
-    def _minutes_to_hours(cls, value: Optional[float]) -> Optional[float]:
-        """Konvertiert Minutenwerte in Dezimalstunden (20 -> 0.3333...)."""
-        if value is None:
-            return None
-        return value / cls._MINUTES_PER_HOUR
 
     def _record_error(
         self,
@@ -336,10 +327,10 @@ class TimeSheetsImporter:
             employee_id TEXT,
             service_date TEXT NOT NULL,
             service_type TEXT NOT NULL,
-            travel_time REAL,
+            travel_time INTEGER,
             travel_distance REAL,
-            direct_time REAL,
-            indirect_time REAL,
+            direct_time INTEGER,
+            indirect_time INTEGER,
             notes TEXT,
             source_file TEXT,
             reporting_month TEXT,
@@ -627,11 +618,11 @@ class TimeSheetsImporter:
                     service_date.isoformat(),
                     reporting_month,
                 )
-            travel = self._minutes_to_hours(to_float(v_travel)) or 0.0
+            travel = int(round(to_float(v_travel) or 0.0))
             distance = to_float(v_distance) or 0.0
-            direct = self._minutes_to_hours(to_float(v_direct)) or 0.0
-            indirect = self._minutes_to_hours(to_float(v_indirect)) or 0.0
-            billable = self._minutes_to_hours(to_float(v_billable))
+            direct = int(round(to_float(v_direct) or 0.0))
+            indirect = int(round(to_float(v_indirect) or 0.0))
+            billable = int(round(to_float(v_billable) or 0.0)) if v_billable is not None else None
 
             if service_date is None and (travel + direct + indirect) == 0.0:
                 continue
@@ -712,10 +703,9 @@ class TimeSheetsImporter:
         end_date = reporting_period.end.date()
         return start_date <= service_date <= end_date
 
-    @classmethod
-    def _normalized_time_value(cls, value: object) -> float:
-        numeric_value = to_float(value) or 0.0
-        return round(numeric_value, cls._TIME_ROUND_DIGITS)
+    @staticmethod
+    def _normalized_time_value(value: object) -> int:
+        return int(round(to_float(value) or 0.0))
 
     def _dedup_signature(self, record: Dict[str, Any]) -> str:
         """
@@ -733,9 +723,9 @@ class TimeSheetsImporter:
                 str(record.get("employee_id") or "").strip(),
                 str(record.get("client_id") or "").strip(),
                 service_date_str,
-                f"{self._normalized_time_value(record.get('travel_time')):.6f}",
-                f"{self._normalized_time_value(record.get('direct_time')):.6f}",
-                f"{self._normalized_time_value(record.get('indirect_time')):.6f}",
+                str(self._normalized_time_value(record.get("travel_time"))),
+                str(self._normalized_time_value(record.get("direct_time"))),
+                str(self._normalized_time_value(record.get("indirect_time"))),
             ]
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -821,9 +811,9 @@ class TimeSheetsImporter:
                         cur.execute(
                             """
                             UPDATE service_data
-                            SET travel_time = COALESCE(travel_time, 0.0) + ?,
-                                direct_time = COALESCE(direct_time, 0.0) + ?,
-                                indirect_time = COALESCE(indirect_time, 0.0) + ?,
+                            SET travel_time = COALESCE(travel_time, 0) + ?,
+                                direct_time = COALESCE(direct_time, 0) + ?,
+                                indirect_time = COALESCE(indirect_time, 0) + ?,
                                 source_file = ?,
                                 reporting_month = ?
                             WHERE id = ?
