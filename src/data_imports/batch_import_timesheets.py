@@ -58,6 +58,7 @@ from shared_modules.utils import (
     ensure_dir,
     to_date,
     to_float,
+    to_year_month_str,
 )
 
 
@@ -207,6 +208,24 @@ class TimeSheetsImporter:
         self._error_entries.append(entry)
         row_suffix = f" (Zeile {row_number})" if row_number is not None else ""
         logger.error("{}{}: {}", source_file, row_suffix, message)
+
+    def _record_warning(
+        self,
+        source_file: str,
+        category: str,
+        message: str,
+        row_number: Optional[int] = None,
+    ) -> None:
+        entry = ImportErrorEntry(
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            source_file=source_file,
+            category=f"Warnung/{category}",
+            message=message,
+            row_number=row_number,
+        )
+        self._error_entries.append(entry)
+        row_suffix = f" (Zeile {row_number})" if row_number is not None else ""
+        logger.warning("{}{}: {}", source_file, row_suffix, message)
 
     def _fetch_reference_values(self, table: str, column: str) -> set[str]:
         sql = f"SELECT {column} FROM {table} WHERE {column} IS NOT NULL"
@@ -581,11 +600,13 @@ class TimeSheetsImporter:
         reporting_month: str,
         reporting_period: MonthPeriod,
         source_file: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], bool]:
+        """Liest alle Datenzeilen. Gibt (rows, has_fatal_date_error) zurück."""
         rng = self.profile.table_range
         mp = row_mapping
 
         rows: List[Dict[str, Any]] = []
+        has_fatal_date_error = False
         for row_idx in range(rng.start_row, rng.end_row + 1):
             v_date = ws[f"{mp.service_date_col}{row_idx}"].value
             v_travel = ws[f"{mp.travel_time_col}{row_idx}"].value
@@ -610,29 +631,40 @@ class TimeSheetsImporter:
                         v_date,
                         service_date.isoformat(),
                     )
-            if service_date is not None and not self._is_within_reporting_period(service_date, reporting_period):
-                logger.warning(
-                    "Leistungsdatum ausserhalb Leistungsmonat in {} Zeile {}: {} (Leistungsmonat: {}).",
-                    source_file,
-                    row_idx,
-                    service_date.isoformat(),
-                    reporting_month,
-                )
             travel = int(round(to_float(v_travel) or 0.0))
             distance = to_float(v_distance) or 0.0
             direct = int(round(to_float(v_direct) or 0.0))
             indirect = int(round(to_float(v_indirect) or 0.0))
             billable = int(round(to_float(v_billable) or 0.0)) if v_billable is not None else None
 
-            if service_date is None and (travel + direct + indirect) == 0.0:
+            if service_date is None:
+                if (travel + direct + indirect) == 0:
+                    continue
+                # Zeiten vorhanden, aber Datum nicht identifizierbar → fataler Fehler
+                self._record_error(
+                    source_file,
+                    "Datenfehler",
+                    f"Datum nicht identifizierbar bei vorhandenen Zeiten "
+                    f"(F={travel}min, D={direct}min, I={indirect}min) – Timesheet wird nicht importiert.",
+                    row_number=row_idx,
+                )
+                has_fatal_date_error = True
                 continue
+
+            if not self._is_within_reporting_period(service_date, reporting_period):
+                self._record_warning(
+                    source_file,
+                    "Leistungsdatum",
+                    f"Leistungsdatum ausserhalb Abrechnungsmonat: {service_date.isoformat()} (CLI-Monat: {reporting_month})",
+                    row_number=row_idx,
+                )
 
             employee_id = header.get("employee_id")
             employee_id_str = str(employee_id).strip() if employee_id is not None else ""
             payload = {
                 "client_id": str(header.get("client_id") or "").strip(),
                 "employee_id": employee_id_str or "UNBEKANNT",
-                "service_date": service_date or date.today(),
+                "service_date": service_date,
                 "service_type": str(header.get("service_type") or "").strip(),
                 "travel_time": travel,
                 "direct_time": direct,
@@ -672,7 +704,7 @@ class TimeSheetsImporter:
                     row_number=row_idx,
                 )
 
-        return rows
+        return rows, has_fatal_date_error
 
     def _row_params(self, record: Dict[str, Any]) -> tuple[Any, ...]:
         data = record.copy()
@@ -875,12 +907,9 @@ class TimeSheetsImporter:
     def _move_to_done(self, file_path: Path) -> Path:
         """
         Verschiebt die verarbeitete Datei in das Verzeichnis 'done'.
-        Bei Namenskollision wird ein Zeitstempel angehängt.
+        Bei Namenskollision wird die bestehende Datei überschrieben.
         """
         target = self.done_dir / file_path.name
-        if target.exists():
-            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            target = self.done_dir / f"{file_path.stem}_{stamp}{file_path.suffix}"
         file_path.replace(target)
         return target
 
@@ -976,6 +1005,17 @@ class TimeSheetsImporter:
                 return 0, file_path, [], reporting_month
 
         header = self._read_header(ws)
+
+        # C6-Abrechnungsmonat gegen CLI-Monat prüfen
+        sheet_month_str = to_year_month_str(header.get("reporting_month"))
+        if sheet_month_str and sheet_month_str != reporting_month:
+            self._record_warning(
+                file_path.name,
+                "Abrechnungsmonat",
+                f"Abrechnungsmonat im Timesheet (C6: {header.get('reporting_month')!r} → {sheet_month_str}) "
+                f"weicht vom CLI-Monat ({reporting_month}) ab. Leistungsdaten werden gegen CLI-Monat geprüft.",
+            )
+
         mapping = self._determine_row_mapping(ws)
         if mapping is None:
             self._record_error(file_path.name, "Struktur", "Header-Struktur ungültig.")
@@ -997,7 +1037,7 @@ class TimeSheetsImporter:
             reporting_month,
         )
 
-        rows = self._read_rows(
+        rows, has_fatal_date_error = self._read_rows(
             ws,
             header,
             row_mapping,
@@ -1006,6 +1046,12 @@ class TimeSheetsImporter:
             reporting_period,
             file_path.name,
         )
+        if has_fatal_date_error:
+            logger.error(
+                "Datei {} enthält nicht identifizierbare Datumsangaben – wird nicht importiert und bleibt im Import.",
+                file_path.name,
+            )
+            return 0, file_path, [], reporting_month
         if not rows:
             logger.warning("Keine importierbaren Zeilen in {} gefunden – Datei bleibt im Import.", file_path.name)
             return 0, file_path, [], reporting_month
@@ -1014,6 +1060,18 @@ class TimeSheetsImporter:
         if imported_count == 0:
             logger.warning("Keine gültigen Zeilen aus {} gespeichert – Datei bleibt im Import.", file_path.name)
             return 0, file_path, [], reporting_month
+
+        total_minutes = sum(
+            (r.get("travel_time") or 0) + (r.get("direct_time") or 0) + (r.get("indirect_time") or 0)
+            for r in imported_rows
+        )
+        if total_minutes == 0:
+            self._record_warning(
+                file_path.name,
+                "Zeitsumme",
+                "Zeitsumme aller importierten Zeilen ist 0 Minuten (leere oder fehlende Zeitwerte).",
+            )
+
         moved = self._move_to_done(file_path)
         self._remove_sheet_protection(moved)
 

@@ -290,8 +290,12 @@ def import_entity_data(
         deactivated_count += 1
 
     if insert_values:
-        target_conn.executemany(insert_sql, insert_values)
-        inserted_count = len(insert_values)
+        try:
+            target_conn.executemany(insert_sql, insert_values)
+            inserted_count = len(insert_values)
+        except Exception as exc:
+            _log_import_diagnostics(target_conn, target_table, pd.DataFrame(records), fields)
+            raise exc
 
     logger.success(
         f"{inserted_count} eingefügt, {updated_count} aktualisiert, {deactivated_count} deaktiviert in {target_table}."
@@ -482,9 +486,7 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
     if source_excel_path.parent.resolve() == imports_path.resolve():
         done_dir_base = Path(done_path_cfg)
         done_dir = ensure_dir(done_dir_base if done_dir_base.is_absolute() else (prj_root / done_dir_base))
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        target_name = f"{source_excel_path.stem}_{timestamp}{source_excel_path.suffix}"
-        target_path = done_dir / target_name
+        target_path = done_dir / source_excel_path.name
         shutil.move(str(source_excel_path), str(target_path))
         logger.info(f"Stammdatendatei verschoben nach: {target_path}")
 

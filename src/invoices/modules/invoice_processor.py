@@ -380,6 +380,15 @@ class InvoiceProcessor:
                     "summe_kosten": sum_kosten,
                 }
 
+                if sum_stunden == 0 or sum_kosten == 0:
+                    logger.warning(
+                        "Rechnung für Client {} übersprungen: Zeitsumme={} Min, Betrag={} CHF.",
+                        client_id,
+                        sum_stunden,
+                        sum_kosten,
+                    )
+                    continue
+
                 invoice_context = InvoiceContext(
                     data={
                         "invoice_id": invoice_id,
