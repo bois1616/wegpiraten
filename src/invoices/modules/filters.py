@@ -57,7 +57,7 @@ def format_hhmm(value: Any) -> str:
     except (TypeError, ValueError):
         return str(value)
     hours, mins = divmod(minutes, 60)
-    return f"{hours}h{mins:02d}m"
+    return f"{hours}:{mins:02d} h"
 
 
 def babel_date(value: Any, locale: str = "de_CH", date_format: Optional[str] = None) -> str:

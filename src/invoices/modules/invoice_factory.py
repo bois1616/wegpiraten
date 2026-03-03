@@ -53,7 +53,7 @@ class InvoiceFactory:
         """
 
         # TODO Prüfen, ob das als Rechnungsnummer ausreicht
-        return f"{invoice_month or 'mm.YYYY'}_{client_id or 'K000'}"
+        return f"{invoice_month or 'mm.YYYY'}-{client_id or 'K000'}"
 
     def create_payment_part_png(
         self,
