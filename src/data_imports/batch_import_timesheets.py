@@ -373,6 +373,8 @@ class TimeSheetsImporter:
             if "tenant_id" not in columns:
                 conn.execute("ALTER TABLE service_data ADD COLUMN tenant_id TEXT")
                 logger.info("Tabelle service_data um Spalte tenant_id erweitert.")
+            # Legacy-Dedup-Tabelle entfernen (verhindert FK-Konflikt beim DELETE FROM service_data)
+            conn.execute("DROP TABLE IF EXISTS service_data_import_dedup")
             conn.execute(drop_legacy_client_date_index_sql)
             conn.execute(drop_legacy_employee_unique_index_sql)
             conn.execute(client_date_index_sql)
