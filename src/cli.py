@@ -276,6 +276,40 @@ def validate_config(
         raise typer.Exit(1)
 
 
+@app.command("report")
+def arbeitszeit_report(
+    month: str = typer.Argument(
+        ...,
+        help="Abrechnungsmonat im Format MM.YYYY, MM-YYYY oder YYYY-MM",
+    ),
+    config_path: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Pfad zur Konfigurationsdatei",
+    ),
+) -> None:
+    """
+    Erstellt ein Arbeitszeitprotokoll als Excel-Datei.
+
+    Aggregiert die Leistungsdaten aus service_data nach Mitarbeiter,
+    Klient und Datum für den angegebenen Monat.
+    """
+    console.print(f"[bold blue]Erstelle Arbeitszeitprotokoll für {month}...[/bold blue]")
+
+    try:
+        config = get_config(config_path)
+
+        from reports.arbeitszeit_report import create_arbeitszeit_report
+
+        out_file = create_arbeitszeit_report(config, month)
+        console.print(f"[bold green]Arbeitszeitprotokoll erstellt: {out_file.name}[/bold green]")
+    except Exception as e:
+        logger.exception(f"Fehler beim Erstellen des Arbeitszeitprotokolls: {e}")
+        console.print(f"[red]Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+
 def main() -> None:
     """Haupteinstiegspunkt für die CLI."""
     app()

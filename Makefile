@@ -5,6 +5,7 @@
 #   make timesheets    MONTH=2026-02   Zeiterfassungsbögen erstellen (Format YYYY-MM)
 #   make import-master                 Stammdaten importieren
 #   make import-sheets MONTH=2026-02   Zeiterfassungsbögen importieren
+#   make report        MONTH=2026-02   Arbeitszeitprotokoll erstellen
 #   make validate                      Konfiguration prüfen
 #
 # MONTH wird beim ersten Aufruf in .month gespeichert und für Folgeaufrufe
@@ -14,7 +15,7 @@
 
 CLI := .venv/bin/wegpiraten
 
-.PHONY: invoices timesheets import-master import-sheets validate _require-month _save-month
+.PHONY: invoices timesheets import-master import-sheets report validate _require-month _save-month
 
 invoices: _require-month _save-month
 	$(CLI) invoice $(MONTH)
@@ -27,6 +28,9 @@ import-master:
 
 import-sheets: _require-month _save-month
 	$(CLI) import-sheets $(MONTH)
+
+report: _require-month _save-month
+	$(CLI) report $(MONTH)
 
 validate:
 	$(CLI) validate

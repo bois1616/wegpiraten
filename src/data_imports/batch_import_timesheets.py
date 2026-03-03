@@ -227,6 +227,24 @@ class TimeSheetsImporter:
         row_suffix = f" (Zeile {row_number})" if row_number is not None else ""
         logger.warning("{}{}: {}", source_file, row_suffix, message)
 
+    def _record_info(
+        self,
+        source_file: str,
+        category: str,
+        message: str,
+        row_number: Optional[int] = None,
+    ) -> None:
+        entry = ImportErrorEntry(
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            source_file=source_file,
+            category=f"Info/{category}",
+            message=message,
+            row_number=row_number,
+        )
+        self._error_entries.append(entry)
+        row_suffix = f" (Zeile {row_number})" if row_number is not None else ""
+        logger.info("{}{}: {}", source_file, row_suffix, message)
+
     def _fetch_reference_values(self, table: str, column: str) -> set[str]:
         sql = f"SELECT {column} FROM {table} WHERE {column} IS NOT NULL"
         values: set[str] = set()
@@ -785,13 +803,16 @@ class TimeSheetsImporter:
                         (dedup_signature,),
                     ).fetchone()
                     if existing_signature:
-                        logger.info(
-                            "Doublette übersprungen (client_id={}, employee_id={}, service_date={}, Datei={}, Zeile={}).",
-                            record.get("client_id"),
-                            record.get("employee_id"),
-                            record.get("service_date"),
+                        self._record_info(
                             source_file,
-                            record.get("_source_row"),
+                            "Doublette",
+                            f"Doublette übersprungen: client_id={record.get('client_id')}, "
+                            f"employee_id={record.get('employee_id')}, "
+                            f"service_date={record.get('service_date')}, "
+                            f"F={record.get('travel_time')}min "
+                            f"D={record.get('direct_time')}min "
+                            f"I={record.get('indirect_time')}min",
+                            row_number=record.get("_source_row"),
                         )
                         continue
 
