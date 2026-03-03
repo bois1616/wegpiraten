@@ -330,7 +330,21 @@ class InvoiceProcessor:
                 sum_stunden = 0
                 sum_kosten = 0.0
 
-                for _, row in client_details.sort_values("service_date").iterrows():
+                # Mehrere Einträge am gleichen Tag (z.B. unterschiedliche Uhrzeiten)
+                # werden zu einer Rechnungsposition zusammengefasst.
+                date_groups = (
+                    client_details.groupby("service_date", as_index=False)
+                    .agg(
+                        travel_time=("travel_time", "sum"),
+                        direct_time=("direct_time", "sum"),
+                        indirect_time=("indirect_time", "sum"),
+                        hourly_rate=("hourly_rate", "first"),
+                        rundung=("rundung", "first"),
+                    )
+                    .sort_values("service_date")
+                )
+
+                for _, row in date_groups.iterrows():
                     service_date = row.get("service_date")
                     if service_date is None or pd.isna(service_date):
                         logger.error("Fehlendes Leistungsdatum bei Client {} – Zeile ignoriert.", client_id)

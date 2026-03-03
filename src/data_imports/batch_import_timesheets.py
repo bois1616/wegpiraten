@@ -33,7 +33,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 import sqlite3
 from copy import copy
@@ -227,24 +226,6 @@ class TimeSheetsImporter:
         row_suffix = f" (Zeile {row_number})" if row_number is not None else ""
         logger.warning("{}{}: {}", source_file, row_suffix, message)
 
-    def _record_info(
-        self,
-        source_file: str,
-        category: str,
-        message: str,
-        row_number: Optional[int] = None,
-    ) -> None:
-        entry = ImportErrorEntry(
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            source_file=source_file,
-            category=f"Info/{category}",
-            message=message,
-            row_number=row_number,
-        )
-        self._error_entries.append(entry)
-        row_suffix = f" (Zeile {row_number})" if row_number is not None else ""
-        logger.info("{}{}: {}", source_file, row_suffix, message)
-
     def _fetch_reference_values(self, table: str, column: str) -> set[str]:
         sql = f"SELECT {column} FROM {table} WHERE {column} IS NOT NULL"
         values: set[str] = set()
@@ -375,38 +356,6 @@ class TimeSheetsImporter:
             FOREIGN KEY (employee_id) REFERENCES employees(emp_id)
         )
         """
-        dedup_signature_table_sql = """
-        CREATE TABLE IF NOT EXISTS service_data_import_dedup (
-            dedup_signature TEXT PRIMARY KEY,
-            service_data_id INTEGER,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (service_data_id) REFERENCES service_data(id)
-        )
-        """
-        deduplicate_sql = """
-        DELETE FROM service_data
-        WHERE COALESCE(TRIM(employee_id), '') <> ''
-          AND id NOT IN (
-            SELECT MAX(id)
-            FROM service_data
-            WHERE COALESCE(TRIM(employee_id), '') <> ''
-            GROUP BY client_id, service_date, employee_id
-        )
-        """
-        dedup_signature_cleanup_sql = """
-        DELETE FROM service_data_import_dedup
-        WHERE service_data_id IN (
-            SELECT id
-            FROM service_data
-            WHERE COALESCE(TRIM(employee_id), '') <> ''
-              AND id NOT IN (
-                SELECT MAX(id)
-                FROM service_data
-                WHERE COALESCE(TRIM(employee_id), '') <> ''
-                GROUP BY client_id, service_date, employee_id
-            )
-        )
-        """
         drop_legacy_client_date_index_sql = """
         DROP INDEX IF EXISTS idx_service_data_client_date
         """
@@ -420,16 +369,10 @@ class TimeSheetsImporter:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             conn.execute(sql)
-            conn.execute(dedup_signature_table_sql)
             columns = {row[1] for row in conn.execute("PRAGMA table_info(service_data)").fetchall()}
             if "tenant_id" not in columns:
                 conn.execute("ALTER TABLE service_data ADD COLUMN tenant_id TEXT")
                 logger.info("Tabelle service_data um Spalte tenant_id erweitert.")
-            # Vor der Dublettenbereinigung zuerst abhängige Dedup-Referenzen entfernen,
-            # sonst schlagen DELETEs auf service_data wegen FK fehl.
-            conn.execute(dedup_signature_cleanup_sql)
-            # Bestehende Dubletten bereinigen, bevor der eindeutige Index gesetzt wird.
-            conn.execute(deduplicate_sql)
             conn.execute(drop_legacy_client_date_index_sql)
             conn.execute(drop_legacy_employee_unique_index_sql)
             conn.execute(client_date_index_sql)
@@ -437,11 +380,10 @@ class TimeSheetsImporter:
 
     def _reset_service_data(self) -> None:
         """
-        Leert service_data und die Dedup-Signaturen für einen sauberen Batch-Lauf.
+        Leert service_data für einen sauberen Batch-Lauf.
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
-            conn.execute("DELETE FROM service_data_import_dedup")
             conn.execute("DELETE FROM service_data")
             conn.commit()
         logger.warning("service_data wurde vor dem Import zurückgesetzt.")
@@ -757,33 +699,6 @@ class TimeSheetsImporter:
     def _normalized_time_value(value: object) -> int:
         return int(round(to_float(value) or 0.0))
 
-    def _dedup_signature(self, record: Dict[str, Any]) -> str:
-        """
-        Bildet eine stabile Signatur gemäß fachlicher Doubletten-Regel:
-        employee_id + client_id + service_date + (fahrzeit, direkt, indirekt).
-        """
-        service_date_value = record.get("service_date")
-        if isinstance(service_date_value, date):
-            service_date_str = service_date_value.isoformat()
-        else:
-            service_date_str = str(service_date_value or "").strip()
-
-        payload = "|".join(
-            [
-                str(record.get("employee_id") or "").strip(),
-                str(record.get("client_id") or "").strip(),
-                service_date_str,
-                str(self._normalized_time_value(record.get("travel_time"))),
-                str(self._normalized_time_value(record.get("direct_time"))),
-                str(self._normalized_time_value(record.get("indirect_time"))),
-            ]
-        )
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-    @staticmethod
-    def _is_missing_employee_id(value: object) -> bool:
-        return not str(value or "").strip()
-
     def _import_rows(self, rows: Iterable[Dict[str, Any]], source_file: str) -> tuple[int, List[Dict[str, Any]]]:
         insert_sql = f"""
         INSERT INTO service_data (
@@ -797,115 +712,7 @@ class TimeSheetsImporter:
             cur = conn.cursor()
             for record in rows:
                 try:
-                    dedup_signature = self._dedup_signature(record)
-                    existing_signature = cur.execute(
-                        "SELECT 1 FROM service_data_import_dedup WHERE dedup_signature = ? LIMIT 1",
-                        (dedup_signature,),
-                    ).fetchone()
-                    if existing_signature:
-                        self._record_info(
-                            source_file,
-                            "Doublette",
-                            f"Doublette übersprungen: client_id={record.get('client_id')}, "
-                            f"employee_id={record.get('employee_id')}, "
-                            f"service_date={record.get('service_date')}, "
-                            f"F={record.get('travel_time')}min "
-                            f"D={record.get('direct_time')}min "
-                            f"I={record.get('indirect_time')}min",
-                            row_number=record.get("_source_row"),
-                        )
-                        continue
-
-                    service_date_value = record.get("service_date")
-                    if isinstance(service_date_value, date):
-                        service_date_value = service_date_value.isoformat()
-
-                    employee_id_str = str(record.get("employee_id") or "").strip()
-
-                    if self._is_missing_employee_id(record.get("employee_id")):
-                        existing_without_employee = cur.execute(
-                            """
-                            SELECT COUNT(*)
-                            FROM service_data
-                            WHERE client_id = ?
-                              AND service_date = ?
-                              AND COALESCE(TRIM(employee_id), '') = ''
-                            """,
-                            (record.get("client_id"), service_date_value),
-                        ).fetchone()
-                        existing_count = int(existing_without_employee[0]) if existing_without_employee else 0
-                        if existing_count > 0:
-                            logger.info(
-                                "Nachkontrolle: weiterer Import ohne employee_id für client_id={} am {} "
-                                "(vorhandene Einträge ohne employee_id: {}, Datei: {}, Zeile: {}).",
-                                record.get("client_id"),
-                                service_date_value,
-                                existing_count,
-                                source_file,
-                                record.get("_source_row"),
-                            )
-
-                    merge_target = cur.execute(
-                        """
-                        SELECT id
-                        FROM service_data
-                        WHERE client_id = ?
-                          AND service_date = ?
-                          AND COALESCE(TRIM(employee_id), '') <> ''
-                          AND TRIM(employee_id) <> ?
-                        ORDER BY id ASC
-                        LIMIT 1
-                        """,
-                        (record.get("client_id"), service_date_value, employee_id_str),
-                    ).fetchone()
-
-                    if merge_target:
-                        target_id = int(merge_target[0])
-                        cur.execute(
-                            """
-                            UPDATE service_data
-                            SET travel_time = COALESCE(travel_time, 0) + ?,
-                                direct_time = COALESCE(direct_time, 0) + ?,
-                                indirect_time = COALESCE(indirect_time, 0) + ?,
-                                source_file = ?,
-                                reporting_month = ?
-                            WHERE id = ?
-                            """,
-                            (
-                                self._normalized_time_value(record.get("travel_time")),
-                                self._normalized_time_value(record.get("direct_time")),
-                                self._normalized_time_value(record.get("indirect_time")),
-                                record.get("source_file"),
-                                record.get("reporting_month"),
-                                target_id,
-                            ),
-                        )
-                        cur.execute(
-                            """
-                            INSERT INTO service_data_import_dedup (dedup_signature, service_data_id)
-                            VALUES (?, ?)
-                            """,
-                            (dedup_signature, target_id),
-                        )
-                        logger.info(
-                            "Zeiten aufsummiert für client_id={} am {} (neue employee_id={} in bestehende Position übernommen).",
-                            record.get("client_id"),
-                            service_date_value,
-                            employee_id_str or "UNBEKANNT",
-                        )
-                    else:
-                        cur.execute(insert_sql, self._row_params(record))
-                        if cur.lastrowid is None:
-                            raise sqlite3.DatabaseError("INSERT in service_data lieferte keine lastrowid.")
-                        target_id = int(cur.lastrowid)
-                        cur.execute(
-                            """
-                            INSERT INTO service_data_import_dedup (dedup_signature, service_data_id)
-                            VALUES (?, ?)
-                            """,
-                            (dedup_signature, target_id),
-                        )
-
+                    cur.execute(insert_sql, self._row_params(record))
                     count += 1
                     imported_rows.append(record)
                 except sqlite3.IntegrityError as exc:
