@@ -12,6 +12,8 @@ dependencies = [
     "dotenv>=0.9.9",
     "icecream>=2.1.7",
     "loguru>=0.7.3",
+    "nodeenv>=1.10.0",
+    "nox>=2026.2.9",
     "openpyxl>=3.1.5",
     "pandas>=2.3.2",
     "pillow>=11.0.0",
@@ -25,6 +27,7 @@ dependencies = [
     "rich>=14.1.0",
     "sqlalchemy>=2.0.43",
     "typer>=0.21.1",
+    "typing-extensions>=4.15.0",
 ]
 
 [project.optional-dependencies]

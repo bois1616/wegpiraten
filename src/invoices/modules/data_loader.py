@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import pandas as pd
 from loguru import logger
@@ -55,7 +55,7 @@ class DataLoader:
         df = pd.DataFrame((row[1:] for row in data), columns=columns)
 
         # Alle Felder mit "(Leer)" durch "" ersetzen
-        df = df.replace("(Leer)", "")
+        df = cast(pd.DataFrame, df.replace("(Leer)", ""))
 
         # Dynamische Filterung nach allen gesetzten Feldern im Pydantic-Filterobjekt
         for key, value in self.filter.model_dump().items():
@@ -65,16 +65,16 @@ class DataLoader:
             if key.endswith("_range") and isinstance(value, (list, tuple)) and len(value) == 2:
                 col_name = key.replace("_range", "")
                 if col_name in df.columns:
-                    df = df[df[col_name].between(value[0], value[1])]
+                    df = cast(pd.DataFrame, df[df[col_name].between(value[0], value[1])])
             # Listenfilter (z.B. payer_list, client_list)
             elif key.endswith("_list") and isinstance(value, (list, tuple)):
                 col_name = key.replace("_list", "")
                 if col_name in df.columns:
-                    df = df[df[col_name].isin(value)]
+                    df = cast(pd.DataFrame, df[df[col_name].isin(value)])
             # Einzelwertfilter
             else:
                 if key in df.columns:
-                    df = df[df[key] == value]
+                    df = cast(pd.DataFrame, df[df[key] == value])
 
         return df
 

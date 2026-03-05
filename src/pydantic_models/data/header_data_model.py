@@ -18,6 +18,9 @@ class HeaderDataModel(BaseModel):
     service_type: str
     short_code: str
     allowed_hours_per_month: float
+    allowed_travel_time: float = 0.0
+    allowed_direct_effort: float = 0.0
+    allowed_indirect_effort: float = 0.0
     client_first_name: Optional[str] = None
     client_last_name: Optional[str] = None
     employee_first_name: Optional[str] = None

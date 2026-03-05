@@ -15,7 +15,21 @@
 
 CLI := .venv/bin/wegpiraten
 
-.PHONY: invoices timesheets import-master import-sheets report validate _require-month _save-month
+.PHONY: help invoices timesheets import-master import-sheets report validate _require-month _save-month
+
+help:
+	@echo ""
+	@echo "Wegpiraten – verfügbare Ziele"
+	@echo ""
+	@echo "  make invoices      MONTH=02.2026   Rechnungen erstellen           (Format MM.YYYY)"
+	@echo "  make timesheets    MONTH=2026-02   Zeiterfassungsbögen erstellen  (Format YYYY-MM)"
+	@echo "  make import-master                 Stammdaten importieren"
+	@echo "  make import-sheets MONTH=2026-02   Zeiterfassungsbögen importieren"
+	@echo "  make report        MONTH=2026-02   Arbeitszeitprotokoll erstellen"
+	@echo "  make validate                      Konfiguration prüfen"
+	@echo ""
+	@echo "  MONTH wird zwischen Aufrufen in .month gespeichert (kein erneutes Angeben nötig)."
+	@echo ""
 
 invoices: _require-month _save-month
 	$(CLI) invoice $(MONTH)

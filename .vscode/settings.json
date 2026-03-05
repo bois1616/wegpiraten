@@ -27,5 +27,6 @@
     ],
     "cSpell.ignoreWords": [
         "positionen"
-    ]
+    ],
+    "makefile.configureOnOpen": false
 }

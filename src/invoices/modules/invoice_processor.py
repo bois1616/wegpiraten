@@ -252,7 +252,7 @@ class InvoiceProcessor:
 
         # Gruppierung nach Zahlungsdienstleister (ZDNR)
         for payer_id, payer_data in invoice_data.groupby("payer_id"):
-            if payer_id is None or pd.isna(payer_id):
+            if payer_id is None or (isinstance(payer_id, float) and payer_id != payer_id):
                 logger.error("Fehlende payer_id in service_data – überspringe Gruppe.")
                 continue
             payer_row = payer_data.iloc[0]
@@ -286,7 +286,7 @@ class InvoiceProcessor:
             )
 
             for client_id, client_details in payer_data.groupby("client_id"):
-                if client_id is None or pd.isna(client_id):
+                if client_id is None or (isinstance(client_id, float) and client_id != client_id):
                     logger.error("Fehlende client_id in service_data – überspringe Datensätze.")
                     continue
                 client_row = client_details.iloc[0]
@@ -341,7 +341,7 @@ class InvoiceProcessor:
                         hourly_rate=("hourly_rate", "first"),
                         rundung=("rundung", "first"),
                     )
-                    .sort_values("service_date")
+                    .sort_values("service_date")  # pyright: ignore[reportCallIssue]
                 )
 
                 for _, row in date_groups.iterrows():

@@ -36,6 +36,9 @@ class TimeSheetHeaderCells(BaseModel):
     service_type: str
     short_code: str
     client_id: str
+    budget_travel_time: Optional[str] = None
+    budget_direct_effort: Optional[str] = None
+    budget_indirect_effort: Optional[str] = None
 
 
 class TimeSheetRowMapping(BaseModel):

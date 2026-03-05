@@ -33,6 +33,9 @@ templates:
     service_type: F7
     short_code: C8
     client_id: F8
+    budget_travel_time: C30
+    budget_direct_effort: D30
+    budget_indirect_effort: E30
   time_sheet_data_start_cell: A10
   time_sheet_data_end_cell: h28
   time_sheet_row_mapping:

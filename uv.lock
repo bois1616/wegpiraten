@@ -1260,6 +1260,8 @@ dependencies = [
     { name = "dotenv" },
     { name = "icecream" },
     { name = "loguru" },
+    { name = "nodeenv" },
+    { name = "nox" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pillow" },
@@ -1273,6 +1275,7 @@ dependencies = [
     { name = "rich" },
     { name = "sqlalchemy" },
     { name = "typer" },
+    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -1297,6 +1300,8 @@ requires-dist = [
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "icecream", specifier = ">=2.1.7" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "nodeenv", specifier = ">=1.10.0" },
+    { name = "nox", specifier = ">=2026.2.9" },
     { name = "nox", marker = "extra == 'dev'", specifier = ">=2025.11.12" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.3.2" },
@@ -1319,6 +1324,7 @@ requires-dist = [
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250822" },
     { name = "types-qrcode", marker = "extra == 'dev'", specifier = ">=8.2.0.20250506" },
     { name = "types-reportlab", marker = "extra == 'dev'", specifier = ">=4.4.1.20250822" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
 ]
 provides-extras = ["dev"]
 

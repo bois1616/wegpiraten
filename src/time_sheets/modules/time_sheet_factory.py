@@ -135,6 +135,9 @@ class TimeSheetFactory:
             c.short_code,
             (COALESCE(c.allowed_travel_time, 0) + COALESCE(c.allowed_direct_effort, 0) + COALESCE(c.allowed_indirect_effort, 0))
                 AS allowed_hours_per_month,
+            COALESCE(c.allowed_travel_time, 0)   AS allowed_travel_time,
+            COALESCE(c.allowed_direct_effort, 0)  AS allowed_direct_effort,
+            COALESCE(c.allowed_indirect_effort, 0) AS allowed_indirect_effort,
             c.employee_id,
             c.first_name AS client_first_name,
             c.last_name AS client_last_name,
@@ -150,7 +153,7 @@ class TimeSheetFactory:
 
         logger.info(f"Lese Client-Daten für Monat {reporting_month}.")
         with self.get_db_connection() as conn:
-            df = pd.read_sql_query(sql, conn, params=(month_start,))
+            df = pd.read_sql_query(sql, conn, params=[month_start])
         logger.info(f"{len(df)} relevante Datensätze für Zeiterfassungs-Sheets geladen.")
 
         headers: List[HeaderDataModel] = []
@@ -214,10 +217,19 @@ class TimeSheetFactory:
         ws[cells.emp_id] = header_data.employee_id
         ws[cells.reporting_month] = reporting_month_dt
         ws[cells.reporting_month].number_format = "MM.YYYY"
-        ws[cells.allowed_hours_per_month] = header_data.allowed_hours_per_month
+        # allowed_hours_per_month kommt als Minuten aus der DB → Stunden für Label "Soll Stunden/Monat"
+        ws[cells.allowed_hours_per_month] = header_data.allowed_hours_per_month / 60
         ws[cells.service_type] = header_data.service_type
         ws[cells.short_code] = header_data.short_code
         ws[cells.client_id] = header_data.client_id
+
+        # Budgets pro Spalte in Obergrenze-Zeile schreiben (Minuten, gleiche Einheit wie Tabelle1)
+        if cells.budget_travel_time:
+            ws[cells.budget_travel_time] = int(header_data.allowed_travel_time)
+        if cells.budget_direct_effort:
+            ws[cells.budget_direct_effort] = int(header_data.allowed_direct_effort)
+        if cells.budget_indirect_effort:
+            ws[cells.budget_indirect_effort] = int(header_data.allowed_indirect_effort)
 
         original_sheet_protected = bool(getattr(ws.protection, "sheet", False))
         if original_sheet_protected:

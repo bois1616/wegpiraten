@@ -9,7 +9,7 @@ import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import openpyxl
 import pandas as pd
@@ -280,6 +280,8 @@ def import_entity_data(
     # Deactivate missing
     missing_keys = set(existing_by_key.keys()) - set(incoming_by_key.keys())
     for key in missing_keys:
+        if key is None:
+            continue
         existing = existing_by_key.get(key, {})
         if existing.get("is_active") == 0:
             continue
@@ -344,7 +346,8 @@ def _log_import_diagnostics(
     if pk_fields:
         duplicates = df_target[df_target.duplicated(subset=pk_fields, keep=False)]
         if not duplicates.empty:
-            sample = duplicates[pk_fields].head(5).to_dict(orient="records")
+            dup_df: pd.DataFrame = cast(pd.DataFrame, duplicates[pk_fields])
+            sample = dup_df.head(5).to_dict(orient="records")
             logger.error(
                 "Doppelte Primärschlüssel in {} gefunden ({} Zeilen). Beispiele: {}",
                 target_table,
@@ -387,11 +390,10 @@ def _log_import_diagnostics(
         missing = sorted(values - ref_values)
         if missing:
             sample_missing = missing[:10]
-            sample_rows = (
-                df_target[df_target[column].astype(str).isin(sample_missing)][[column]]
-                .head(5)
-                .to_dict(orient="records")
+            filtered_df: pd.DataFrame = cast(
+                pd.DataFrame, df_target[df_target[column].astype(str).isin(sample_missing)][[column]]
             )
+            sample_rows = filtered_df.head(5).to_dict(orient="records")
             logger.error(
                 "FK-Verletzung in {}.{}: {} fehlende Werte (z.B. {}). Beispiele Zeilen: {}",
                 target_table,

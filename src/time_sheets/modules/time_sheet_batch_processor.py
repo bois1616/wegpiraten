@@ -67,6 +67,9 @@ class TimeSheetBatchProcessor:
             c.short_code,
             (COALESCE(c.allowed_travel_time, 0) + COALESCE(c.allowed_direct_effort, 0) + COALESCE(c.allowed_indirect_effort, 0))
                 AS allowed_hours_per_month,
+            COALESCE(c.allowed_travel_time, 0)    AS allowed_travel_time,
+            COALESCE(c.allowed_direct_effort, 0)  AS allowed_direct_effort,
+            COALESCE(c.allowed_indirect_effort, 0) AS allowed_indirect_effort,
             c.employee_id,
             c.first_name AS client_first_name,
             c.last_name AS client_last_name,
@@ -82,7 +85,7 @@ class TimeSheetBatchProcessor:
 
         logger.info(f"Führe Client-Query für Monat {reporting_month} aus.")
         with sqlite3.connect(self.db_path) as conn:
-            df = pd.read_sql_query(sql, conn, params=(month_start,))
+            df = pd.read_sql_query(sql, conn, params=[month_start])
         logger.info(f"{len(df)} Klientendatensätze geladen.")
 
         headers: List[HeaderDataModel] = []

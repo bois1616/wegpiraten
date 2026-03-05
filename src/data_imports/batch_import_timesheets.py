@@ -38,7 +38,7 @@ import sqlite3
 from copy import copy
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, cast
 
 import pandas as pd
 from loguru import logger
@@ -423,6 +423,21 @@ class TimeSheetsImporter:
             return str(row[0]).strip()
         return None
 
+    def _resolve_hourly_rate(self, client_id: Optional[str]) -> Optional[float]:
+        if not client_id:
+            return None
+        sql = """
+        SELECT st.hourly_rate
+        FROM clients c
+        LEFT JOIN service_types st ON c.service_type = st.service_type_id
+        WHERE c.client_id = ?
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(sql, (client_id,)).fetchone()
+        if row and row[0] is not None:
+            return to_float(row[0])
+        return None
+
     def _resolve_employee_id(self, client_id: Optional[str]) -> Optional[str]:
         if not client_id:
             return None
@@ -538,6 +553,7 @@ class TimeSheetsImporter:
         service_type = self._resolve_service_type(client_id_str or None)
         resolved_employee_id = self._resolve_employee_id(client_id_str or None)
         resolved_tenant_id = self._resolve_tenant_id(client_id_str or None)
+        resolved_hourly_rate = self._resolve_hourly_rate(client_id_str or None)
         if not employee_id:
             employee_id = resolved_employee_id
         employee_id_str = str(employee_id).strip() if employee_id is not None else ""
@@ -551,6 +567,7 @@ class TimeSheetsImporter:
             "short_code": ws[cells.short_code].value,  # type: ignore[union-attr]
             "client_id": client_id_str or None,
             "tenant_id": resolved_tenant_id,
+            "hourly_rate": resolved_hourly_rate,
         }
 
     def _read_rows(
@@ -648,6 +665,7 @@ class TimeSheetsImporter:
                         "direct_time": validated.direct_time,
                         "indirect_time": validated.indirect_time,
                         "billable_hours": validated.billable_hours,
+                        "hourly_rate": header.get("hourly_rate"),
                         "notes": str(v_notes).strip() if v_notes is not None else None,
                         "source_file": source_file,
                         "reporting_month": reporting_month,
@@ -771,9 +789,27 @@ class TimeSheetsImporter:
                 f"Blattschutz konnte nicht entfernt werden: {exc}",
             )
 
+    # Spaltenreihenfolge für den Detailexport
+    _EXPORT_COLUMNS: tuple[str, ...] = (
+        "reporting_month",
+        "source_file",
+        "service_date",
+        "tenant_id",
+        "client_id",
+        "employee_id",
+        "service_type",
+        "hourly_rate",
+        "travel_time",
+        "direct_time",
+        "indirect_time",
+        "notes",
+    )
+
     def _export_rows_to_excel(self, export_rows: List[ImportedRowExport], reporting_month: str) -> Path:
         """
         Schreibt alle importierten Zeilen als Sammeldatei ins Output-Verzeichnis.
+        Sheet 1: Detaildaten (nur Spalten aus _EXPORT_COLUMNS)
+        Sheet 2: Rechnungsvorschau – aggregiert je Klient mit Stundensumme und Rechnungsbetrag.
         Stellt sicher, dass der Monatsname gesetzt ist; andernfalls wird der Fehler protokolliert
         und als ValueError weitergereicht.
         """
@@ -781,6 +817,8 @@ class TimeSheetsImporter:
             logger.error("Export abgebrochen: reporting_month wurde nicht ermittelt.")
             raise ValueError("reporting_month darf für den Export nicht leer sein.")
         out_file = self.output_dir / f"importierte_daten_{reporting_month}.xlsx"
+
+        # --- Detailsheet ---
         df = pd.DataFrame(
             [
                 {
@@ -791,21 +829,72 @@ class TimeSheetsImporter:
             ]
         )
         # Zeitspalten sind bereits in ganzen Minuten gespeichert – nur in int konvertieren.
-        for time_column in ("travel_time", "direct_time", "indirect_time", "total_hours"):
+        for time_column in ("travel_time", "direct_time", "indirect_time"):
             if time_column in df.columns:
-                df[time_column] = pd.to_numeric(df[time_column], errors="coerce").fillna(0).round().astype(int)
-        if {"travel_time", "direct_time", "indirect_time"}.issubset(df.columns):
-            df["billable_minutes"] = (
-                pd.to_numeric(df["travel_time"], errors="coerce").fillna(0).astype(int)
-                + pd.to_numeric(df["direct_time"], errors="coerce").fillna(0).astype(int)
-                + pd.to_numeric(df["indirect_time"], errors="coerce").fillna(0).astype(int)
-            )
-        if "billable_hours" in df.columns:
-            df = df.drop(columns=["billable_hours"])
+                numeric: pd.Series = cast(pd.Series, pd.to_numeric(df[time_column], errors="coerce"))
+                df[time_column] = numeric.fillna(0).round().astype(int)
+        # Nur definierte Spalten in der gewünschten Reihenfolge exportieren
+        export_cols = [c for c in self._EXPORT_COLUMNS if c in df.columns]
+        df_detail = df[export_cols]
+
+        # --- Rechnungsvorschau (Pivot je Klient) ---
+        df_pivot = self._build_invoice_preview(df)
+
         with pd.ExcelWriter(out_file, engine="openpyxl") as writer:
-            df.to_excel(writer, sheet_name="importierte_daten", index=False)
+            df_detail.to_excel(writer, sheet_name="importierte_daten", index=False)
+            df_pivot.to_excel(writer, sheet_name="rechnungsvorschau", index=False)
+
         logger.info(f"Export-Datei geschrieben: {out_file}")
         return out_file
+
+    @staticmethod
+    def _build_invoice_preview(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Aggregiert die Detaildaten je Klient für eine Rechnungsvorschau.
+        Gibt einen DataFrame mit einer Zeile pro Klient zurück.
+        """
+        group_cols = ["client_id"]
+        for optional in ("tenant_id", "service_type"):
+            if optional in df.columns:
+                group_cols.append(optional)
+
+        agg: Dict[str, Any] = {}
+        for col in ("travel_time", "direct_time", "indirect_time"):
+            if col in df.columns:
+                agg[col] = "sum"
+        if "hourly_rate" in df.columns:
+            agg["hourly_rate"] = "first"
+
+        if not agg:
+            return pd.DataFrame()
+
+        pivot = df.groupby(group_cols, dropna=False).agg(agg).reset_index()
+
+        # Gesamtminuten und Stunden berechnen
+        time_cols = [c for c in ("travel_time", "direct_time", "indirect_time") if c in pivot.columns]
+        if time_cols:
+            pivot["total_minutes"] = pivot[time_cols].sum(axis=1).round().astype(int)
+            pivot["total_hours"] = (pivot["total_minutes"] / 60).round(2)
+
+        # Rechnungssumme = Stunden * Stundenansatz
+        if "hourly_rate" in pivot.columns and "total_hours" in pivot.columns:
+            pivot["rechnungssumme_chf"] = (pivot["total_hours"] * pivot["hourly_rate"]).round(2)
+
+        # Spaltenreihenfolge
+        ordered = [c for c in group_cols if c in pivot.columns]
+        for col in (
+            "travel_time",
+            "direct_time",
+            "indirect_time",
+            "total_minutes",
+            "total_hours",
+            "hourly_rate",
+            "rechnungssumme_chf",
+        ):
+            if col in pivot.columns:
+                ordered.append(col)
+
+        return cast(pd.DataFrame, pivot[[c for c in ordered if c in pivot.columns]])
 
     def process_file(
         self,
