@@ -34,7 +34,7 @@ help:
 invoices: _require-month _save-month
 	$(CLI) invoice $(MONTH)
 
-timesheets: _require-month _save-month
+timesheets: _require-month
 	$(CLI) timesheet $(MONTH)
 
 import-master:

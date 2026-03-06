@@ -84,6 +84,7 @@ class InvoiceProcessor:
 
         tenant_select_sql = """
             NULL AS tenant_id,
+            NULL AS tenant_name,
             NULL AS tenant_street,
             NULL AS tenant_zip,
             NULL AS tenant_city,
@@ -110,6 +111,7 @@ class InvoiceProcessor:
                     """
                     CREATE TABLE IF NOT EXISTS masterdata_tenant (
                         tenant_id TEXT PRIMARY KEY,
+                        name TEXT,
                         tenant_street TEXT,
                         tenant_zip TEXT,
                         tenant_city TEXT,
@@ -120,12 +122,17 @@ class InvoiceProcessor:
                 )
                 tenant_select_sql = f"""
                     {tenant_source_expr} AS tenant_id,
+                    t.name AS tenant_name,
                     t.tenant_street AS tenant_street,
                     t.tenant_zip AS tenant_zip,
                     t.tenant_city AS tenant_city,
                     t.tenant_iban AS tenant_iban,
                 """
                 tenant_join_sql = f"LEFT JOIN masterdata_tenant t ON {tenant_source_expr} = t.tenant_id"
+                tenant_columns = {row[1] for row in conn.execute("PRAGMA table_info(masterdata_tenant)").fetchall()}
+                if "name" not in tenant_columns:
+                    conn.execute("ALTER TABLE masterdata_tenant ADD COLUMN name TEXT")
+                    logger.info("Tabelle masterdata_tenant um Spalte name erweitert.")
             else:
                 logger.warning(
                     "Spalte tenant_id fehlt in service_data und clients. Tenant-Daten bleiben für die Faktura leer."
@@ -418,6 +425,7 @@ class InvoiceProcessor:
                         "service_provider": service_provider_obj,
                         "provider_city": safe_str(service_provider_obj.city),
                         "tenant_id": safe_str(client_row.get("tenant_id")),
+                        "tenant_name": safe_str(client_row.get("tenant_name")),
                         "tenant_street": safe_str(client_row.get("tenant_street")),
                         "tenant_zip": safe_str(client_row.get("tenant_zip")),
                         "tenant_city": safe_str(client_row.get("tenant_city")),

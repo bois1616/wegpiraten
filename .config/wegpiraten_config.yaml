@@ -101,6 +101,9 @@ entities:
         type: str
         primary_key: true
         excel_column: tenant_id
+      - name: name
+        type: str
+        excel_column: name
       - name: tenant_street
         type: str
         excel_column: tenant_street

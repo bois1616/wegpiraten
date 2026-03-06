@@ -95,16 +95,25 @@ class InvoiceFactory:
             except Exception:
                 continue
 
-        # Service Provider aus typisiertem Entity-Objekt
-        service_provider: LegalPerson = self.provider
+        # Tenant-Daten bevorzugen (klientenspezifisch), Fallback auf globalen Service Provider
         payer = invoice_context.data.get("payer")
+        tenant_iban = safe_str(invoice_context.data.get("tenant_iban"))
 
-        provider_name = safe_str(getattr(service_provider, "name", ""))
-        provider_street = safe_str(getattr(service_provider, "street", ""))
-        provider_zip_city = safe_str(getattr(service_provider, "zip_city", ""))
-        provider_zip = safe_str(getattr(service_provider, "zip", ""))
-        provider_city = safe_str(getattr(service_provider, "city", ""))
-        provider_iban = safe_str(getattr(service_provider, "iban", ""))
+        if tenant_iban:
+            provider_name = safe_str(invoice_context.data.get("tenant_name"))
+            provider_street = safe_str(invoice_context.data.get("tenant_street"))
+            provider_zip = safe_str(invoice_context.data.get("tenant_zip"))
+            provider_city = safe_str(invoice_context.data.get("tenant_city"))
+            provider_zip_city = f"{provider_zip} {provider_city}".strip()
+            provider_iban = tenant_iban
+        else:
+            service_provider: LegalPerson = self.provider
+            provider_name = safe_str(getattr(service_provider, "name", ""))
+            provider_street = safe_str(getattr(service_provider, "street", ""))
+            provider_zip_city = safe_str(getattr(service_provider, "zip_city", ""))
+            provider_zip = safe_str(getattr(service_provider, "zip", ""))
+            provider_city = safe_str(getattr(service_provider, "city", ""))
+            provider_iban = safe_str(getattr(service_provider, "iban", ""))
 
         payer_name = safe_str(getattr(payer, "name", ""))
         payer_street = safe_str(getattr(payer, "street", ""))
