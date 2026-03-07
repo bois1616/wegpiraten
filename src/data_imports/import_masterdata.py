@@ -65,13 +65,13 @@ def map_row(row: pd.Series, mapping: Dict[str, FieldConfig], required_fields: li
                         value = str(value)
                     else:
                         value = str(value)
-                # Spezialfall: float auf int, falls nötig
-                if field_type is int and isinstance(value, float) and value.is_integer():
+                # Spezialfall: multiply_by vor int-Cast anwenden (z.B. 0.5h * 60 = 30 Min)
+                if entry.multiply_by is not None and field_type is int:
+                    value = int(round(float(value) * entry.multiply_by))
+                elif field_type is int and isinstance(value, float) and value.is_integer():
                     value = int(value)
                 else:
                     value = field_type(value)
-                if entry.multiply_by is not None and value is not None:
-                    value = int(round(float(value) * entry.multiply_by))
             except Exception:
                 logger.warning(f"Typkonvertierung für Feld '{field_name}' fehlgeschlagen, Wert: {value}")
         result[field_name] = value
