@@ -94,6 +94,11 @@ def invoice_batch(
         "-c",
         help="Pfad zur Konfigurationsdatei (Standard: .config/wegpiraten_config.yaml)",
     ),
+    clients: Optional[str] = typer.Option(
+        None,
+        "--clients",
+        help="Kommagetrennte Liste von Klienten-IDs (z.B. C1017,C1038). Optional.",
+    ),
 ) -> None:
     """
     Erstellt Rechnungen für einen Abrechnungsmonat.
@@ -109,7 +114,10 @@ def invoice_batch(
         from invoices.modules.invoice_filter import InvoiceFilter
         from invoices.modules.invoice_processor import InvoiceProcessor
 
-        filter_obj = InvoiceFilter(invoice_month=month)
+        client_list = [c.strip() for c in clients.split(",") if c.strip()] if clients else None
+        if client_list:
+            console.print(f"[blue]Filter: Klienten {client_list}[/blue]")
+        filter_obj = InvoiceFilter(invoice_month=month, client_list=client_list)
         processor = InvoiceProcessor(config=config, filter=filter_obj)
         processor.run()
 
