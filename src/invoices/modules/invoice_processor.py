@@ -26,6 +26,10 @@ from .invoice_context import InvoiceContext
 from .invoice_factory import InvoiceFactory
 from .invoice_filter import InvoiceFilter
 
+# Privatleistungs-Code: im Startmonat werden 15 min kostenfrei als Einführungsgespräch ausgewiesen
+_PRIVATE_SERVICE_TYPE_CODE = "ST99"
+_INTRO_FREE_MINUTES = 15
+
 
 class InvoiceProcessor:
     """
@@ -151,6 +155,7 @@ class InvoiceProcessor:
             c.last_name AS client_last_name,
             c.social_security_number AS client_social_security_number,
             {tenant_select_sql}
+            c.start_date AS client_start_date,
             COALESCE(c.allowed_travel_time, 0) AS allowed_travel_time,
             COALESCE(c.allowed_direct_effort, 0) AS allowed_direct_effort,
             COALESCE(c.allowed_indirect_effort, 0) AS allowed_indirect_effort,
@@ -330,12 +335,30 @@ class InvoiceProcessor:
                     client_id=str(client_id), invoice_month=self.filter.invoice_month
                 )
 
+                # Privatleistung im Startmonat: erste 15 min werden kostenfrei ausgewiesen
+                is_private_intro_month = False
+                if service_type == _PRIVATE_SERVICE_TYPE_CODE:
+                    client_start_date_raw = client_row.get("client_start_date")
+                    if client_start_date_raw:
+                        try:
+                            start_dt = pd.to_datetime(str(client_start_date_raw)).date()
+                            is_private_intro_month = (
+                                start_dt.year == period.start.year and start_dt.month == period.start.month
+                            )
+                        except Exception:
+                            logger.warning(
+                                "Startdatum für Klient {} nicht parsbar: {} – Einführungsregelung nicht angewendet.",
+                                client_id,
+                                client_start_date_raw,
+                            )
+
                 positions = []
                 sum_fahrtzeit = 0
                 sum_direkt = 0
                 sum_indirekt = 0
                 sum_stunden = 0
                 sum_kosten = 0.0
+                remaining_intro_minutes = _INTRO_FREE_MINUTES if is_private_intro_month else 0
 
                 # Mehrere Einträge am gleichen Tag (z.B. unterschiedliche Uhrzeiten)
                 # werden zu einer Rechnungsposition zusammengefasst.
@@ -369,25 +392,48 @@ class InvoiceProcessor:
                     fahrtzeit = self._round_minutes(row.get("travel_time"), rundung)
                     direkt = self._round_minutes(row.get("direct_time"), rundung)
                     indirekt = self._round_minutes(row.get("indirect_time"), rundung)
+
+                    # Einführungsgespräch: kostenfreie Freiminuten von direct_time abziehen
+                    if remaining_intro_minutes > 0 and direkt > 0:
+                        intro_direct = min(remaining_intro_minutes, direkt)
+                        remaining_intro_minutes -= intro_direct
+                        positions.append(
+                            {
+                                "Leistungsdatum": service_date,
+                                "Bezeichnung": "Einführungsgespräch – ohne Berechnung",
+                                "Fahrtzeit": 0,
+                                "Direkt": intro_direct,
+                                "Indirekt": 0,
+                                "Stunden": intro_direct,
+                                "Kosten": 0.0,
+                                "is_intro": True,
+                            }
+                        )
+                        sum_direkt += intro_direct
+                        sum_stunden += intro_direct
+                        direkt -= intro_direct
+
                     minuten_total = fahrtzeit + direkt + indirekt
                     kosten = (minuten_total / 60.0) * hourly_rate
 
-                    positions.append(
-                        {
-                            "Leistungsdatum": service_date,
-                            "Fahrtzeit": fahrtzeit,
-                            "Direkt": direkt,
-                            "Indirekt": indirekt,
-                            "Stunden": minuten_total,
-                            "Kosten": kosten,
-                        }
-                    )
-
-                    sum_fahrtzeit += fahrtzeit
-                    sum_direkt += direkt
-                    sum_indirekt += indirekt
-                    sum_stunden += minuten_total
-                    sum_kosten += kosten
+                    if minuten_total > 0:
+                        positions.append(
+                            {
+                                "Leistungsdatum": service_date,
+                                "Bezeichnung": "",
+                                "Fahrtzeit": fahrtzeit,
+                                "Direkt": direkt,
+                                "Indirekt": indirekt,
+                                "Stunden": minuten_total,
+                                "Kosten": kosten,
+                                "is_intro": False,
+                            }
+                        )
+                        sum_fahrtzeit += fahrtzeit
+                        sum_direkt += direkt
+                        sum_indirekt += indirekt
+                        sum_stunden += minuten_total
+                        sum_kosten += kosten
 
                 if not positions:
                     logger.warning("Keine gültigen Positionen für Client {} – Rechnung übersprungen.", client_id)
@@ -401,7 +447,9 @@ class InvoiceProcessor:
                     "summe_kosten": sum_kosten,
                 }
 
-                if sum_stunden == 0 or sum_kosten == 0:
+                # Rechnungen mit Betrag 0 werden nur bei Privatleistungen im Startmonat
+                # zugelassen (Einführungsgespräch komplett kostenfrei).
+                if sum_stunden == 0 or (sum_kosten == 0 and not is_private_intro_month):
                     logger.warning(
                         "Rechnung für Client {} übersprungen: Zeitsumme={} Min, Betrag={} CHF.",
                         client_id,

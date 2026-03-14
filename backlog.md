@@ -21,6 +21,16 @@ Stand 2026-03-14: Nachträglich aus Git-Historie rekonstruiert.
 - [x] [P1] [Rechnung] Rechnungen mit Zeitsumme 0 oder Betrag 0 überspringen. Hinweis: `invoice_processor.py`; Guard vor Positionserstellung.
 - [x] [P1] [Rechnung] Rechnungspositionen tagesweise aggregieren (mehrere Einsätze = eine Position). Hinweis: `groupby`-Summe in `invoice_processor.py` vor Positionserstellung.
 - [x] [P1] [Rechnung] CLIENT-Filter für selektiven Rechnungslauf. Hinweis: `make invoices CLIENT=C1017,C1038`; `src/cli.py` + Makefile.
+- [x] [P1] [Rechnung] Kostenloses Einführungsgespräch (15 min) bei Privatleistungen im Startmonat ausweisen. Hinweis: `invoice_processor.py`; `c.start_date` im SQL ergänzt; Intro-Splitting in der date_groups-Schleife; `is_intro`-Flag + `Bezeichnung`-Feld in Positions-Dict; Null-Kosten-Guard für Startmonat deaktiviert. `rechnungsvorlage.docx`: Datumszelle zeigt bei Intro-Positionen `item.Bezeichnung` statt `item.Leistungsdatum|date`.
+
+  **Fachliche Regel:**
+  - Gilt wenn `service_type_code == "ST99"` UND Abrechnungsmonat = Monat aus `clients.start_date`
+  - 15 min werden von `direct_time` (chronologisch am ersten Tag mit Direktzeit) als Gratis-Position ausgewiesen
+  - Verbleibende Minuten werden normal berechnet
+  - Bei < 15 min total: gesamte Zeit kostenlos; Rechnung wird trotzdem ausgestellt (Ausnahme von der sonst geltenden Betrag-0-Filterung)
+  - Konstanten: `_PRIVATE_SERVICE_TYPE_CODE = "ST99"`, `_INTRO_FREE_MINUTES = 15`
+  - Template-Ausdruck: `{{item.Leistungsdatum|date if not item.is_intro else item.Bezeichnung}}`
+
 - [x] [P1] [Import] Doubletten beim mehrfachen Timesheet-Import verhindern (Upsert). Hinweis: ursprünglich Hash-basierte Dedup; später vereinfacht auf direkten Import ohne Dedup (jede Zeile eigenständig).
 - [x] [P1] [Import] Datum-Validierung beim Timesheet-Import (fehlendes/fehlerhaftes Jahr; Datum ausserhalb Monat). Hinweis: Warnung + Fehlerprotokoll in `batch_import_timesheets.py`.
 - [x] [P1] [Import] Abrechnungsmonat aus Bogen-Header (C6) gegen CLI-Monat prüfen. Hinweis: Warnung wenn Monat abweicht.
@@ -41,10 +51,3 @@ Stand 2026-03-14: Nachträglich aus Git-Historie rekonstruiert.
 - [x] [P2] [Doku] Konzept-Dokument (`docs/konzept.md`). Hinweis: Ablaufdiagramm, Datenbankstruktur, Technologieentscheide.
 - [x] [P2] [Doku] Runbook Betriebsablauf (`docs/runbook_betriebsablauf.md`). Hinweis: Monats-Ablauf, Befehle, Fehlerbehandlung.
 - [x] [P2] [Doku] Externes Abrechnungsmodalitäten-Dokument eingepflegt (`docs/Annex 4_Abrechnungsmodalitäten_de.pdf`).
-
-## Offen
-
-- [x] [P1] [Zeiterfassung] Zeiterfassungsbogen-Template: aktuelle Änderungen (M in git status) committen und dokumentieren.
-- [ ] [P2] [QA] Automatische Tests (unit/integration) für Import- und Rechnungslogik.
-- [ ] [P2] [Import] `validate`-Befehl ausbauen: Prüfung ob alle FK-Referenzen in DB konsistent sind.
-- [x] [P3] [Architektur] GUI-Möglichkeit evaluieren (war mit Flask begonnen, dann archiviert). Nur wenn CLI nicht ausreicht.

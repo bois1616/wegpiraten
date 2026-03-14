@@ -1,5 +1,9 @@
 # Umsetzungs-Log (Neueste Einträge zuerst)
 
+## 2026-03-14
+
+- **Feature Einführungsgespräch kostenfrei bei Privatleistungen (ST99) im Startmonat**: `invoice_processor.py`: (1) `c.start_date AS client_start_date` in den SQL-SELECT aufgenommen. (2) Modulkonstanten `_PRIVATE_SERVICE_TYPE_CODE = "ST99"` und `_INTRO_FREE_MINUTES = 15` definiert. (3) Nach Auflösung von `service_type` wird `is_private_intro_month` ermittelt: gilt wenn Code = ST99 und Abrechnungsmonat = Monat aus `client_start_date`. (4) `remaining_intro_minutes = 15` vor der date_groups-Schleife. In der Schleife werden die ersten 15 min `direct_time` (chronologisch; über mehrere Tage wenn nötig) als eigene Position mit `Kosten = 0.0`, `Bezeichnung = "Einführungsgespräch – ohne Berechnung"` und `is_intro = True` eingefügt; die verbleibende `direct_time` des Tages wird normal berechnet. Normale Positionen erhalten `Bezeichnung = ""` und `is_intro = False`. (5) `sum_kosten == 0`-Guard angepasst: bei `is_private_intro_month` wird auch eine Null-Kosten-Rechnung ausgestellt (Ausnahme der sonst geltenden Filterregel). Pyright: 0 Fehler. Noch offen: Rechnungsvorlage anpassen (Template-Felder `is_intro` und `Bezeichnung` einbauen).
+
 ## 2026-03-11
 
 - **Rechnungsvorlage aktualisiert**: `templates/rechnungsvorlage.docx` überarbeitet (kleinere Layout-Anpassungen).
