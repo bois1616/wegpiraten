@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(.venv/bin/pyright src/invoices/modules/invoice_processor.py src/invoices/modules/invoice_factory.py)"
+      "Bash(.venv/bin/pyright src/invoices/modules/invoice_processor.py src/invoices/modules/invoice_factory.py)",
+      "Bash(ls *.md)"
     ]
   }
 }
