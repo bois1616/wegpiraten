@@ -323,7 +323,7 @@ class InvoiceFactory:
             *debtor_lines,
             "SCOR",
             generate_scor(additional_info),
-            "",  # Ustrd leer (Rechnungsnummer steht in RfNb)
+            additional_info,  # Ustrd: Rechnungsnummer für Portal-Import
             "EPD",
             "",
             "",
