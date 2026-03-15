@@ -5,6 +5,7 @@ Verwendung:
     nox              # Führt alle Standard-Sessions aus (lint, typecheck)
     nox -s lint      # Nur Linting mit ruff
     nox -s typecheck # Nur Type-Checking mit pyright
+    nox -s test      # Unit-Tests mit pytest
     nox -s format    # Code formatieren mit ruff
     nox -l           # Verfügbare Sessions auflisten
 """
@@ -63,6 +64,13 @@ def typecheck(session: nox.Session) -> None:
         "types-reportlab>=4.4",
     )
     session.run("pyright", *SRC_DIRS)
+
+
+@nox.session(python=PYTHON_VERSION)
+def test(session: nox.Session) -> None:
+    """Führt Unit-Tests mit pytest durch."""
+    session.install("pytest>=8.0", ".")
+    session.run("pytest", "tests/", "--tb=short", env={"PYTHONPATH": "src"})
 
 
 @nox.session(python=PYTHON_VERSION)

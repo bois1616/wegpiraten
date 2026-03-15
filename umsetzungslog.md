@@ -2,6 +2,8 @@
 
 ## 2026-03-15
 
+- **Feature: SPC-QR RfNb (SCOR/ISO 11649) statt Ustrd**: `invoice_factory.py`: (1) Modul-Funktion `generate_scor(invoice_number: str) -> str` hinzugefügt — bereinigt Rechnungsnummer auf alphanumerisch/max. 21 Zeichen, berechnet ISO-11649-Prüfziffern via MOD-97 und liefert `RF{check}{ref}`. (2) `_build_spc_payload` umgestellt: `RfTyp=SCOR`, `RfNb=generate_scor(additional_info)`, `Ustrd` leer. Pytest-Setup: `pyproject.toml` um `pytest>=8.0` + `[tool.pytest.ini_options]` erweitert; `noxfile.py` um Session `test` ergänzt; `tests/test_generate_scor.py` mit 9 Tests (bekannter ISO-Referenzwert, typische Rechnungsnummern, Randfälle, Parametrisierung). Pyright: 0 Fehler, 9/9 Tests grün.
+
 - **Feature: Genehmigungshinweis bei überzogenem Budget (`budget_exceeded`)**: Masterdata-Tabelle `masterdata_client` in `wegpiraten_datenbank.xlsx` hat neue Spalten `sr_ap_first_name`, `sr_ap_last_name`, `sr_ap_gender` (Ansprechperson direkt am Klienten). (1) `wegpiraten_config.yaml` / Modell `client`: drei Felder als `type: str`, `optional: true` ergänzt. (2) `invoice_processor.py`: SQL-SELECT um `c.sr_ap_first_name/last_name/gender` erweitert. `budget_exceeded`-Flag: `True` wenn für mindestens eine Zeitart `sum > allowed > 0`. Flag + AP-Felder in `InvoiceContext` eingetragen; `allowed_*`-Werte aus bereits berechneten Variablen bezogen (keine Doppelberechnung). (3) `rechnungsvorlage.docx`: Block `{%p if budget_exceeded %}…{%p endif %}` über Danksagung auf Seite 2 — manuell eingefügt. Pyright: 0 Fehler.
 
 - **Fix: Bedingte Formatierung in `wegpiraten_datenbank.xlsx`**: Tabelle `masterdata_client`, Spalte `end_date`: neue Regel – wenn `HEUTE()` weniger als 40 Tage vor `end_date` liegt, wird die Zelle gelb hinterlegt (Frühwarnung auslaufende Aufträge).

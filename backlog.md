@@ -23,6 +23,7 @@ Stand 2026-03-14: Nachträglich aus Git-Historie rekonstruiert.
   3. `invoice_processor.py` / SQL: JOIN oder Subquery auf `service_requester` um AP-Felder ergänzen; `budget_exceeded`-Flag berechnen (`sum_X > allowed_X > 0` für alle drei Zeitarten); alle vier Werte in `InvoiceContext` eintragen.
   4. `rechnungsvorlage.docx`: Block über Danksagung (Seite 2) mit `{% if budget_exceeded %}…{% endif %}`; bei `False` entsteht kein Leerabsatz.
 
+- [x] [P1] [Rechnung] SPC-QR: Rechnungsnummer in RfNb (SCOR/ISO 11649) statt Ustrd. Hinweis: `generate_scor()` in `invoice_factory.py`; SPC-Payload `RfTyp=SCOR`, `RfNb=RF{check}{ref}`, `Ustrd` leer. 9 pytest-Tests in `tests/test_generate_scor.py`; pytest in pyproject.toml + nox-Session `test`.
 - [x] [P1] [Rechnung] Rechnungsnummer-Konvention einheitlich (z.B. 2026-02-C1010). Hinweis: Trenner `_` → `-` in `invoice_factory.py`.
 - [x] [P1] [Rechnung] Gruppierung nach Zahlungsdienstleister; Sammel-PDF je ZD. Hinweis: `invoice_processor.py`; PDFs zusammengefasst per ZD.
 - [x] [P1] [Rechnung] Rechnungsübersicht als Excel (Soll/Ist je Fallkategorie). Hinweis: `document_utils.py`; Spalten Zahlungsträger, Klient, Büro + Max/Ist-Spalten mit bedingter Formatierung.

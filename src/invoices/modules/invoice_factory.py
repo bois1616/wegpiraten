@@ -1,3 +1,4 @@
+import re
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -16,6 +17,26 @@ from shared_modules.utils import (
 )
 
 from .invoice_context import InvoiceContext
+
+
+def generate_scor(invoice_number: str) -> str:
+    """
+    Konvertiert eine Rechnungsnummer in eine gültige ISO 11649 SCOR-Referenz (RF-Referenz).
+
+    Algorithmus:
+    1. Rechnungsnummer bereinigen: nur alphanumerische Zeichen (A-Z, 0-9), max. 21 Zeichen.
+    2. ref + "RF00" → Buchstaben in Ziffern (A=10 … Z=35) → Ganzzahl MOD 97.
+    3. Prüfziffern = str(98 - Rest).zfill(2).
+    4. Ergebnis: "RF" + Prüfziffern + bereinigte Referenz.
+
+    Validierung: (ref + "RF" + check_digits) als rotierende Ziffernfolge MOD 97 == 1.
+    """
+    ref = re.sub(r"[^A-Z0-9]", "", invoice_number.upper())[:21]
+    if not ref:
+        ref = "0"
+    numeric = "".join(str(ord(c) - ord("A") + 10) if c.isalpha() else c for c in ref + "RF00")
+    check_digits = str(98 - (int(numeric) % 97)).zfill(2)
+    return f"RF{check_digits}{ref}"
 
 
 class InvoiceFactory:
@@ -300,9 +321,9 @@ class InvoiceFactory:
             amount_str,
             currency,
             *debtor_lines,
-            "NON",
-            "",
-            safe_str(additional_info),
+            "SCOR",
+            generate_scor(additional_info),
+            "",  # Ustrd leer (Rechnungsnummer steht in RfNb)
             "EPD",
             "",
             "",
