@@ -136,7 +136,10 @@ class TimeSheetsImporter:
         "indirect_time_col": "stunden",
         "billable_hours_col": "notizen",
     }
+    # tt.mm oder tt.mm. (Monat und Jahr aus Abrechnungsmonat)
     _SHORT_DATE_PATTERN = re.compile(r"^\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]?\s*$")
+    # nur tt oder tt. (Monat und Jahr vollständig aus Abrechnungsmonat)
+    _DAY_ONLY_PATTERN = re.compile(r"^\s*(\d{1,2})\.?\s*$")
 
     def __init__(self, config: Config, profile: Optional[TimeSheetImportProfile] = None):
         self.config = config
@@ -601,7 +604,7 @@ class TimeSheetsImporter:
 
             service_date = to_date(v_date)
             if service_date is None:
-                service_date = self._parse_partial_service_date(v_date, reporting_period.start.year)
+                service_date = self._parse_partial_service_date(v_date, reporting_period)
                 if service_date is not None:
                     logger.info(
                         "Partielles Datum korrigiert in {} Zeile {}: '{}' -> {}",
@@ -692,22 +695,42 @@ class TimeSheetsImporter:
             data["service_date"] = data["service_date"].isoformat()
         return tuple(data.get(column) for column in self._INSERT_FIELDS)
 
-    def _parse_partial_service_date(self, raw_value: object, reporting_year: int) -> Optional[date]:
+    def _parse_partial_service_date(self, raw_value: object, reporting_period: MonthPeriod) -> Optional[date]:
         """
-        Interpretiert tt.mm. bzw. t.m. als Datum mit Jahr aus dem CLI-Leistungsmonat.
+        Tolerante Datumsergänzung bei Texteingaben im Datumsfeld.
+
+        Unterstützte Formate (Abrechnungsmonat ergänzt fehlende Teile):
+          - "12"    → Tag 12, Monat+Jahr aus Abrechnungsmonat
+          - "12."   → Tag 12, Monat+Jahr aus Abrechnungsmonat
+          - "12.3"  → Tag 12, Monat 3, Jahr aus Abrechnungsmonat
+          - "12.3." → Tag 12, Monat 3, Jahr aus Abrechnungsmonat
         """
         if not isinstance(raw_value, str):
             return None
-        match = self._SHORT_DATE_PATTERN.match(raw_value)
-        if not match:
-            return None
 
-        day = int(match.group(1))
-        month = int(match.group(2))
-        try:
-            return date(reporting_year, month, day)
-        except ValueError:
-            return None
+        year = reporting_period.start.year
+        period_month = reporting_period.start.month
+
+        # tt.mm oder tt.mm.
+        match = self._SHORT_DATE_PATTERN.match(raw_value)
+        if match:
+            day = int(match.group(1))
+            month = int(match.group(2))
+            try:
+                return date(year, month, day)
+            except ValueError:
+                return None
+
+        # nur tt oder tt.
+        match = self._DAY_ONLY_PATTERN.match(raw_value)
+        if match:
+            day = int(match.group(1))
+            try:
+                return date(year, period_month, day)
+            except ValueError:
+                return None
+
+        return None
 
     @staticmethod
     def _is_within_reporting_period(service_date: date, reporting_period: MonthPeriod) -> bool:

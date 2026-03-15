@@ -31,6 +31,7 @@ Stand 2026-03-14: Nachträglich aus Git-Historie rekonstruiert.
   - Konstanten: `_PRIVATE_SERVICE_TYPE_CODE = "ST99"`, `_INTRO_FREE_MINUTES = 15`
   - Template-Ausdruck: `{{item.Leistungsdatum|date if not item.is_intro else item.Bezeichnung}}`
 
+- [x] [P1] [Import] Tolerante Datumsergänzung im Timesheet-Import: Texteingaben wie «12», «12.», «12.3», «12.3.» werden zusammen mit dem Abrechnungsmonat zu vollständigen Daten ergänzt. Nicht erkennbare Werte erzeugen Logeintrag, stoppen den Import nicht. Hinweis: `_parse_partial_service_date` in `batch_import_timesheets.py` erweitert; zweites Pattern `_DAY_ONLY_PATTERN` für bare Tag-Eingaben.
 - [x] [P1] [Import] Doubletten beim mehrfachen Timesheet-Import verhindern (Upsert). Hinweis: ursprünglich Hash-basierte Dedup; später vereinfacht auf direkten Import ohne Dedup (jede Zeile eigenständig).
 - [x] [P1] [Import] Datum-Validierung beim Timesheet-Import (fehlendes/fehlerhaftes Jahr; Datum ausserhalb Monat). Hinweis: Warnung + Fehlerprotokoll in `batch_import_timesheets.py`.
 - [x] [P1] [Import] Abrechnungsmonat aus Bogen-Header (C6) gegen CLI-Monat prüfen. Hinweis: Warnung wenn Monat abweicht.
