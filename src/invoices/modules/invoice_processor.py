@@ -156,6 +156,9 @@ class InvoiceProcessor:
             c.social_security_number AS client_social_security_number,
             {tenant_select_sql}
             c.start_date AS client_start_date,
+            c.sr_ap_first_name AS sr_ap_first_name,
+            c.sr_ap_last_name AS sr_ap_last_name,
+            c.sr_ap_gender AS sr_ap_gender,
             COALESCE(c.allowed_travel_time, 0) AS allowed_travel_time,
             COALESCE(c.allowed_direct_effort, 0) AS allowed_direct_effort,
             COALESCE(c.allowed_indirect_effort, 0) AS allowed_indirect_effort,
@@ -447,6 +450,15 @@ class InvoiceProcessor:
                     "summe_kosten": sum_kosten,
                 }
 
+                allowed_travel = int(client_row.get("allowed_travel_time") or 0)
+                allowed_direct = int(client_row.get("allowed_direct_effort") or 0)
+                allowed_indirect = int(client_row.get("allowed_indirect_effort") or 0)
+                budget_exceeded = (
+                    (allowed_travel > 0 and sum_fahrtzeit > allowed_travel)
+                    or (allowed_direct > 0 and sum_direkt > allowed_direct)
+                    or (allowed_indirect > 0 and sum_indirekt > allowed_indirect)
+                )
+
                 # Rechnungen mit Betrag 0 werden nur bei Privatleistungen im Startmonat
                 # zugelassen (Einführungsgespräch komplett kostenfrei).
                 if sum_stunden == 0 or (sum_kosten == 0 and not is_private_intro_month):
@@ -481,9 +493,13 @@ class InvoiceProcessor:
                         "client_name": client_name or safe_str(client_obj.name),
                         "service_type_description": service_type_description,
                         "client": client_obj,
-                        "allowed_travel_time": int(client_row.get("allowed_travel_time") or 0),
-                        "allowed_direct_effort": int(client_row.get("allowed_direct_effort") or 0),
-                        "allowed_indirect_effort": int(client_row.get("allowed_indirect_effort") or 0),
+                        "allowed_travel_time": allowed_travel,
+                        "allowed_direct_effort": allowed_direct,
+                        "allowed_indirect_effort": allowed_indirect,
+                        "budget_exceeded": budget_exceeded,
+                        "sr_ap_first_name": safe_str(client_row.get("sr_ap_first_name")),
+                        "sr_ap_last_name": safe_str(client_row.get("sr_ap_last_name")),
+                        "sr_ap_gender": safe_str(client_row.get("sr_ap_gender")),
                         "positions": positions,
                         **totals,
                     }

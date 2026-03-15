@@ -2,6 +2,10 @@
 
 ## 2026-03-15
 
+- **Feature: Genehmigungshinweis bei überzogenem Budget (`budget_exceeded`)**: Masterdata-Tabelle `masterdata_client` in `wegpiraten_datenbank.xlsx` hat neue Spalten `sr_ap_first_name`, `sr_ap_last_name`, `sr_ap_gender` (Ansprechperson direkt am Klienten). (1) `wegpiraten_config.yaml` / Modell `client`: drei Felder als `type: str`, `optional: true` ergänzt. (2) `invoice_processor.py`: SQL-SELECT um `c.sr_ap_first_name/last_name/gender` erweitert. `budget_exceeded`-Flag: `True` wenn für mindestens eine Zeitart `sum > allowed > 0`. Flag + AP-Felder in `InvoiceContext` eingetragen; `allowed_*`-Werte aus bereits berechneten Variablen bezogen (keine Doppelberechnung). (3) `rechnungsvorlage.docx`: Block `{%p if budget_exceeded %}…{%p endif %}` über Danksagung auf Seite 2 — manuell eingefügt. Pyright: 0 Fehler.
+
+- **Fix: Bedingte Formatierung in `wegpiraten_datenbank.xlsx`**: Tabelle `masterdata_client`, Spalte `end_date`: neue Regel – wenn `HEUTE()` weniger als 40 Tage vor `end_date` liegt, wird die Zelle gelb hinterlegt (Frühwarnung auslaufende Aufträge).
+
 - **Fix: Tolerante Datumsergänzung im Timesheet-Import**: Datumsfeld im Timesheet ist neu als Text formatiert; Eingaben wie «12», «12.», «12.3», «12.3.» werden jetzt tolerant zusammen mit dem bekannten Abrechnungsmonat zu vollständigen Daten ergänzt. `batch_import_timesheets.py`: (1) `_DAY_ONLY_PATTERN = re.compile(r"^\s*(\d{1,2})\.?\s*$")` als zweites Klassenmuster ergänzt. (2) `_parse_partial_service_date` auf Signatur `(raw_value, reporting_period: MonthPeriod)` umgestellt (statt `reporting_year: int`). (3) Methode prüft zuerst `_SHORT_DATE_PATTERN` (tt.mm/tt.mm.), dann `_DAY_ONLY_PATTERN` (nur tt/tt.); Monat und/oder Jahr werden aus `reporting_period.start` ergänzt. Nicht erkennbare Werte geben `None` zurück → bestehende Fehlerprotokoll-Logik greift. Pyright: 0 Fehler.
 
 ## 2026-03-14

@@ -135,6 +135,18 @@ entities:
       - name: short_code
         type: str
         excel_column: short_code
+      - name: sr_ap_first_name
+        type: str
+        optional: true
+        excel_column: sr_ap_first_name
+      - name: sr_ap_last_name
+        type: str
+        optional: true
+        excel_column: sr_ap_last_name
+      - name: sr_ap_gender
+        type: str
+        optional: true
+        excel_column: sr_ap_gender
       - name: tenant_id
         type: str
         excel_column: tenant_id

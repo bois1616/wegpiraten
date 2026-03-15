@@ -15,6 +15,14 @@ Stand 2026-03-14: Nachträglich aus Git-Historie rekonstruiert.
 
 ## P1 Should
 
+- [x] [P1] [Rechnung] Genehmigungshinweis auf Rechnung bei überzogenem Budget. Wenn `travel_time`, `direct_time` oder `indirect_time` das erlaubte Budget überschreiten UND das TS zum Import vorliegt, erscheint auf Seite 2 über der Danksagung: «`{{sr_ap_gender}} {{sr_ap_first_name}} {{sr_ap_last_name}} hat nach Absprache mit uns das erhöhte Stundenkontigent für diesen Monat gesondert genehmigt.`» Andernfalls bleibt die Stelle leer.
+
+  **Umsetzungsplan:**
+  1. `wegpiraten_datenbank.xlsx` / Tabelle `masterdata_service_requester`: Spalten `ap_gender`, `ap_first_name`, `ap_last_name` ergänzen und befüllen.
+  2. `.config/wegpiraten_config.yaml` / Modell `service_requester`: dieselben drei Felder als `type: str`, `optional: true` nachziehen.
+  3. `invoice_processor.py` / SQL: JOIN oder Subquery auf `service_requester` um AP-Felder ergänzen; `budget_exceeded`-Flag berechnen (`sum_X > allowed_X > 0` für alle drei Zeitarten); alle vier Werte in `InvoiceContext` eintragen.
+  4. `rechnungsvorlage.docx`: Block über Danksagung (Seite 2) mit `{% if budget_exceeded %}…{% endif %}`; bei `False` entsteht kein Leerabsatz.
+
 - [x] [P1] [Rechnung] Rechnungsnummer-Konvention einheitlich (z.B. 2026-02-C1010). Hinweis: Trenner `_` → `-` in `invoice_factory.py`.
 - [x] [P1] [Rechnung] Gruppierung nach Zahlungsdienstleister; Sammel-PDF je ZD. Hinweis: `invoice_processor.py`; PDFs zusammengefasst per ZD.
 - [x] [P1] [Rechnung] Rechnungsübersicht als Excel (Soll/Ist je Fallkategorie). Hinweis: `document_utils.py`; Spalten Zahlungsträger, Klient, Büro + Max/Ist-Spalten mit bedingter Formatierung.
