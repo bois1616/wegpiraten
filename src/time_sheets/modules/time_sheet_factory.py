@@ -262,7 +262,7 @@ class TimeSheetFactory:
                 if hasattr(ws.protection, attr):
                     setattr(ws.protection, attr, value)
 
-        filename = f"{header_data.client_id} ({header_data.short_code})_{reporting_month_dt.strftime('%Y-%m')}.xlsx"
+        filename = f"{header_data.employee_id}_{header_data.client_id} ({header_data.short_code})_{reporting_month_dt.strftime('%Y-%m')}.xlsx"
         target_file = target_output / filename
         try:
             wb.save(target_file)
