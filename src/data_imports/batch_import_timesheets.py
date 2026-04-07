@@ -899,9 +899,10 @@ class TimeSheetsImporter:
             pivot["total_minutes"] = pivot[time_cols].sum(axis=1).round().astype(int)
             pivot["total_hours"] = (pivot["total_minutes"] / 60).round(2)
 
-        # Rechnungssumme = Stunden * Stundenansatz
-        if "hourly_rate" in pivot.columns and "total_hours" in pivot.columns:
-            pivot["rechnungssumme_chf"] = (pivot["total_hours"] * pivot["hourly_rate"]).round(2)
+        # Rechnungssumme analog zur Rechnungslogik aus Minuten berechnen.
+        # total_hours bleibt eine reine Anzeige-Spalte und darf gerundet sein.
+        if "hourly_rate" in pivot.columns and "total_minutes" in pivot.columns:
+            pivot["rechnungssumme_chf"] = ((pivot["total_minutes"] / 60) * pivot["hourly_rate"]).round(2)
 
         # Spaltenreihenfolge
         ordered = [c for c in group_cols if c in pivot.columns]
