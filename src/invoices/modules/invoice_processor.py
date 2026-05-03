@@ -59,7 +59,7 @@ class InvoiceProcessor:
         - Fallback auf 1 Minute bei ungültigen Werten.
         """
         step = to_float(value) or 0.0
-        if step <= 0:
+        if not math.isfinite(step) or step <= 0:
             return 1.0
         if step < 1:
             step = step * 60.0
