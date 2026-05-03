@@ -144,6 +144,7 @@ class DocumentUtils:
                 {
                     "Rechnungsdatum": data.get("invoice_date"),
                     "Zahlungsträger": getattr(payer, "name", "n.a") if payer else "n.a",
+                    "Klienten-ID": getattr(client, "key", "") if client else "",
                     "Klient": (
                         ", ".join(p for p in [getattr(client, "last_name", ""), getattr(client, "first_name", "")] if p)
                         if client
