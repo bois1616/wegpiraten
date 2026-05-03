@@ -363,10 +363,15 @@ class InvoiceProcessor:
                 sum_kosten = 0.0
                 remaining_intro_minutes = _INTRO_FREE_MINUTES if is_private_intro_month else 0
 
-                # Mehrere Einträge am gleichen Tag (z.B. unterschiedliche Uhrzeiten)
-                # werden zu einer Rechnungsposition zusammengefasst.
+                # Zeilen aufteilen: «ohne Berechnung»-Einträge (Notiz, case-insensitiv) bleiben
+                # als eigene Rechnungsposition erhalten; alle anderen werden je Tag summiert.
+                details_sorted = client_details.sort_values("service_date")  # pyright: ignore[reportCallIssue]
+                is_intro_mask = details_sorted["notes"].apply(lambda v: "ohne berechnung" in str(v or "").lower())
+                intro_rows = details_sorted[is_intro_mask]
+                normal_rows = details_sorted[~is_intro_mask]
+
                 date_groups = (
-                    client_details.groupby("service_date", as_index=False)
+                    normal_rows.groupby("service_date", as_index=False)
                     .agg(
                         travel_time=("travel_time", "sum"),
                         direct_time=("direct_time", "sum"),
@@ -377,6 +382,51 @@ class InvoiceProcessor:
                     .sort_values("service_date")  # pyright: ignore[reportCallIssue]
                 )
 
+                has_intro_position = False
+
+                def _make_position(
+                    service_date: object,
+                    fahrtzeit: int,
+                    direkt: int,
+                    indirekt: int,
+                    hourly_rate: float,
+                    is_intro: bool,
+                ) -> dict:
+                    minuten_total = fahrtzeit + direkt + indirekt
+                    kosten = 0.0 if is_intro else (minuten_total / 60.0) * hourly_rate
+                    return {
+                        "Leistungsdatum": service_date,
+                        "Bezeichnung": "",
+                        "Fahrtzeit": fahrtzeit,
+                        "Direkt": direkt,
+                        "Indirekt": indirekt,
+                        "Stunden": minuten_total,
+                        "Kosten": kosten,
+                        "is_intro": is_intro,
+                    }
+
+                # «ohne Berechnung»-Positionen als separate Zeilen (nicht aggregiert, Kosten=0)
+                for _, irow in intro_rows.iterrows():
+                    service_date = irow.get("service_date")
+                    if service_date is None or pd.isna(service_date):
+                        continue
+                    rundung = irow.get("rundung")
+                    fahrtzeit = self._round_minutes(irow.get("travel_time"), rundung)
+                    direkt = self._round_minutes(irow.get("direct_time"), rundung)
+                    indirekt = self._round_minutes(irow.get("indirect_time"), rundung)
+                    minuten_total = fahrtzeit + direkt + indirekt
+                    if minuten_total == 0:
+                        continue
+                    has_intro_position = True
+                    pos = _make_position(service_date, fahrtzeit, direkt, indirekt, 0.0, is_intro=True)
+                    positions.append(pos)
+                    sum_fahrtzeit += fahrtzeit
+                    sum_direkt += direkt
+                    sum_indirekt += indirekt
+                    sum_stunden += minuten_total
+                    # sum_kosten bleibt 0 für diese Zeilen
+
+                # Normale Positionen je Tag aggregiert
                 for _, row in date_groups.iterrows():
                     service_date = row.get("service_date")
                     if service_date is None or pd.isna(service_date):
@@ -396,10 +446,11 @@ class InvoiceProcessor:
                     direkt = self._round_minutes(row.get("direct_time"), rundung)
                     indirekt = self._round_minutes(row.get("indirect_time"), rundung)
 
-                    # Einführungsgespräch: kostenfreie Freiminuten von direct_time abziehen
+                    # Einführungsgespräch (Startmonat): kostenfreie Freiminuten von direct_time abziehen
                     if remaining_intro_minutes > 0 and direkt > 0:
                         intro_direct = min(remaining_intro_minutes, direkt)
                         remaining_intro_minutes -= intro_direct
+                        has_intro_position = True
                         positions.append(
                             {
                                 "Leistungsdatum": service_date,
@@ -421,16 +472,7 @@ class InvoiceProcessor:
 
                     if minuten_total > 0:
                         positions.append(
-                            {
-                                "Leistungsdatum": service_date,
-                                "Bezeichnung": "",
-                                "Fahrtzeit": fahrtzeit,
-                                "Direkt": direkt,
-                                "Indirekt": indirekt,
-                                "Stunden": minuten_total,
-                                "Kosten": kosten,
-                                "is_intro": False,
-                            }
+                            _make_position(service_date, fahrtzeit, direkt, indirekt, hourly_rate, is_intro=False)
                         )
                         sum_fahrtzeit += fahrtzeit
                         sum_direkt += direkt
@@ -459,9 +501,9 @@ class InvoiceProcessor:
                     or (allowed_indirect > 0 and sum_indirekt > allowed_indirect)
                 )
 
-                # Rechnungen mit Betrag 0 werden nur bei Privatleistungen im Startmonat
-                # zugelassen (Einführungsgespräch komplett kostenfrei).
-                if sum_stunden == 0 or (sum_kosten == 0 and not is_private_intro_month):
+                # Rechnungen mit Betrag 0 werden zugelassen wenn Privatleistung im Startmonat
+                # oder mindestens eine Position als «ohne Berechnung» markiert ist.
+                if sum_stunden == 0 or (sum_kosten == 0 and not is_private_intro_month and not has_intro_position):
                     logger.warning(
                         "Rechnung für Client {} übersprungen: Zeitsumme={} Min, Betrag={} CHF.",
                         client_id,
@@ -493,6 +535,7 @@ class InvoiceProcessor:
                         "client_name": client_name or safe_str(client_obj.name),
                         "service_type_description": service_type_description,
                         "client": client_obj,
+                        "has_intro_position": has_intro_position,
                         "allowed_travel_time": allowed_travel,
                         "allowed_direct_effort": allowed_direct,
                         "allowed_indirect_effort": allowed_indirect,

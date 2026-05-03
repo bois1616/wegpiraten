@@ -136,6 +136,12 @@ class TimeSheetsImporter:
         "indirect_time_col": "stunden",
         "billable_hours_col": "notizen",
     }
+    _HEADER_LABEL_ALIASES: Dict[str, set[str]] = {
+        # Bestehende Vorlagen verwenden teilweise "Fahrzeit" statt "Fahrtzeit".
+        "fahrtzeit": {"fahrzeit"},
+    }
+    # tt.mm.jj oder tt.mm.jjjj (vollständiges Datum mit zweistelligem/vierstelligem Jahr)
+    _FULL_DATE_PATTERN = re.compile(r"^\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{2,4})\s*$")
     # tt.mm oder tt.mm. (Monat und Jahr aus Abrechnungsmonat)
     _SHORT_DATE_PATTERN = re.compile(r"^\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]?\s*$")
     # nur tt oder tt. (Monat und Jahr vollständig aus Abrechnungsmonat)
@@ -397,6 +403,13 @@ class TimeSheetsImporter:
     def _normalize_label(value: object) -> str:
         return " ".join(str(value or "").strip().lower().split())
 
+    @classmethod
+    def _label_matches(cls, actual_label: str, expected_label: str) -> bool:
+        """Prüft Header-Labels inklusive dokumentierter Template-Varianten."""
+        if actual_label == expected_label:
+            return True
+        return actual_label in cls._HEADER_LABEL_ALIASES.get(expected_label, set())
+
     def _get_header_label(self, ws: Worksheet, column: str) -> str:
         row_idx = self.profile.table_range.start_row
         value = ws[f"{column}{row_idx}"].value
@@ -497,8 +510,16 @@ class TimeSheetsImporter:
                 column = getattr(mp, key, None)
                 if not column:
                     continue
-                if labels.get(key) != expected_label:
+                actual_label = labels.get(key, "")
+                if not self._label_matches(actual_label, expected_label):
                     return False
+                if actual_label != expected_label:
+                    logger.info(
+                        "Header-Variante akzeptiert: {}='{}' (erwartet '{}').",
+                        key,
+                        actual_label,
+                        expected_label,
+                    )
             return True
 
         expected = {
@@ -700,16 +721,30 @@ class TimeSheetsImporter:
         Tolerante Datumsergänzung bei Texteingaben im Datumsfeld.
 
         Unterstützte Formate (Abrechnungsmonat ergänzt fehlende Teile):
-          - "12"    → Tag 12, Monat+Jahr aus Abrechnungsmonat
-          - "12."   → Tag 12, Monat+Jahr aus Abrechnungsmonat
+          - "12.3.26"  → Tag 12, Monat 3, Jahr 2026 (zweistellig → 2000+)
+          - "12.3.2026" → Tag 12, Monat 3, Jahr 2026
           - "12.3"  → Tag 12, Monat 3, Jahr aus Abrechnungsmonat
           - "12.3." → Tag 12, Monat 3, Jahr aus Abrechnungsmonat
+          - "12"    → Tag 12, Monat+Jahr aus Abrechnungsmonat
+          - "12."   → Tag 12, Monat+Jahr aus Abrechnungsmonat
         """
         if not isinstance(raw_value, str):
             return None
 
         year = reporting_period.start.year
         period_month = reporting_period.start.month
+
+        # tt.mm.jj oder tt.mm.jjjj
+        match = self._FULL_DATE_PATTERN.match(raw_value)
+        if match:
+            day = int(match.group(1))
+            month = int(match.group(2))
+            raw_year = int(match.group(3))
+            full_year = (2000 + raw_year) if raw_year < 100 else raw_year
+            try:
+                return date(full_year, month, day)
+            except ValueError:
+                return None
 
         # tt.mm oder tt.mm.
         match = self._SHORT_DATE_PATTERN.match(raw_value)

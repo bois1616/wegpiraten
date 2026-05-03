@@ -143,6 +143,12 @@ def _write_excel(df: pd.DataFrame, out_file: Path, month_str: str) -> None:
             ).font = Font(bold=True)
             ws_sum.cell(row=total_row, column=col_idx).number_format = int_fmt
 
+        # --- Pivot: Zeitdaten je Mitarbeiter und Tag ---
+        pivot_df = _build_pivot(df)
+        pivot_df.to_excel(writer, sheet_name="Pivot", index=False)
+        ws_pivot = writer.sheets["Pivot"]
+        _write_pivot_sheet(ws_pivot, pivot_df, header_fill, header_font)
+
 
 def _apply_table(ws, df: pd.DataFrame, name: str) -> None:
     end_col = get_column_letter(len(df.columns))
@@ -195,3 +201,64 @@ def _autofit(ws, df: pd.DataFrame) -> None:
             df.iloc[:, col_idx - 1].astype(str).str.len().max() if not df.empty else 0,
         )
         ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 3, 40)
+
+
+_PIVOT_MIN_COLS = ["Sum Fahrzeit", "Sum Direkt", "Sum Indirekt", "Gesamt Min"]
+_PIVOT_HMM_COL = "Gesamt h:mm"
+
+
+def _build_pivot(df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregiert Zeitdaten je Mitarbeiter und Tag."""
+    pivot = (
+        df.groupby(["Mitarbeiter", "Datum"], as_index=False)
+        .agg(
+            **{
+                "Sum Fahrzeit": ("Fahrtzeit", "sum"),
+                "Sum Direkt": ("Direktkontakt", "sum"),
+                "Sum Indirekt": ("Indir. Bearbeitung", "sum"),
+            }
+        )
+        .sort_values(["Mitarbeiter", "Datum"])
+    )
+    pivot["Gesamt Min"] = pivot["Sum Fahrzeit"] + pivot["Sum Direkt"] + pivot["Sum Indirekt"]
+    # Platzhalter; die eigentliche h:mm-Formel wird beim Schreiben als Excel-Formel eingetragen
+    pivot[_PIVOT_HMM_COL] = None
+    return pivot  # type: ignore[return-value]
+
+
+def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> None:
+    """Formatiert das Pivot-Sheet und setzt die [h]:mm-Formel für Gesamt h:mm."""
+    from openpyxl.styles import Alignment as Aln
+
+    cols = list(pivot_df.columns)
+    min_col_idx = cols.index("Gesamt Min") + 1
+    hmm_col_idx = cols.index(_PIVOT_HMM_COL) + 1
+    min_col_letter = get_column_letter(min_col_idx)
+    date_col_idx = cols.index("Datum") + 1
+    date_col_letter = get_column_letter(date_col_idx)
+
+    # Kopfzeile formatieren
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Aln(horizontal="center")
+
+    last_row = len(pivot_df) + 1
+    for row in range(2, last_row + 1):
+        # Datumsspalte
+        ws[f"{date_col_letter}{row}"].number_format = "dd.mm.yyyy"
+        ws[f"{date_col_letter}{row}"].alignment = Aln(horizontal="center")
+        # Minuten-Spalten
+        for col_name in _PIVOT_MIN_COLS:
+            col_idx = cols.index(col_name) + 1
+            cell = ws.cell(row=row, column=col_idx)
+            cell.number_format = "0"
+            cell.alignment = Aln(horizontal="right")
+        # h:mm-Formel: Minuten / 1440 ergibt einen Excel-Zeitwert; Format [h]:mm zeigt >24h korrekt
+        hmm_cell = ws.cell(row=row, column=hmm_col_idx, value=f"={min_col_letter}{row}/1440")
+        hmm_cell.number_format = "[h]:mm"
+        hmm_cell.alignment = Aln(horizontal="right")
+
+    # Spaltenbreiten
+    for col_idx, col_name in enumerate(cols, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = min(len(str(col_name)) + 4, 22)
