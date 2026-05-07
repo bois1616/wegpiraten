@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -16,6 +18,9 @@ class HeaderCells(BaseModel):
     service_type: str = "G7"  # Schlüssel/Festwert
     short_code: str = "C8"  # informativ
     client_id: str = "G8"  # Schlüssel
+    budget_travel_time: Optional[str] = None
+    budget_direct_effort: Optional[str] = None
+    budget_indirect_effort: Optional[str] = None
 
     @classmethod
     def from_config(cls, cfg) -> "HeaderCells":
@@ -27,4 +32,7 @@ class HeaderCells(BaseModel):
             service_type=cfg.service_type,
             short_code=cfg.short_code,
             client_id=cfg.client_id,
+            budget_travel_time=getattr(cfg, "budget_travel_time", None),
+            budget_direct_effort=getattr(cfg, "budget_direct_effort", None),
+            budget_indirect_effort=getattr(cfg, "budget_indirect_effort", None),
         )

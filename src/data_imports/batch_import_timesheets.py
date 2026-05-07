@@ -114,6 +114,9 @@ class TimeSheetsImporter:
         "notes",
         "source_file",
         "reporting_month",
+        "allowed_travel_time",
+        "allowed_direct_effort",
+        "allowed_indirect_effort",
     )
 
     _HEADER_LABELS_WITH_KM: Dict[str, str] = {
@@ -382,6 +385,10 @@ class TimeSheetsImporter:
             if "tenant_id" not in columns:
                 conn.execute("ALTER TABLE service_data ADD COLUMN tenant_id TEXT")
                 logger.info("Tabelle service_data um Spalte tenant_id erweitert.")
+            for budget_col in ("allowed_travel_time", "allowed_direct_effort", "allowed_indirect_effort"):
+                if budget_col not in columns:
+                    conn.execute(f"ALTER TABLE service_data ADD COLUMN {budget_col} INTEGER")
+                    logger.info("Tabelle service_data um Spalte {} erweitert.", budget_col)
             # Legacy-Dedup-Tabelle entfernen (verhindert FK-Konflikt beim DELETE FROM service_data)
             conn.execute("DROP TABLE IF EXISTS service_data_import_dedup")
             conn.execute(drop_legacy_client_date_index_sql)
@@ -463,6 +470,20 @@ class TimeSheetsImporter:
         if row and row[0]:
             return str(row[0]).strip()
         return None
+
+    def _resolve_budget(self, client_id: Optional[str]) -> tuple[Optional[int], Optional[int], Optional[int]]:
+        """Liest allowed_travel_time, allowed_direct_effort, allowed_indirect_effort aus clients."""
+        if not client_id:
+            return None, None, None
+        sql = "SELECT allowed_travel_time, allowed_direct_effort, allowed_indirect_effort FROM clients WHERE client_id = ?"
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(sql, (client_id,)).fetchone()
+        if row:
+            travel = int(row[0]) if row[0] is not None else None
+            direct = int(row[1]) if row[1] is not None else None
+            indirect = int(row[2]) if row[2] is not None else None
+            return travel, direct, indirect
+        return None, None, None
 
     def _resolve_tenant_id(self, client_id: Optional[str]) -> Optional[str]:
         if not client_id:
@@ -582,6 +603,28 @@ class TimeSheetsImporter:
             employee_id = resolved_employee_id
         employee_id_str = str(employee_id).strip() if employee_id is not None else ""
 
+        def _read_budget_cell(cell_addr: Optional[str]) -> Optional[int]:
+            if not cell_addr:
+                return None
+            raw = ws[cell_addr].value  # type: ignore[union-attr]
+            if raw is None:
+                return None
+            try:
+                return int(float(str(raw).strip()))
+            except (ValueError, TypeError):
+                return None
+
+        sheet_travel = _read_budget_cell(cells.budget_travel_time)
+        sheet_direct = _read_budget_cell(cells.budget_direct_effort)
+        sheet_indirect = _read_budget_cell(cells.budget_indirect_effort)
+
+        # Fallback auf DB, falls das Sheet keine Budgets enthält
+        if sheet_travel is None and sheet_direct is None and sheet_indirect is None:
+            db_travel, db_direct, db_indirect = self._resolve_budget(client_id_str or None)
+            if db_travel is not None or db_direct is not None or db_indirect is not None:
+                logger.debug("Budget für Klient {} aus DB übernommen (Timesheet ohne Budgetzeile).", client_id_str)
+            sheet_travel, sheet_direct, sheet_indirect = db_travel, db_direct, db_indirect
+
         return {
             "employee_fullname": ws[cells.employee_name].value,  # type: ignore[union-attr]
             "employee_id": employee_id_str or None,
@@ -592,6 +635,9 @@ class TimeSheetsImporter:
             "client_id": client_id_str or None,
             "tenant_id": resolved_tenant_id,
             "hourly_rate": resolved_hourly_rate,
+            "allowed_travel_time": sheet_travel,
+            "allowed_direct_effort": sheet_direct,
+            "allowed_indirect_effort": sheet_indirect,
         }
 
     def _read_rows(
@@ -693,6 +739,9 @@ class TimeSheetsImporter:
                         "notes": str(v_notes).strip() if v_notes is not None else None,
                         "source_file": source_file,
                         "reporting_month": reporting_month,
+                        "allowed_travel_time": header.get("allowed_travel_time"),
+                        "allowed_direct_effort": header.get("allowed_direct_effort"),
+                        "allowed_indirect_effort": header.get("allowed_indirect_effort"),
                         "_source_row": row_idx,
                     }
                 )
