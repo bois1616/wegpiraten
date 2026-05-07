@@ -15,6 +15,14 @@ from shared_modules.config import Config
 from .invoice_context import InvoiceContext
 
 
+def _summary_column_letter(summary_df: pd.DataFrame, column_name: str) -> str:
+    """Gibt den Excel-Spaltenbuchstaben für eine eindeutige Übersichts-Spalte zurück."""
+    loc = summary_df.columns.get_loc(column_name)
+    if not isinstance(loc, int):
+        raise ValueError(f"Spalte '{column_name}' ist in der Rechnungsübersicht nicht eindeutig.")
+    return get_column_letter(loc + 1)
+
+
 class DocumentUtils:
     """
     Statische Hilfsklasse für Dokumentenoperationen:
@@ -197,8 +205,7 @@ class DocumentUtils:
 
                 # Währungsspalte formatieren und summieren
                 if "Rechnungsbetrag" in summary_df.columns:
-                    loc = summary_df.columns.get_loc("Rechnungsbetrag")
-                    kosten_col_letter = get_column_letter(int(loc) + 1)  # type: ignore[arg-type]
+                    kosten_col_letter = _summary_column_letter(summary_df, "Rechnungsbetrag")
                     for row in range(2, len(summary_df) + 2):
                         worksheet[f"{kosten_col_letter}{row}"].number_format = kosten_format
                     worksheet[f"{kosten_col_letter}{total_row_idx}"] = (
@@ -219,8 +226,7 @@ class DocumentUtils:
                 ]
                 for col_name in int_min_cols:
                     if col_name in summary_df.columns:
-                        loc = summary_df.columns.get_loc(col_name)
-                        col_letter = get_column_letter(int(loc) + 1)  # type: ignore[arg-type]
+                        col_letter = _summary_column_letter(summary_df, col_name)
                         for row in range(2, len(summary_df) + 2):
                             worksheet[f"{col_letter}{row}"].number_format = "0"
                         worksheet[f"{col_letter}{total_row_idx}"] = (
@@ -239,16 +245,15 @@ class DocumentUtils:
                         ("Max Total", "Summe Ist"),
                     ]:
                         if max_col in summary_df.columns and ist_col in summary_df.columns:
-                            max_letter = get_column_letter(int(summary_df.columns.get_loc(max_col)) + 1)  # type: ignore[arg-type]
-                            ist_letter = get_column_letter(int(summary_df.columns.get_loc(ist_col)) + 1)  # type: ignore[arg-type]
+                            max_letter = _summary_column_letter(summary_df, max_col)
+                            ist_letter = _summary_column_letter(summary_df, ist_col)
                             cell_range = f"{max_letter}2:{ist_letter}{data_row_count + 1}"
                             rule = FormulaRule(formula=[f"${ist_letter}2>${max_letter}2"], fill=red_fill)
                             worksheet.conditional_formatting.add(cell_range, rule)
 
                 # Datumsspalte formatieren
                 if "Rechnungsdatum" in summary_df.columns:
-                    loc = summary_df.columns.get_loc("Rechnungsdatum")
-                    datum_col_letter = get_column_letter(int(loc) + 1)  # type: ignore[arg-type]
+                    datum_col_letter = _summary_column_letter(summary_df, "Rechnungsdatum")
                     for row in range(2, len(summary_df) + 2):
                         worksheet[f"{datum_col_letter}{row}"].number_format = datum_format
         except Exception as e:

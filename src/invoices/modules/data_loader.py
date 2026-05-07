@@ -55,7 +55,7 @@ class DataLoader:
         df = pd.DataFrame((row[1:] for row in data), columns=columns)
 
         # Alle Felder mit "(Leer)" durch "" ersetzen
-        df = cast(pd.DataFrame, df.replace("(Leer)", ""))
+        df = df.replace("(Leer)", "")
 
         # Dynamische Filterung nach allen gesetzten Feldern im Pydantic-Filterobjekt
         for key, value in self.filter.model_dump().items():

@@ -38,7 +38,7 @@ import sqlite3
 from copy import copy
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, cast
+from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
 from loguru import logger
@@ -722,7 +722,7 @@ class TimeSheetsImporter:
             }
 
             try:
-                validated = InvoiceRowModel(**payload)
+                validated = InvoiceRowModel.model_validate(payload)
                 rows.append(
                     {
                         "client_id": validated.client_id,
@@ -938,7 +938,9 @@ class TimeSheetsImporter:
         # Zeitspalten sind bereits in ganzen Minuten gespeichert – nur in int konvertieren.
         for time_column in ("travel_time", "direct_time", "indirect_time"):
             if time_column in df.columns:
-                numeric: pd.Series = cast(pd.Series, pd.to_numeric(df[time_column], errors="coerce"))
+                numeric = pd.to_numeric(df[time_column], errors="coerce")
+                if not isinstance(numeric, pd.Series):
+                    raise TypeError(f"Zeitspalte '{time_column}' konnte nicht als Series gelesen werden.")
                 df[time_column] = numeric.fillna(0).round().astype(int)
         # Nur definierte Spalten in der gewünschten Reihenfolge exportieren
         export_cols = [c for c in self._EXPORT_COLUMNS if c in df.columns]
@@ -1002,7 +1004,7 @@ class TimeSheetsImporter:
             if col in pivot.columns:
                 ordered.append(col)
 
-        return cast(pd.DataFrame, pivot[[c for c in ordered if c in pivot.columns]])
+        return pivot.loc[:, [c for c in ordered if c in pivot.columns]]
 
     def process_file(
         self,

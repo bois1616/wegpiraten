@@ -68,7 +68,7 @@ def babel_date(value: Any, locale: str = "de_CH", date_format: Optional[str] = N
         try:
             value = datetime.strptime(value, "%d.%m.%Y").date()
         except Exception:
-            return value  # Fallback: gib den String zurück
+            return str(value)  # Fallback: gib den String zurück
     return format_date(value, format=date_format or "medium", locale=locale)
 
 

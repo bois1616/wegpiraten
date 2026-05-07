@@ -159,8 +159,8 @@ class TimeSheetFactory:
         headers: List[HeaderDataModel] = []
         for idx, row in df.iterrows():
             try:
-                row_dict = row.to_dict()
-                headers.append(HeaderDataModel(**row_dict))  # type: ignore[arg-type]
+                row_dict = {str(key): value for key, value in row.to_dict().items()}
+                headers.append(HeaderDataModel.model_validate(row_dict))
             except ValidationError as exc:
                 logger.error(f"Ungültige Reporting-Daten in Zeile {idx}: {exc}")
         return headers

@@ -9,7 +9,7 @@ import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple
 
 import openpyxl
 import pandas as pd
@@ -346,7 +346,7 @@ def _log_import_diagnostics(
     if pk_fields:
         duplicates = df_target[df_target.duplicated(subset=pk_fields, keep=False)]
         if not duplicates.empty:
-            dup_df: pd.DataFrame = cast(pd.DataFrame, duplicates[pk_fields])
+            dup_df: pd.DataFrame = duplicates.loc[:, pk_fields]
             sample = dup_df.head(5).to_dict(orient="records")
             logger.error(
                 "Doppelte Primärschlüssel in {} gefunden ({} Zeilen). Beispiele: {}",
@@ -390,9 +390,10 @@ def _log_import_diagnostics(
         missing = sorted(values - ref_values)
         if missing:
             sample_missing = missing[:10]
-            filtered_df: pd.DataFrame = cast(
-                pd.DataFrame, df_target[df_target[column].astype(str).isin(sample_missing)][[column]]
-            )
+            filtered_df: pd.DataFrame = df_target.loc[
+                df_target[column].astype(str).isin(sample_missing),
+                [column],
+            ]
             sample_rows = filtered_df.head(5).to_dict(orient="records")
             logger.error(
                 "FK-Verletzung in {}.{}: {} fehlende Werte (z.B. {}). Beispiele Zeilen: {}",
