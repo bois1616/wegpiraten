@@ -16,6 +16,7 @@ import nox
 
 # Standard-Sessions, die bei `nox` ohne Argumente ausgeführt werden
 nox.options.sessions = ["lint", "typecheck"]
+nox.options.reuse_existing_virtualenvs = True
 
 # Python-Version für alle Sessions
 PYTHON_VERSION = "3.13"
