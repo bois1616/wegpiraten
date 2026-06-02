@@ -495,6 +495,19 @@ class TimeSheetsImporter:
             return str(row[0]).strip()
         return None
 
+    def _resolve_employee_2(self, client_id: Optional[str]) -> Optional[str]:
+        """Liest employee_2 aus clients, sofern die Spalte existiert."""
+        if not client_id:
+            return None
+        with sqlite3.connect(self.db_path) as conn:
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
+            if "employee_2" not in columns:
+                return None
+            row = conn.execute("SELECT employee_2 FROM clients WHERE client_id = ?", (client_id,)).fetchone()
+        if row and row[0]:
+            return str(row[0]).strip()
+        return None
+
     def _determine_row_mapping(self, ws: Worksheet) -> Optional[tuple[RowMapping, bool]]:
         mp = self.profile.row_mapping
         detected_notes_col = self._detect_notes_column(ws)
@@ -625,9 +638,27 @@ class TimeSheetsImporter:
                 logger.debug("Budget für Klient {} aus DB übernommen (Timesheet ohne Budgetzeile).", client_id_str)
             sheet_travel, sheet_direct, sheet_indirect = db_travel, db_direct, db_indirect
 
+        # Zweiten MA aus Stammdaten lesen (optional)
+        employee_2 = self._resolve_employee_2(client_id_str or None)
+        if employee_2 and employee_2 == employee_id_str:
+            logger.warning(
+                "employee_2 ('{}') ist identisch mit employee_id – wird ignoriert (client_id={}).",
+                employee_2,
+                client_id_str,
+            )
+            employee_2 = None
+        if employee_2 and employee_2 not in self._valid_employee_ids:
+            logger.error(
+                "employee_2 '{}' existiert nicht in employees – wird ignoriert (client_id={}).",
+                employee_2,
+                client_id_str,
+            )
+            employee_2 = None
+
         return {
             "employee_fullname": ws[cells.employee_name].value,  # type: ignore[union-attr]
             "employee_id": employee_id_str or None,
+            "employee_2": employee_2,
             "reporting_month": ws[cells.reporting_month].value,  # type: ignore[union-attr]
             "allowed_hours_per_month": allowed_hours,
             "service_type": service_type,
@@ -1089,6 +1120,20 @@ class TimeSheetsImporter:
         if imported_count == 0:
             logger.warning("Keine gültigen Zeilen aus {} gespeichert – Datei bleibt im Import.", file_path.name)
             return 0, file_path, [], reporting_month
+
+        # Zweites Timesheet für employee_2: dieselben Zeilen mit employee_2 als employee_id
+        employee_2 = header.get("employee_2")
+        if employee_2:
+            rows_emp2 = [{**r, "employee_id": employee_2} for r in rows]
+            count_emp2, imported_rows_emp2 = self._import_rows(rows_emp2, file_path.name)
+            logger.info(
+                "{} Zeilen für employee_2 '{}' importiert aus {}.",
+                count_emp2,
+                employee_2,
+                file_path.name,
+            )
+            imported_count += count_emp2
+            imported_rows = imported_rows + imported_rows_emp2
 
         total_minutes = sum(
             (r.get("travel_time") or 0) + (r.get("direct_time") or 0) + (r.get("indirect_time") or 0)

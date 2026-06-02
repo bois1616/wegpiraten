@@ -168,6 +168,14 @@ entities:
       - name: employee_id # foreign key
         type: str
         excel_column: employee_id
+      - name: employee_2 # optionaler zweiter MA mit FK auf employees
+        type: str
+        optional: true
+        excel_column: employee_2
+      - name: is_internal # 1 = interner Klient (kein Klientenbezug), keine Rechnung
+        type: int
+        optional: true
+        excel_column: is_internal
       - name: allowed_travel_time
         type: int
         optional: true

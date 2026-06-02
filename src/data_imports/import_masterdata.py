@@ -52,10 +52,10 @@ def map_row(row: pd.Series, mapping: Dict[str, FieldConfig], required_fields: li
             or (isinstance(value, float) and pd.isna(value))
             or (isinstance(value, str) and value.strip() == "")
         ):
-            if field_type is str:
+            if field_type is str and not entry.optional:
                 value = ""  # Leerer String für Textfelder
             else:
-                value = None  # Für numerische Felder bleibt es None!
+                value = None  # Optionale Felder und numerische Felder → NULL
         else:
             try:
                 if field_type is str:
@@ -201,8 +201,11 @@ def import_entity_data(
                 continue
             seen_keys.add(pk_key)
             if foreign_keys:
+                optional_fields = {f.name for f in fields if f.optional}
                 missing_fk_fields = []
                 for column, _, _ in foreign_keys:
+                    if column in optional_fields:
+                        continue
                     value = mapped.get(column)
                     if value is None or (isinstance(value, str) and value.strip() == ""):
                         missing_fk_fields.append(column)
@@ -328,6 +331,7 @@ DEFAULT_TABLE_MAPPINGS = {
 FOREIGN_KEY_MAPPINGS: Dict[str, list[tuple[str, str, str]]] = {
     "clients": [
         ("employee_id", "employees", "emp_id"),
+        ("employee_2", "employees", "emp_id"),
         ("tenant_id", "masterdata_tenant", "tenant_id"),
         ("payer_id", "payer", "payer_id"),
         ("service_requester_id", "service_requester", "service_requester_id"),
@@ -355,7 +359,9 @@ def _log_import_diagnostics(
                 sample,
             )
 
+    optional_field_names = {f.name for f in fields if f.optional}
     for column, ref_table, ref_column in FOREIGN_KEY_MAPPINGS.get(target_table, []):
+        is_optional = column in optional_field_names
         if column not in df_target.columns:
             logger.warning(
                 "FK-Prüfung übersprungen: Spalte {} fehlt in {}.",
@@ -366,7 +372,7 @@ def _log_import_diagnostics(
         series = df_target[column]
         blanks = series.isna() | series.astype(str).str.strip().eq("")
         blank_count = int(blanks.sum())
-        if blank_count:
+        if blank_count and not is_optional:
             logger.error(
                 "FK-Spalte {} enthält {} leere Werte (NULL/leer).",
                 column,
@@ -402,6 +408,22 @@ def _log_import_diagnostics(
                 len(missing),
                 sample_missing,
                 sample_rows,
+            )
+
+    # Warnung: employee_2 darf nicht identisch mit employee_id sein
+    if target_table == "clients" and "employee_id" in df_target.columns and "employee_2" in df_target.columns:
+        same_mask = (
+            df_target["employee_2"].notna()
+            & df_target["employee_2"].astype(str).str.strip().ne("")
+            & (df_target["employee_2"].astype(str).str.strip() == df_target["employee_id"].astype(str).str.strip())
+        )
+        if same_mask.any():
+            affected = df_target.loc[same_mask, "client_id"].tolist() if "client_id" in df_target.columns else []
+            logger.warning(
+                "employee_2 ist identisch mit employee_id bei {} Klient(en): {}. "
+                "employee_2 wird beim Import ignoriert.",
+                len(affected),
+                affected,
             )
 
 
