@@ -1,24 +1,51 @@
-# AGENTS.md - Leitlinie für KI-Agenten (Codex, Claude, etc.)
+# AGENTS.md — Leitlinie für KI-Agenten
 
-Dieses Dokument beschreibt die Konventionen und Regeln für KI-Agenten, die an diesem Projekt arbeiten.
+Dieses Dokument beschreibt Konventionen und Regeln für alle KI-Agenten (Claude, Codex, Gemini, etc.), die an diesem Projekt arbeiten. Es ist modell-agnostisch.
 
-## Projektübersicht
-
-**Wegpiraten** ist eine CLI-Anwendung für:
-
-- Import von Stammdaten (Mitarbeiter, Klienten, Zahlungsdienstleister) aus Excel in SQLite
-- Import von Zeiterfassungsbögen (Leistungsdaten)
-- Erstellung von Rechnungen für einen Leistungsmonat
-- Erstellung von leeren Zeiterfassungsbögen für den Folgemonat
-
-**Sprache**: Deutsch (Code-Kommentare, Dokumentation, Benutzeroberfläche)
-**Locale**: de_CH (Schweizerdeutsch), Währung: CHF
+Claude-spezifische Anweisungen stehen in [CLAUDE.md](CLAUDE.md).
 
 ---
 
-## Betriebsworkflow (Monatlicher Batch-Betrieb)
+## Projektübersicht
 
-Der Regelbetrieb erfolgt in festen Zyklen:
+**Wegpiraten** ist eine deutschsprachige CLI-Anwendung für ein Schweizer Pflegedienstleistungsunternehmen.
+
+Kernfunktionen:
+
+- Import von Stammdaten (Mitarbeiter, Klienten, Zahlungsdienstleister) aus Excel in SQLite
+- Import von ausgefüllten Zeiterfassungsbögen (Leistungsdaten)
+- Erstellung von Rechnungen für einen Leistungsmonat (DOCX + PDF)
+- Erstellung von leeren Zeiterfassungsbögen für den Folgemonat
+
+**Kein GUI** — reine CLI-Bedienung mit typer.
+**Sprache**: Deutsch (Kommentare, Dokumentation, Benutzeroberfläche)
+**Locale**: de_CH, Währung: CHF
+
+---
+
+## Projektprioritäten (verbindlich)
+
+1. Robustheit vor Performance
+2. Korrektheit vor Komfort
+3. Nachvollziehbarkeit vor Automatisierung
+
+Automatisierung ist erwünscht, darf aber die Nachvollziehbarkeit nicht reduzieren.
+
+---
+
+## Projektcharakter
+
+Dieses System ist als Übergangslösung konzipiert. Ziel:
+
+- Sicherer Betrieb
+- Korrekte Abrechnung
+- Begrenzte Wartung
+
+Nicht-Ziel: langfristige Architektur, Skalierung, Funktionsausbau.
+
+---
+
+## Betriebsworkflow (monatlicher Batch-Betrieb)
 
 ### Initial
 
@@ -36,7 +63,7 @@ Der Regelbetrieb erfolgt in festen Zyklen:
 
 ### Korrekturen
 
-- Notwendige Rechnungskorrekturen erfolgen manuell in DOCX
+- Rechnungskorrekturen erfolgen manuell in DOCX
 - Korrekturen müssen im Archiv dokumentiert werden
 
 ---
@@ -50,35 +77,102 @@ Der Regelbetrieb erfolgt in festen Zyklen:
 
 ---
 
-## Projektprioritäten (Verbindlich)
+## Architektur
 
-Die folgenden Prioritäten gelten strikt:
-
-1. Robustheit vor Performance
-2. Korrektheit vor Komfort
-3. Nachvollziehbarkeit vor Automatisierung
-
-Automatisierung ist erwünscht, darf aber die Nachvollziehbarkeit nicht reduzieren.
-
----
-
-## Review-Regel
-
-Ein Patch ist nicht akzeptabel, wenn er gegen die Projektprioritäten verstößt.
-
-Insbesondere unzulässig sind:
-
-- Vereinfachungen mit fachlichen Risiken
-- Optimierungen mit Verlust an Transparenz
-- Automatisierungen ohne ausreichendes Logging
+```text
+src/
+├── cli.py                    # Haupteinstiegspunkt (typer)
+├── shared_modules/
+│   ├── config.py            # Singleton-Konfiguration (YAML + Pydantic)
+│   ├── entity.py            # Entity-Basisklassen (LegalPerson, PrivatePerson)
+│   ├── month_period.py      # Monatszeitraum-Utilities
+│   └── utils.py             # Hilfsfunktionen
+├── pydantic_models/
+│   ├── config/              # Konfigurationsmodelle
+│   └── data/                # Datenmodelle
+├── invoices/                # Rechnungsverarbeitung
+├── time_sheets/             # Zeiterfassungsbogen-Erstellung
+├── data_imports/            # Stammdaten- und Zeiterfassungs-Import
+└── unused/                  # Archivierte/ungenutzte Module
+```
 
 ---
 
-## Betriebsstabilität (Übergangsbetrieb)
+## Coding-Konventionen
 
-Dieses Projekt dient als temporäre Übergangslösung.
+### Python
 
-Daher gelten folgende Stabilitätsregeln:
+- Python 3.13+
+- Type Hints für alle Funktionen und Methoden
+- Pydantic v2 für Datenvalidierung (`model_validator`, nicht `validator`)
+- Docstrings auf Deutsch
+- Logging mit `loguru` (kein `print()`)
+- CLI-Output mit `rich`
+
+### Qualitätssicherung
+
+```bash
+nox              # lint + typecheck (empfohlen)
+nox -s lint      # ruff check
+nox -s typecheck # pyright
+nox -s format    # ruff format
+```
+
+### Konfiguration
+
+- Zentrale YAML-Config: `.config/wegpiraten_config.yaml`
+- Secrets in `.env` (Fernet-verschlüsselt)
+- Config-Zugriff immer über `Config`-Singleton
+
+---
+
+## Wichtige Regeln
+
+### DO
+
+1. Type Hints für alle Funktionen
+2. Pydantic v2 für Validierung — keine manuellen dict-Zugriffe ohne Validierung
+3. Config-Singleton nutzen: `Config()` oder `Config(path)`
+4. Kommentare auf Deutsch
+5. Neue CLI-Befehle in `cli.py` über typer
+6. Vor Commit `nox` ausführen
+
+### DON'T
+
+1. Kein `config.data.xxx` — nutze `config.structure`, `config.formatting`, etc.
+2. Keine Flask-Imports (GUI ist deaktiviert)
+3. Keine hardcoded Pfade — immer über Config
+4. Kein `print()` — nutze `loguru.logger` oder `rich.console`
+5. Keine Pydantic v1 Syntax
+
+---
+
+## Config-Zugriff (korrekt)
+
+```python
+from shared_modules.config import Config
+
+config = Config()
+
+config.structure.prj_root
+config.get_db_path()
+config.get_template_path("vorlage.xlsx")
+config.get_output_path()
+config.formatting.locale
+config.formatting.currency
+config.get_currency()
+config.templates.invoice_template_name
+config.templates.time_sheet_template
+config.service_provider.name
+config.service_provider.iban
+config.models["employee"].fields
+config.models["client"].fields
+config.get_expected_columns()
+```
+
+---
+
+## Betriebsstabilität
 
 ### Konfiguration
 
@@ -102,185 +196,12 @@ Daher gelten folgende Stabilitätsregeln:
 
 ---
 
-## Projektcharakter
+## Review-Regel
 
-Dieses System ist als Übergangslösung konzipiert.
+Ein Patch ist nicht akzeptabel, wenn er gegen die Projektprioritäten verstößt.
 
-Ziel ist:
+Unzulässig sind insbesondere:
 
-- Sicherer Betrieb
-- Korrekte Abrechnung
-- Begrenzte Wartung
-
-Nicht-Ziel ist:
-
-- Langfristige Architektur
-- Skalierung
-- Funktionsausbau
-
-## Architektur
-
-```md
-src/
-├── cli.py                    # Haupteinstiegspunkt (typer)
-├── shared_modules/
-│   ├── config.py            # Singleton-Konfiguration (YAML + Pydantic)
-│   ├── entity.py            # Entity-Basisklassen (LegalPerson, PrivatePerson)
-│   ├── month_period.py      # Monatszeitraum-Utilities
-│   └── utils.py             # Hilfsfunktionen
-├── pydantic_models/
-│   ├── config/              # Konfigurationsmodelle
-│   └── data/                # Datenmodelle
-├── invoices/                # Rechnungsverarbeitung
-├── time_sheets/             # Zeiterfassungsbogen-Erstellung
-├── data_imports/            # Stammdaten- und Zeiterfassungs-Import
-└── unused/                  # Archivierte/ungenutzte Module
-```
-
-## Coding-Konventionen
-
-### Python
-
-- Python 3.13+
-- Type Hints für alle Funktionen und Methoden
-- Pydantic v2 für Datenvalidierung
-- Docstrings auf Deutsch
-
-### Qualitätssicherung
-
-```bash
-nox -s lint       # ruff check
-nox -s typecheck  # pyright
-nox -s format     # ruff format
-```
-
-### Konfiguration
-
-- Zentrale YAML-Config: `.config/wegpiraten_config.yaml`
-- Secrets in `.env` (Fernet-verschlüsselt)
-- Config-Zugriff immer über `Config`-Singleton
-
-## Wichtige Regeln
-
-### DO (Machen)
-
-1. **Type Hints verwenden** - Alle Funktionen typisieren
-2. **Pydantic für Validierung** - Keine manuellen dict-Zugriffe ohne Validierung
-3. **Config-Singleton nutzen** - `Config()` oder `Config(path)`
-4. **Deutsche Kommentare** - Docstrings und Kommentare auf Deutsch
-5. **CLI über typer** - Neue Befehle in `cli.py` hinzufügen
-6. **Tests mit nox** - Vor Commit `nox` ausführen
-
-### DON'T (Vermeiden)
-
-1. **Keine `config.data.xxx`** - Nutze `config.structure`, `config.formatting`, etc.
-2. **Keine Flask-Imports** - GUI ist deaktiviert
-3. **Keine hardcoded Pfade** - Immer über Config
-4. **Keine print()** - Nutze `loguru.logger` oder `rich.console`
-5. **Keine Pydantic v1 Syntax** - Nutze `model_validator`, nicht `validator`
-
-## Config-Zugriff (Korrekt)
-
-```python
-from shared_modules.config import Config
-
-config = Config()  # Singleton mit Default-Pfad
-
-# Struktur
-config.structure.prj_root
-config.get_db_path()
-config.get_template_path("vorlage.xlsx")
-config.get_output_path()
-
-# Formatierung
-config.formatting.locale
-config.formatting.currency
-config.get_currency()
-
-# Templates
-config.templates.invoice_template_name
-config.templates.time_sheet_template
-
-# Service Provider
-config.service_provider.name
-config.service_provider.iban
-
-# Entity-Modelle
-config.models["employee"].fields
-config.models["client"].fields
-config.get_expected_columns()
-```
-
-## Neue Features hinzufügen
-
-### Neuer CLI-Befehl
-
-```python
-# In src/cli.py
-@app.command("neuer-befehl")
-def neuer_befehl(
-    param: str = typer.Argument(..., help="Beschreibung"),
-    config_path: Optional[Path] = typer.Option(None, "--config", "-c"),
-) -> None:
-    """Beschreibung des Befehls."""
-    config = get_config(config_path)
-    # Implementierung
-```
-
-### Neues Pydantic-Modell
-
-```python
-# In src/pydantic_models/data/neues_modell.py
-from pydantic import BaseModel, model_validator
-
-class NeuesModell(BaseModel):
-    """Beschreibung auf Deutsch."""
-    feld: str
-    optional_feld: Optional[int] = None
-
-    @model_validator(mode="after")
-    def validate_something(self) -> "NeuesModell":
-        # Validierungslogik
-        return self
-```
-
-## Fehlerbehandlung
-
-```python
-from loguru import logger
-
-try:
-    # Operation
-except ValueError as e:
-    logger.error(f"Validierungsfehler: {e}")
-    raise
-except FileNotFoundError as e:
-    logger.error(f"Datei nicht gefunden: {e}")
-    raise
-```
-
-## Dateipfade
-
-```python
-from pathlib import Path
-from shared_modules.config import Config
-
-config = Config()
-
-# Richtig
-db_path = config.get_db_path()
-template_path = config.get_template_path("vorlage.xlsx")
-
-# Falsch - niemals hardcoded
-db_path = Path("/home/user/data/db.sqlite3")  # NEIN!
-```
-
-## Bekannte Probleme (TODO)
-
-1. `import_masterdata.py` verwendet noch `config.data.xxx` - muss migriert werden
-2. `document_utils.py` hat Type-Fehler mit pandas iloc
-3. `time_sheet_factory.py` hat Optional-Zugriffe ohne None-Check
-
-## Kontakt
-
-Bei Fragen zur Architektur: Siehe `CLAUDE.md` und `konzept.md`
+- Vereinfachungen mit fachlichen Risiken
+- Optimierungen mit Verlust an Transparenz
+- Automatisierungen ohne ausreichendes Logging
