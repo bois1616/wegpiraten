@@ -228,11 +228,18 @@ def _build_pivot(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> None:
-    """Formatiert das Pivot-Sheet mit Tageszeilen und Summenzeile je Mitarbeiter."""
+    """Formatiert das Pivot-Sheet mit Tageszeilen, MA-Summenzeilen und Gesamtsumme."""
     from openpyxl.styles import Alignment as Aln
 
+    # Bänderung: zwei abwechselnde Farbtöne für MA-Blöcke
+    band_fills = [
+        PatternFill(start_color="EEF2F9", end_color="EEF2F9", fill_type="solid"),
+        PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid"),
+    ]
     subtotal_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    total_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
     subtotal_font = Font(bold=True)
+    total_font = Font(bold=True, color="FFFFFF")
 
     cols = list(pivot_df.columns)
     min_col_idx = cols.index("Gesamt Min") + 1
@@ -240,6 +247,7 @@ def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> 
     min_col_letter = get_column_letter(min_col_idx)
     date_col_idx = cols.index("Datum") + 1
     ma_col_idx = cols.index("Mitarbeiter") + 1
+    num_cols = len(cols)
 
     # Kopfzeile formatieren
     for cell in ws[1]:
@@ -247,21 +255,30 @@ def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> 
         cell.font = header_font
         cell.alignment = Aln(horizontal="center")
 
-    # Datenzeilen schreiben und nach jedem MA-Block eine Summenzeile einfügen
+    min_cols_letters = [get_column_letter(cols.index(c) + 1) for c in _PIVOT_MIN_COLS[:-1]]
+    sum_min_letter = get_column_letter(min_col_idx)
+
+    # Alle MA-Summenzeilen-Positionen für die Gesamtsumme merken
+    subtotal_rows: list[int] = []
+
     excel_row = 2
-    for emp, group in pivot_df.groupby("Mitarbeiter", sort=False):
+    for band_idx, (emp, group) in enumerate(pivot_df.groupby("Mitarbeiter", sort=False)):
+        row_fill = band_fills[band_idx % 2]
         block_start = excel_row
+
         for _, data_row in group.iterrows():
+            for col_idx in range(1, num_cols + 1):
+                ws.cell(row=excel_row, column=col_idx).fill = row_fill
             ws.cell(row=excel_row, column=ma_col_idx, value=emp)
             ws.cell(row=excel_row, column=date_col_idx, value=data_row["Datum"]).number_format = "dd.mm.yyyy"
             ws.cell(row=excel_row, column=date_col_idx).alignment = Aln(horizontal="center")
-            for col_name in _PIVOT_MIN_COLS[:-1]:  # Fahrzeit, Direkt, Indirekt
+            ws.cell(row=excel_row, column=date_col_idx).fill = row_fill
+            for col_name in _PIVOT_MIN_COLS[:-1]:
                 col_idx = cols.index(col_name) + 1
                 cell = ws.cell(row=excel_row, column=col_idx, value=data_row[col_name])
                 cell.number_format = "0"
                 cell.alignment = Aln(horizontal="right")
-            # Gesamt Min als Formel
-            min_cols_letters = [get_column_letter(cols.index(c) + 1) for c in _PIVOT_MIN_COLS[:-1]]
+                cell.fill = row_fill
             gesamt_cell = ws.cell(
                 row=excel_row,
                 column=min_col_idx,
@@ -269,16 +286,22 @@ def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> 
             )
             gesamt_cell.number_format = "0"
             gesamt_cell.alignment = Aln(horizontal="right")
-            # h:mm
+            gesamt_cell.fill = row_fill
             hmm_cell = ws.cell(row=excel_row, column=hmm_col_idx, value=f"={min_col_letter}{excel_row}/1440")
             hmm_cell.number_format = "[h]:mm"
             hmm_cell.alignment = Aln(horizontal="right")
+            hmm_cell.fill = row_fill
             excel_row += 1
 
         # Summenzeile je Mitarbeiter
         block_end = excel_row - 1
+        subtotal_rows.append(excel_row)
+        for col_idx in range(1, num_cols + 1):
+            ws.cell(row=excel_row, column=col_idx).fill = subtotal_fill
         ws.cell(row=excel_row, column=ma_col_idx, value=emp).font = subtotal_font
+        ws.cell(row=excel_row, column=ma_col_idx).fill = subtotal_fill
         ws.cell(row=excel_row, column=date_col_idx, value="Total").font = subtotal_font
+        ws.cell(row=excel_row, column=date_col_idx).fill = subtotal_fill
         for col_name in _PIVOT_MIN_COLS[:-1]:
             col_idx = cols.index(col_name) + 1
             col_letter = get_column_letter(col_idx)
@@ -291,7 +314,6 @@ def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> 
             cell.alignment = Aln(horizontal="right")
             cell.font = subtotal_font
             cell.fill = subtotal_fill
-        sum_min_letter = get_column_letter(min_col_idx)
         gesamt_sum = ws.cell(
             row=excel_row,
             column=min_col_idx,
@@ -306,10 +328,36 @@ def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> 
         hmm_sum.alignment = Aln(horizontal="right")
         hmm_sum.font = subtotal_font
         hmm_sum.fill = subtotal_fill
-        # Hintergrundfarbe für die gesamte Summenzeile
-        for col_idx in range(1, len(cols) + 1):
-            ws.cell(row=excel_row, column=col_idx).fill = subtotal_fill
         excel_row += 1
+
+    # Gesamtsummenzeile (summiert alle MA-Summenzeilen)
+    for col_idx in range(1, num_cols + 1):
+        cell = ws.cell(row=excel_row, column=col_idx)
+        cell.fill = total_fill
+        cell.font = total_font
+    ws.cell(row=excel_row, column=ma_col_idx, value="Gesamt").font = total_font
+    ws.cell(row=excel_row, column=ma_col_idx).fill = total_fill
+    ws.cell(row=excel_row, column=date_col_idx).fill = total_fill
+    for col_name in _PIVOT_MIN_COLS[:-1]:
+        col_idx = cols.index(col_name) + 1
+        col_letter = get_column_letter(col_idx)
+        refs = "+".join(f"{col_letter}{r}" for r in subtotal_rows)
+        cell = ws.cell(row=excel_row, column=col_idx, value=f"={refs}")
+        cell.number_format = "0"
+        cell.alignment = Aln(horizontal="right")
+        cell.font = total_font
+        cell.fill = total_fill
+    total_min_refs = "+".join(f"{sum_min_letter}{r}" for r in subtotal_rows)
+    total_min = ws.cell(row=excel_row, column=min_col_idx, value=f"={total_min_refs}")
+    total_min.number_format = "0"
+    total_min.alignment = Aln(horizontal="right")
+    total_min.font = total_font
+    total_min.fill = total_fill
+    total_hmm = ws.cell(row=excel_row, column=hmm_col_idx, value=f"={sum_min_letter}{excel_row}/1440")
+    total_hmm.number_format = "[h]:mm"
+    total_hmm.alignment = Aln(horizontal="right")
+    total_hmm.font = total_font
+    total_hmm.fill = total_fill
 
     # Spaltenbreiten
     for col_idx, col_name in enumerate(cols, start=1):
