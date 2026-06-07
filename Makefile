@@ -1,7 +1,7 @@
 # Wegpiraten – Makefile
 # Verwendung: make <ziel> [MONTH=...] [CLIENT=...]
 #
-#   make invoices      MONTH=02.2026                    Rechnungen erstellen        (Format MM.YYYY)
+#   make invoices      MONTH=02.2026                    Rechnungen + Arbeitszeitprotokoll (Format MM.YYYY)
 #   make invoices      MONTH=02.2026 CLIENT=C1017,C1038 Rechnungen für bestimmte Klienten
 #   make timesheets    MONTH=2026-02                    Zeiterfassungsbögen erstellen (Format YYYY-MM)
 #   make import-master                                  Stammdaten importieren
@@ -22,7 +22,7 @@ help:
 	@echo ""
 	@echo "Wegpiraten – verfügbare Ziele"
 	@echo ""
-	@echo "  make invoices      MONTH=02.2026                    Rechnungen erstellen           (Format MM.YYYY)"
+	@echo "  make invoices      MONTH=02.2026                    Rechnungen + Arbeitszeitprotokoll  (Format MM.YYYY)"
 	@echo "  make invoices      MONTH=02.2026 CLIENT=C1017,C1038 Rechnungen für bestimmte Klienten"
 	@echo "  make timesheets    MONTH=2026-02                    Zeiterfassungsbögen erstellen  (Format YYYY-MM)"
 	@echo "  make import-master                                  Stammdaten importieren"

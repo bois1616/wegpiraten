@@ -122,6 +122,12 @@ def invoice_batch(
         processor.run()
 
         console.print("[bold green]Rechnungserstellung erfolgreich abgeschlossen.[/bold green]")
+
+        console.print(f"[bold blue]Erstelle Arbeitszeitprotokoll für {month}...[/bold blue]")
+        from reports.arbeitszeit_report import create_arbeitszeit_report
+
+        report_file = create_arbeitszeit_report(config, month)
+        console.print(f"[bold green]Arbeitszeitprotokoll erstellt: {report_file}[/bold green]")
     except Exception as e:
         logger.exception(f"Fehler bei der Rechnungserstellung: {e}")
         console.print(f"[red]Fehler: {e}[/red]")

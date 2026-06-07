@@ -143,9 +143,10 @@ def _write_excel(df: pd.DataFrame, out_file: Path, month_str: str) -> None:
             ).font = Font(bold=True)
             ws_sum.cell(row=total_row, column=col_idx).number_format = int_fmt
 
-        # --- Pivot: Zeitdaten je Mitarbeiter und Tag ---
+        # --- Pivot: Zeitdaten je Mitarbeiter und Tag mit Summenzeile je MA ---
         pivot_df = _build_pivot(df)
-        pivot_df.to_excel(writer, sheet_name="Pivot", index=False)
+        # Sheet manuell anlegen; _write_pivot_sheet schreibt alle Zeilen inkl. Header selbst
+        pd.DataFrame(columns=pivot_df.columns).to_excel(writer, sheet_name="Pivot", index=False)
         ws_pivot = writer.sheets["Pivot"]
         _write_pivot_sheet(ws_pivot, pivot_df, header_fill, header_font)
 
@@ -227,15 +228,18 @@ def _build_pivot(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> None:
-    """Formatiert das Pivot-Sheet und setzt die [h]:mm-Formel für Gesamt h:mm."""
+    """Formatiert das Pivot-Sheet mit Tageszeilen und Summenzeile je Mitarbeiter."""
     from openpyxl.styles import Alignment as Aln
+
+    subtotal_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    subtotal_font = Font(bold=True)
 
     cols = list(pivot_df.columns)
     min_col_idx = cols.index("Gesamt Min") + 1
     hmm_col_idx = cols.index(_PIVOT_HMM_COL) + 1
     min_col_letter = get_column_letter(min_col_idx)
     date_col_idx = cols.index("Datum") + 1
-    date_col_letter = get_column_letter(date_col_idx)
+    ma_col_idx = cols.index("Mitarbeiter") + 1
 
     # Kopfzeile formatieren
     for cell in ws[1]:
@@ -243,21 +247,69 @@ def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> 
         cell.font = header_font
         cell.alignment = Aln(horizontal="center")
 
-    last_row = len(pivot_df) + 1
-    for row in range(2, last_row + 1):
-        # Datumsspalte
-        ws[f"{date_col_letter}{row}"].number_format = "dd.mm.yyyy"
-        ws[f"{date_col_letter}{row}"].alignment = Aln(horizontal="center")
-        # Minuten-Spalten
-        for col_name in _PIVOT_MIN_COLS:
+    # Datenzeilen schreiben und nach jedem MA-Block eine Summenzeile einfügen
+    excel_row = 2
+    for emp, group in pivot_df.groupby("Mitarbeiter", sort=False):
+        block_start = excel_row
+        for _, data_row in group.iterrows():
+            ws.cell(row=excel_row, column=ma_col_idx, value=emp)
+            ws.cell(row=excel_row, column=date_col_idx, value=data_row["Datum"]).number_format = "dd.mm.yyyy"
+            ws.cell(row=excel_row, column=date_col_idx).alignment = Aln(horizontal="center")
+            for col_name in _PIVOT_MIN_COLS[:-1]:  # Fahrzeit, Direkt, Indirekt
+                col_idx = cols.index(col_name) + 1
+                cell = ws.cell(row=excel_row, column=col_idx, value=data_row[col_name])
+                cell.number_format = "0"
+                cell.alignment = Aln(horizontal="right")
+            # Gesamt Min als Formel
+            min_cols_letters = [get_column_letter(cols.index(c) + 1) for c in _PIVOT_MIN_COLS[:-1]]
+            gesamt_cell = ws.cell(
+                row=excel_row,
+                column=min_col_idx,
+                value=f"={'+'.join(f'{letter}{excel_row}' for letter in min_cols_letters)}",
+            )
+            gesamt_cell.number_format = "0"
+            gesamt_cell.alignment = Aln(horizontal="right")
+            # h:mm
+            hmm_cell = ws.cell(row=excel_row, column=hmm_col_idx, value=f"={min_col_letter}{excel_row}/1440")
+            hmm_cell.number_format = "[h]:mm"
+            hmm_cell.alignment = Aln(horizontal="right")
+            excel_row += 1
+
+        # Summenzeile je Mitarbeiter
+        block_end = excel_row - 1
+        ws.cell(row=excel_row, column=ma_col_idx, value=emp).font = subtotal_font
+        ws.cell(row=excel_row, column=date_col_idx, value="Total").font = subtotal_font
+        for col_name in _PIVOT_MIN_COLS[:-1]:
             col_idx = cols.index(col_name) + 1
-            cell = ws.cell(row=row, column=col_idx)
+            col_letter = get_column_letter(col_idx)
+            cell = ws.cell(
+                row=excel_row,
+                column=col_idx,
+                value=f"=SUM({col_letter}{block_start}:{col_letter}{block_end})",
+            )
             cell.number_format = "0"
             cell.alignment = Aln(horizontal="right")
-        # h:mm-Formel: Minuten / 1440 ergibt einen Excel-Zeitwert; Format [h]:mm zeigt >24h korrekt
-        hmm_cell = ws.cell(row=row, column=hmm_col_idx, value=f"={min_col_letter}{row}/1440")
-        hmm_cell.number_format = "[h]:mm"
-        hmm_cell.alignment = Aln(horizontal="right")
+            cell.font = subtotal_font
+            cell.fill = subtotal_fill
+        sum_min_letter = get_column_letter(min_col_idx)
+        gesamt_sum = ws.cell(
+            row=excel_row,
+            column=min_col_idx,
+            value=f"=SUM({sum_min_letter}{block_start}:{sum_min_letter}{block_end})",
+        )
+        gesamt_sum.number_format = "0"
+        gesamt_sum.alignment = Aln(horizontal="right")
+        gesamt_sum.font = subtotal_font
+        gesamt_sum.fill = subtotal_fill
+        hmm_sum = ws.cell(row=excel_row, column=hmm_col_idx, value=f"={sum_min_letter}{excel_row}/1440")
+        hmm_sum.number_format = "[h]:mm"
+        hmm_sum.alignment = Aln(horizontal="right")
+        hmm_sum.font = subtotal_font
+        hmm_sum.fill = subtotal_fill
+        # Hintergrundfarbe für die gesamte Summenzeile
+        for col_idx in range(1, len(cols) + 1):
+            ws.cell(row=excel_row, column=col_idx).fill = subtotal_fill
+        excel_row += 1
 
     # Spaltenbreiten
     for col_idx, col_name in enumerate(cols, start=1):
