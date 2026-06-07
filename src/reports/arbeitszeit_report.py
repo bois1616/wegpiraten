@@ -262,11 +262,11 @@ def _write_pivot_sheet(ws, pivot_df: pd.DataFrame, header_fill, header_font) -> 
     subtotal_rows: list[int] = []
 
     excel_row = 2
-    for band_idx, (emp, group) in enumerate(pivot_df.groupby("Mitarbeiter", sort=False)):
-        row_fill = band_fills[band_idx % 2]
+    for emp, group in pivot_df.groupby("Mitarbeiter", sort=False):
         block_start = excel_row
 
-        for _, data_row in group.iterrows():
+        for row_idx, (_, data_row) in enumerate(group.iterrows()):
+            row_fill = band_fills[row_idx % 2]
             for col_idx in range(1, num_cols + 1):
                 ws.cell(row=excel_row, column=col_idx).fill = row_fill
             ws.cell(row=excel_row, column=ma_col_idx, value=emp)
