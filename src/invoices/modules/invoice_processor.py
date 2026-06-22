@@ -159,6 +159,7 @@ class InvoiceProcessor:
             c.sr_ap_first_name AS sr_ap_first_name,
             c.sr_ap_last_name AS sr_ap_last_name,
             c.sr_ap_gender AS sr_ap_gender,
+            c.application_number AS application_number,
             COALESCE(sd.allowed_travel_time, 0) AS allowed_travel_time,
             COALESCE(sd.allowed_direct_effort, 0) AS allowed_direct_effort,
             COALESCE(sd.allowed_indirect_effort, 0) AS allowed_indirect_effort,
@@ -554,8 +555,11 @@ class InvoiceProcessor:
                         invoice_context=invoice_context,
                         jinja_env=jinja_env,
                     )
-                    # docx_name = f"Rechnung_{payer_id}_{client_id}_{self.filter.invoice_month}.docx"
-                    docx_name = f"RE {client_obj.key} - {client_obj.first_name} {client_obj.last_name} ({self.filter.invoice_month}).docx"
+                    application_number = safe_str(client_row.get("application_number")) or "PRÜFEN"
+                    period_von = period.start.strftime("%Y%m%d")
+                    period_bis = period.end.strftime("%Y%m%d")
+                    file_stem = f"{invoice_id}_{period_von}_{period_bis}_{application_number}"
+                    docx_name = f"{file_stem}.docx"
                     docx_path = output_path / docx_name
                     rendered_invoice.save(docx_path)
                     all_docx.append(docx_path)

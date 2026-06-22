@@ -198,6 +198,10 @@ entities:
         type: str
         excel_column: notes
         optional: true
+      - name: application_number
+        type: str
+        optional: true
+        excel_column: application_number
 
   payer:
     fields:
