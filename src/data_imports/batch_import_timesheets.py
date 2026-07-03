@@ -149,6 +149,8 @@ class TimeSheetsImporter:
     _SHORT_DATE_PATTERN = re.compile(r"^\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]?\s*$")
     # nur tt oder tt. (Monat und Jahr vollständig aus Abrechnungsmonat)
     _DAY_ONLY_PATTERN = re.compile(r"^\s*(\d{1,2})\.?\s*$")
+    # erste 1-2-stellige Zahl im String als Tag (z.B. "25:6.", "25,6") – Monat/Jahr aus Abrechnungsmonat
+    _DAY_FALLBACK_PATTERN = re.compile(r"(\d{1,2})")
 
     def __init__(self, config: Config, profile: Optional[TimeSheetImportProfile] = None):
         self.config = config
@@ -807,6 +809,7 @@ class TimeSheetsImporter:
           - "12.3." → Tag 12, Monat 3, Jahr aus Abrechnungsmonat
           - "12"    → Tag 12, Monat+Jahr aus Abrechnungsmonat
           - "12."   → Tag 12, Monat+Jahr aus Abrechnungsmonat
+          - "25:6." → Tag 25, Monat+Jahr aus Abrechnungsmonat (nur erste Zahl als Tag erkennbar)
         """
         if not isinstance(raw_value, str):
             return None
@@ -838,6 +841,15 @@ class TimeSheetsImporter:
 
         # nur tt oder tt.
         match = self._DAY_ONLY_PATTERN.match(raw_value)
+        if match:
+            day = int(match.group(1))
+            try:
+                return date(year, period_month, day)
+            except ValueError:
+                return None
+
+        # Sonderfälle wie "25:6." – erste erkennbare Zahl als Tag, Rest ignorieren
+        match = self._DAY_FALLBACK_PATTERN.search(raw_value)
         if match:
             day = int(match.group(1))
             try:
