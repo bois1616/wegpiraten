@@ -512,7 +512,15 @@ class InvoiceProcessor:
                         invoice_context=invoice_context,
                         jinja_env=jinja_env,
                     )
-                    application_number = safe_str(client_row.get("application_number")) or "PRÜFEN"
+                    application_number = safe_str(client_row.get("application_number"))
+                    if not application_number:
+                        # Ohne Antragsnummer kann KJA-FS beim Batch-Upload nicht automatisch abfüllen.
+                        application_number = "PRÜFEN"
+                        logger.warning(
+                            "Klient {} ohne Antragsnummer – Dateiname erhält Platzhalter «PRÜFEN» "
+                            "und muss vor dem KJA-FS-Batch-Upload manuell geprüft werden.",
+                            client_id,
+                        )
                     period_von = period.start.strftime("%Y%m%d")
                     period_bis = period.end.strftime("%Y%m%d")
                     file_stem = f"{invoice_id}_{period_von}_{period_bis}_{application_number}"

@@ -68,12 +68,13 @@ class InvoiceFactory:
         Erstellt eine eindeutige Rechnungsnummer aus Leistungszeitraum und Klienten-ID.
         Args:
             client_id (str): Klienten-ID.
-            invoice_month (str): Abrechnungsmonat im Format 'MM-YYYY'.
+            invoice_month (str): Abrechnungsmonat im Format 'MM.YYYY'.
         Returns:
-            str: Rechnungsnummer im Format 'MM-YYYY_CLIENTID'.
+            str: Rechnungsnummer im Format 'MM.YYYY-CLIENTID'.
         """
 
-        # TODO Prüfen, ob das als Rechnungsnummer ausreicht
+        # Bindestrich als Trenner: Der KJA-FS-Dateiname nutzt Unterstriche als Feldtrenner,
+        # daher darf die Rechnungsnummer selbst keinen Unterstrich enthalten.
         return f"{invoice_month or 'mm.YYYY'}-{client_id or 'K000'}"
 
     def create_payment_part_png(
