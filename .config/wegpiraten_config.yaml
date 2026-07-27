@@ -13,8 +13,18 @@ structure:
 database:
   sqlite_db_name: wegpiraten.sqlite3
   db_name: wegpiraten_datenbank.xlsx
-  db_encrypted: true
   # db password in .env
+
+# Quelle der Stammdaten-Datei auf Proton Drive (Zugriff nur via proton-drive
+# CLI, kein Mount). Der Lock serialisiert gegen die Sync-Timer (SQLITE_BUSY),
+# vgl. ~/proton-drive/Makefile.
+masterdata_source:
+  remote_dir: "/my-files/Shared/Beatus/Wegpiraten Unterlagen"
+  file_pattern: "wegpiraten_datenbank*.xlsx"
+  preferred_filename: wegpiraten_datenbank.xlsx
+  proton_cli: "~/.local/bin/proton-drive"
+  lockfile: "~/proton-drive/.proton.lock"
+  lock_timeout_seconds: 1800
 
 logging:
   log_file: wegpiraten.log

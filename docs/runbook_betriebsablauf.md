@@ -94,11 +94,45 @@ python -m cli validate
 
 ---
 
+### 1.4 Stammdaten von Proton Drive holen (bei Änderungen)
+
+Die Stammdaten-Datei `wegpiraten_datenbank.xlsx` liegt auf Proton Drive
+(Verzeichnis `masterdata_source.remote_dir` in der Config). Zugriff nur über
+die proton-drive CLI (E2E-verschlüsselt, kein Mount); die Aufrufe laufen
+unter dem zentralen flock (`~/proton-drive/.proton.lock`), damit sie sich
+nicht mit den Sync-Timern um den lokalen CLI-Cache streiten (SQLITE_BUSY).
+
+```bash
+python -m cli fetch-master          # nur holen (legt Datei in den Import-Ordner)
+python -m cli import-master --fetch # holen + direkt importieren
+```
+
+`fetch-master` wählt remote die richtige Datei (exakter Dateiname vor
+Varianten, sonst neueste), vergleicht per SHA1 mit der lokalen Kopie und
+lädt nur bei Abweichung. Die Remote-Datei bleibt unverändert.
+
+---
+
 ## 2. Timesheets übernehmen
 
 ### 2.1 Dateien ablegen
 
 Erhaltene Excel-Dateien in Import-Verzeichnis kopieren.
+
+Alternativ direkt von Proton Drive holen (gleicher Mechanismus wie
+`fetch-master`, s. 1.4): das Monatsverzeichnis relativ zum Basis-Ordner
+`masterdata_source.remote_dir` angeben. Beim Makefile-Aufruf wird das
+Verzeichnis in `.tsdir` gecacht -- Folgeaufrufe brauchen kein TSDIR mehr,
+ein neues TSDIR= überschreibt den Cache.
+
+```bash
+python -m cli fetch-timesheets "Timesheets - Rechnungen-Auswertungen/2026-06 Juni/Timesheets (ausgefüllt)"
+# oder: make fetch-timesheets TSDIR="Timesheets - .../2026-06 Juni/Timesheets (ausgefüllt)"
+# danach: make fetch-timesheets
+```
+
+Bereits aktuelle lokale Kopien werden übersprungen (SHA1-Vergleich),
+Remote-Dateien bleiben unverändert.
 
 Dateinamen prüfen:
 

@@ -53,8 +53,9 @@ Nicht-Ziel: langfristige Architektur, Skalierung, Funktionsausbau.
 
 ### Monatlicher Ablauf
 
+0. Stammdaten bei Änderungen von Proton Drive holen (`fetch-master` bzw. `import-master --fetch`; Zugriff via proton-drive CLI unter zentralem flock)
 1. Manuelle Anpassung der Stammdaten in der DB (falls erforderlich)
-2. Import der Timesheets aus einem Verzeichnis
+2. Import der Timesheets aus einem Verzeichnis (Holung von Proton Drive: `fetch-timesheets <relativer Remote-Pfad>`, Verzeichnis-Cache analog MONTH)
 3. Batch-Erstellung der Rechnungen (DOCX + PDF)
 4. Manueller Versand per E-Mail
 5. Archivierung aller Daten (ZIP) und Leeren der Verzeichnisse
@@ -165,6 +166,7 @@ config.templates.invoice_template_name
 config.templates.time_sheet_template
 config.service_provider.name
 config.service_provider.iban
+config.masterdata_source.remote_dir
 config.models["employee"].fields
 config.models["client"].fields
 config.get_expected_columns()

@@ -44,14 +44,11 @@ TYPECHECK_DEPS = [
     "typer>=0.21",
     "rich>=14.1",
     "docxtpl>=0.20",
-    "sqlalchemy>=2.0",
     "babel>=2.17",
     "pillow>=11.0",
     "pypdf2>=3.0",
     "qrcode>=8.2",
     "types-qrcode>=8.2",
-    "reportlab>=4.4",
-    "types-reportlab>=4.4",
 ]
 
 

@@ -13,6 +13,7 @@ from pydantic_models.config.database_config import DatabaseConfig
 from pydantic_models.config.entity_model_config import EntityModelConfig, FieldConfig
 from pydantic_models.config.formatting_config import FormattingConfig
 from pydantic_models.config.logging_config import LoggingConfig
+from pydantic_models.config.masterdata_source_config import MasterdataSourceConfig
 from pydantic_models.config.service_provider_config import ServiceProviderConfig
 
 # Importiere die statischen Pydantic-Modelle direkt, wenn src im PYTHONPATH liegt
@@ -76,6 +77,7 @@ class Config:
         self.formatting = self._parse_section(self.raw_config, "formatting", FormattingConfig)
         self.service_provider = self._parse_section(self.raw_config, "service_provider", ServiceProviderConfig)
         self.templates = self._parse_section(self.raw_config, "templates", TemplatesConfig)
+        self.masterdata_source = self._parse_section(self.raw_config, "masterdata_source", MasterdataSourceConfig)
         self.models = self._parse_entities(self.raw_config.get("entities", {}))
 
         self._validate_structure_and_paths()

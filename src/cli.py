@@ -8,6 +8,8 @@ Befehle:
     invoice         Rechnungen für einen Abrechnungsmonat erstellen
     timesheet       Neue Zeiterfassungsbögen für einen Monat erstellen
     import-master   Stammdaten aus Excel in SQLite importieren
+    fetch-master    Stammdaten-Datei von Proton Drive holen
+    fetch-timesheets Zeiterfassungsbögen von Proton Drive holen
     import-sheets   Ausgefüllte Zeiterfassungsbögen importieren
 """
 
@@ -21,6 +23,7 @@ from loguru import logger
 from rich.console import Console
 
 from shared_modules.config import DEFAULT_CONFIG_PATH, Config
+from shared_modules.month_period import get_month_period
 
 app = typer.Typer(
     name="wegpiraten",
@@ -28,6 +31,21 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+
+MONTH_HELP = "Abrechnungsmonat im Format MM.YYYY, MM-YYYY oder YYYY-MM"
+
+
+def normalize_month(month: str, target_format: str) -> str:
+    """
+    Normalisiert einen Monatsstring (MM.YYYY, MM-YYYY oder YYYY-MM)
+    an der CLI-Grenze auf das vom Downstream-Modul erwartete Zielformat.
+    """
+    try:
+        period = get_month_period(month)
+    except ValueError:
+        console.print(f"[red]Ungültiges Monatsformat: {month} (erwartet: MM.YYYY, MM-YYYY oder YYYY-MM)[/red]")
+        raise typer.Exit(1)
+    return period.start.strftime(target_format)
 
 
 def get_config(config_path: Optional[Path] = None) -> Config:
@@ -86,7 +104,7 @@ def ensure_database_exists(config_path: Path) -> None:
 def invoice_batch(
     month: str = typer.Argument(
         ...,
-        help="Abrechnungsmonat im Format MM.YYYY (z.B. 01.2025)",
+        help=MONTH_HELP,
     ),
     config_path: Optional[Path] = typer.Option(
         None,
@@ -114,6 +132,8 @@ def invoice_batch(
         from invoices.modules.invoice_filter import InvoiceFilter
         from invoices.modules.invoice_processor import InvoiceProcessor
 
+        # Rechnungsmodule erwarten das Format MM.YYYY (Rechnungs-ID, Dateinamen)
+        month = normalize_month(month, "%m.%Y")
         client_list = [c.strip() for c in clients.split(",") if c.strip()] if clients else None
         if client_list:
             console.print(f"[blue]Filter: Klienten {client_list}[/blue]")
@@ -138,7 +158,7 @@ def invoice_batch(
 def create_timesheets(
     month: str = typer.Argument(
         ...,
-        help="Monat für die neuen Zeiterfassungsbögen im Format YYYY-MM (z.B. 2025-02)",
+        help="Monat für die neuen Zeiterfassungsbögen im Format MM.YYYY, MM-YYYY oder YYYY-MM",
     ),
     config_path: Optional[Path] = typer.Option(
         None,
@@ -161,6 +181,8 @@ def create_timesheets(
         from time_sheets.modules.time_sheet_batch_processor import TimeSheetBatchProcessor
         from time_sheets.modules.time_sheet_factory import TimeSheetFactory
 
+        # Timesheet-Module erwarten das Format YYYY-MM (strptime, Dateinamen)
+        month = normalize_month(month, "%Y-%m")
         factory = TimeSheetFactory(config)
         processor = TimeSheetBatchProcessor(config, reporting_factory=factory)
         processor.run(reporting_month=month)
@@ -186,6 +208,11 @@ def import_masterdata(
         "-s",
         help="Pfad zur Excel-Quelldatei (optional, überschreibt Import-Ordner aus Config)",
     ),
+    fetch: bool = typer.Option(
+        False,
+        "--fetch",
+        help="Stammdaten-Datei vor dem Import von Proton Drive holen",
+    ),
 ) -> None:
     """
     Importiert Stammdaten aus Excel in die SQLite-Datenbank.
@@ -194,11 +221,18 @@ def import_masterdata(
     Leistungsbesteller aus der Excel-Datei im Import-Ordner
     (structure.imports_path, standardmässig ``import``).
     Die verarbeitete Datei wird anschliessend nach ``done`` verschoben.
+    Mit ``--fetch`` wird die Datei vorher von Proton Drive geholt.
     """
     console.print("[bold blue]Importiere Stammdaten...[/bold blue]")
 
     try:
         config = get_config(config_path)
+
+        if fetch:
+            from data_imports.fetch_masterdata import fetch_masterdata
+
+            fetched = fetch_masterdata(config)
+            console.print(f"[blue]Von Proton Drive geholt: {fetched}[/blue]")
 
         from data_imports.import_masterdata import run_import
 
@@ -211,12 +245,81 @@ def import_masterdata(
         raise typer.Exit(1)
 
 
+@app.command("fetch-master")
+def fetch_masterdata_cmd(
+    config_path: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Pfad zur Konfigurationsdatei",
+    ),
+) -> None:
+    """
+    Holt die Stammdaten-Datei von Proton Drive in den Import-Ordner.
+
+    Sucht das Remote-Verzeichnis (masterdata_source.remote_dir) per
+    proton-drive CLI nach der Datei, vergleicht sie mit der lokalen Kopie
+    und lädt sie nur bei Abweichung herunter. Die Remote-Datei bleibt
+    unverändert.
+    """
+    console.print("[bold blue]Hole Stammdaten von Proton Drive...[/bold blue]")
+
+    try:
+        config = get_config(config_path)
+
+        from data_imports.fetch_masterdata import fetch_masterdata
+
+        path = fetch_masterdata(config)
+
+        console.print(f"[bold green]Stammdaten bereit: {path}[/bold green]")
+    except Exception as e:
+        logger.exception(f"Fehler beim Holen der Stammdaten: {e}")
+        console.print(f"[red]Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("fetch-timesheets")
+def fetch_timesheets_cmd(
+    remote_dir: str = typer.Argument(
+        ...,
+        help="Remote-Verzeichnis relativ zu masterdata_source.remote_dir, "
+        "z.B. 'Timesheets - Rechnungen-Auswertungen/2026-06 Juni/Timesheets (ausgefüllt)'",
+    ),
+    config_path: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Pfad zur Konfigurationsdatei",
+    ),
+) -> None:
+    """
+    Holt ausgefüllte Zeiterfassungsbögen von Proton Drive in den Import-Ordner.
+
+    Lädt alle Excel-Dateien aus dem angegebenen Remote-Unterverzeichnis
+    (relativ zu masterdata_source.remote_dir). Bereits aktuelle lokale Kopien
+    werden übersprungen, Remote-Dateien bleiben unverändert.
+    """
+    console.print(f"[bold blue]Hole Zeiterfassungsbögen von Proton Drive ({remote_dir})...[/bold blue]")
+
+    try:
+        config = get_config(config_path)
+
+        from data_imports.fetch_masterdata import fetch_timesheets
+
+        paths = fetch_timesheets(config, remote_dir)
+
+        console.print(f"[bold green]{len(paths)} Zeiterfassungsbögen bereit im Import-Ordner.[/bold green]")
+    except Exception as e:
+        logger.exception(f"Fehler beim Holen der Zeiterfassungsbögen: {e}")
+        console.print(f"[red]Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+
 @app.command("import-sheets")
 def import_timesheets(
     month: str = typer.Argument(
         ...,
-        help="Leistungsmonat im Format MM.YYYY, MM-YYYY oder YYYY-MM (verbindlich)",
-    ),
+        help="Leistungsmonat im Format MM.YYYY, MM-YYYY oder YYYY-MM (verbindlich)",    ),
     config_path: Optional[Path] = typer.Option(
         None,
         "--config",

@@ -12,6 +12,7 @@ wheels/
 .env
 # Make
 .month
+.tsdir
 
 # Eigene temp Dateien
 .tmp/

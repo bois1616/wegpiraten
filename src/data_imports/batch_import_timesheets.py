@@ -18,9 +18,9 @@
 # mit assert (“prüfe einmal und dann traue”).
 # Zeilen werden defensiv konvertiert und validiert.
 # Transaktionale Inserts mit Rollback bei Fehler.
-# Pfade: Vorerst wird ein fixer Windows-Pfad als Quelle verwendet.
-# Wenn dieser nicht existiert, wird auf einen dynamischen Pfad aus der Config
-# (structure.imports_path) oder schließlich prj_root/data_imports zurückgefallen.
+# Pfade: Die Quelle wird aus der Config (structure.imports_path) abgeleitet;
+# falls dieser Pfad nicht existiert, wird auf prj_root/import bzw.
+# prj_root/data_imports zurückgefallen.
 # Die verarbeiteten Dateien werden in ein Unterverzeichnis importiert verschoben,
 #  welches bei Bedarf angelegt wird.
 # Pydantic:
@@ -171,14 +171,12 @@ class TimeSheetsImporter:
         )
         default_import = prj_root / "import"
         fallback_local = prj_root / "data_imports"
-        default_windows = Path(r"C:\Users\micro\OneDrive\Shared\Beatus\Wegpiraten Unterlagen\data_imports")
 
         # Kandidatenliste: nimm den ersten existierenden Pfad
         candidates: List[Optional[Path]] = [
             Path(cfg_imports_path) if cfg_imports_path else None,
             default_import,
             fallback_local,
-            default_windows,
         ]
         self.source_dir = ensure_dir(choose_existing_path(candidates, default_import))
         self.done_dir = ensure_dir(Path(cfg_done_path) if cfg_done_path else (prj_root / "done"))
