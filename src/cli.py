@@ -11,6 +11,7 @@ Befehle:
     fetch-master    Stammdaten-Datei von Proton Drive holen
     fetch-timesheets Zeiterfassungsbögen von Proton Drive holen
     import-sheets   Ausgefüllte Zeiterfassungsbögen importieren
+    accordix        KFSG-Leistungsmeldung (ambulant) für Accordix erstellen
 """
 
 import sqlite3
@@ -427,10 +428,49 @@ def arbeitszeit_report(
         raise typer.Exit(1)
 
 
+@app.command("accordix")
+def accordix_report(
+    month: str = typer.Argument(
+        ...,
+        help="Meldemonat im Format MM.YYYY, MM-YYYY oder YYYY-MM",
+    ),
+    config_path: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Pfad zur Konfigurationsdatei",
+    ),
+) -> None:
+    """
+    Erstellt die KFSG-Leistungsmeldung (ambulant) für Accordix als Excel-Datei.
+
+    Nutzt die offizielle KJA-Vorlage und befüllt alle im Meldemonat aktiven,
+    einer Accordix-Leistungsart zuordenbaren Klient:innen. Fehlende Angaben
+    (Geburtsdatum, Geschlecht, Wohnkanton, Zuweisung etc.) bleiben leer und
+    werden manuell nachgetragen.
+    """
+    console.print(f"[bold blue]Erstelle Accordix-Meldung für {month}...[/bold blue]")
+
+    try:
+        config = get_config(config_path)
+
+        from reports.accordix_report import create_accordix_report
+
+        out_file = create_accordix_report(config, month)
+        console.print(f"[bold green]Accordix-Meldung erstellt: {out_file.name}[/bold green]")
+        console.print(
+            "[yellow]Hinweis: Geburtsdatum, Geschlecht, Wohnkanton, Wohnort, "
+            "Zuweisung und Austrittsangaben müssen manuell nachgetragen werden.[/yellow]"
+        )
+    except Exception as e:
+        logger.exception(f"Fehler beim Erstellen der Accordix-Meldung: {e}")
+        console.print(f"[red]Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+
 def main() -> None:
     """Haupteinstiegspunkt für die CLI."""
     app()
-
 
 if __name__ == "__main__":
     main()
