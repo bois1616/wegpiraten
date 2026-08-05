@@ -103,6 +103,10 @@ entities:
         type: float
         excel_column: fte
         format: ${numeric_format}
+      - name: ts
+        type: bool
+        excel_column: TS
+        optional: true
       - name: notes
         type: str
         excel_column: notes
@@ -185,10 +189,6 @@ entities:
         type: str
         optional: true
         excel_column: employee_2
-      - name: is_internal # 1 = interner Klient (kein Klientenbezug), keine Rechnung
-        type: int
-        optional: true
-        excel_column: is_internal
       - name: allowed_travel_time
         type: int
         optional: true

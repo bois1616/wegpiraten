@@ -1,0 +1,25 @@
+[
+  {
+    "FirstName": "Erika",
+    "LastName": "Muster",
+    "DateOfBirth": "2005-08-15",
+    "SocialInsuranceNumber": "756.7538.5284.04",
+    "Gender": "Female",
+    "UmaUmfRecognition": "No",
+    "SpokenLanguage": "DE",
+    "CantonOfResidence": "BE",
+    "ResidenceLegalGuardian": "3600 Thun",
+    "ServiceTypeName": "Sozialpädagogische Familienbegleitung (SPF)",
+    "StartDate": "2023-09-01",
+    "EndDate": "2024-08-31",
+    "Allocation": "Einvernehmlich über Sozialdienst",
+    "NumberOfCareDaysPerWeek": 3,
+    "IsConsultativeAdolescentPsychiatricCare": true,
+    "IsLeavingReasonPlanned": false,
+    "LeavingReason": "Abbruch durch Sorgeberechtigte/Leistungsempfänger",
+    "CustomLeavingReason": null,
+    "AfterLeaveSituation": "Andere",
+    "CustomAfterLeaveSituation": "Eine Beschreibung der Situation nach Verlassen der Massnahme",
+    "Remarks": null
+  }
+]

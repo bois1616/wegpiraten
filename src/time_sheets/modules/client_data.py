@@ -42,6 +42,18 @@ LEFT JOIN employees e2 ON c.employee_2  = e2.emp_id
 LEFT JOIN service_types st ON c.service_type = st.service_type_id
 WHERE (c.end_date IS NULL OR c.end_date >= ?)
   AND COALESCE(c.is_active, 1) = 1
+  AND c.service_type != 'ST999'
+"""
+
+# Mitarbeiter mit TS=WAHR: Generiert Timesheets für "Sonstige Aufwendungen"
+# (nicht klientenbezogen, z.B. Team-Tage, Weiterbildungen).
+_INTERNAL_TS_SQL = """
+SELECT
+    e.emp_id AS employee_id,
+    e.first_name AS employee_first_name,
+    e.last_name AS employee_last_name
+FROM employees e
+WHERE COALESCE(e.ts, 0) = 1
 """
 
 
@@ -50,6 +62,8 @@ def load_active_client_headers(db_path: Path, reporting_month: str) -> List[Head
     Lädt alle im Erfassungsmonat aktiven Klienten mitsamt Mitarbeiterdaten
     und validiert sie gegen HeaderDataModel.
     Für Klienten mit employee_2 wird ein zweiter Header-Datensatz ergänzt.
+    Interne Klienten (service_type ST999 / Sonstige Aufwendungen) werden ausgeschlossen;
+    diese werden separat über employees.ts gesteuert.
     """
     month_start = f"{reporting_month}-01"
 
@@ -73,5 +87,42 @@ def load_active_client_headers(db_path: Path, reporting_month: str) -> List[Head
                 headers.append(HeaderDataModel.model_validate(row2))
         except ValidationError as exc:
             logger.error(f"Ungültige Reporting-Daten in Zeile {idx}: {exc}")
+
+    return headers
+
+
+def load_internal_timesheet_headers(db_path: Path) -> List[HeaderDataModel]:
+    """
+    Lädt Mitarbeiter mit TS=WAHR und erzeugt HeaderDataModel für
+    'Sonstige Aufwendungen' (nicht klientenbezogene Zeiten wie Team-Tage,
+    Weiterbildungen).
+
+    Die Allowed-Hours-Werte entsprechen den bisherigen CM-Klienten:
+    Reise: 1000 min, Direkt: 1000 min, Indirekt: 500 min.
+    """
+    logger.info("Lade Mitarbeiter für Sonstige-Aufwände-Timesheets.")
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql_query(_INTERNAL_TS_SQL, conn)
+    logger.info(f"{len(df)} Mitarbeiter mit TS=WAHR gefunden.")
+
+    headers: List[HeaderDataModel] = []
+    for idx, row in df.iterrows():
+        try:
+            row_dict = {str(key): value for key, value in row.to_dict().items()}
+            header = HeaderDataModel(
+                client_id="SA",
+                employee_id=row_dict["employee_id"],
+                service_type="SONST",
+                short_code="Sonst.Aufw.",
+                allowed_hours_per_month=2500.0,
+                allowed_travel_time=1000.0,
+                allowed_direct_effort=1000.0,
+                allowed_indirect_effort=500.0,
+                employee_first_name=row_dict.get("employee_first_name"),
+                employee_last_name=row_dict.get("employee_last_name"),
+            )
+            headers.append(header)
+        except ValidationError as exc:
+            logger.error(f"Ungültige Sonstige-Aufwände-Daten in Zeile {idx}: {exc}")
 
     return headers

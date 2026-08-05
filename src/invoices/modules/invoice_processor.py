@@ -187,7 +187,6 @@ class InvoiceProcessor:
             )
         LEFT JOIN service_types st_id ON c.service_type = st_id.service_type_id
         WHERE sd.service_date BETWEEN ? AND ?
-          AND COALESCE(c.is_internal, 0) = 0
         """
             params: List[Scalar] = [start_date, end_date]
 

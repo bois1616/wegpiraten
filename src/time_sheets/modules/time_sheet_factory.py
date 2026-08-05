@@ -14,7 +14,7 @@ from pydantic_models.config.entity_model_config import EntityModelConfig
 from pydantic_models.data.header_data_model import HeaderDataModel
 from shared_modules.config import Config
 from shared_modules.utils import derive_table_range, ensure_dir
-from time_sheets.modules.client_data import load_active_client_headers
+from time_sheets.modules.client_data import load_active_client_headers, load_internal_timesheet_headers
 
 
 class TimeSheetFactory:
@@ -124,10 +124,10 @@ class TimeSheetFactory:
 
     def fetch_reporting_data(self, reporting_month: str) -> List[HeaderDataModel]:
         """
-        Lädt alle im Erfassungsmonat aktiven Clients samt Mitarbeiterdaten
-        und validiert sie gegen das dynamische Header-Modell.
+        Lädt alle im Erfassungsmonat aktiven Klienten samt Mitarbeiterdaten
+        sowie die Sonstige-Aufwände-Datensätze für MA mit TS=WAHR.
         """
-        return load_active_client_headers(self.db_path, reporting_month)
+        return load_active_client_headers(self.db_path, reporting_month) + load_internal_timesheet_headers(self.db_path)
 
     # --------------------------------------------------------------------- #
     # Sheet-Erstellung

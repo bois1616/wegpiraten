@@ -55,3 +55,13 @@ Nicht zugeordnet (werden nicht gemeldet, Zeile wird mit Warnung übersprungen):
 | Z | Bemerkungen | |
 
 Definition der Wertelisten und des Mappings: `src/shared_modules/accordix.py`.
+
+## Offizielle JSON-Spezifikationen
+
+Die vollständigen JSON-Formatvorlagen (ambulant und stationär) liegen lokal unter:
+- `docs/Import-Accordix_ambulant_JSON-Format_V1.0.json`
+- `docs/Import-Accordix_stationär_JSON-Format_V1.0.json`
+- `docs/Import-Accordix_ambulant_JSON-Beispiel_V1.0.json`
+- `docs/Import-Accordix_stationär_JSON-Beispiel_V1.0.json`
+
+Quelle: <https://www.kja.dij.be.ch/de/start/foerder--und-schutzleistungen/kantonale-datenerfassung/Datenbank_Accordix/MoeglichkeitenDatenmeldung.html>

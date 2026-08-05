@@ -1,0 +1,25 @@
+[
+  {
+    "FirstName": "string",
+    "LastName": "string",
+    "DateOfBirth": "string (dd.MM.yyyy)",
+    "SocialInsuranceNumber": "string?",
+    "Gender": "string (Male | Female | NonBinary)",
+    "UmaUmfRecognition": "string (Unknown | Yes | No)",
+    "SpokenLanguage": "string? (DE | FR)",
+    "CantonOfResidence": "string (AG | AI | AR | BE | BL | BS | FR | GE | GL | GR | JU | LU | NE | NW | OW | SG | SH | SO | SZ | TG | TI | UR | VD | VS | ZG | ZH | Ausland)",
+    "ResidenceLegalGuardian": "string? (PLZ and/or Municipaly name)",
+    "ServiceTypeName": "string",
+    "StartDate": "string (dd.MM.yyyy)",
+    "EndDate": "string? (dd.MM.yyyy)",
+    "Allocation": "string?",
+    "NumberOfCareDaysPerWeek": "number? (3-5)",
+    "IsConsultativeAdolescentPsychiatricCare": "boolean?",
+    "IsLeavingReasonPlanned": "boolean?",
+    "LeavingReason": "string?",
+    "CustomLeavingReason": "string?",
+    "AfterLeaveSituation": "string?",
+    "CustomAfterLeaveSituation": "string?",
+    "Remarks": "string?"
+  }
+]

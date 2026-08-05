@@ -9,7 +9,7 @@ from loguru import logger
 from pydantic_models.data.header_data_model import HeaderDataModel
 from shared_modules.config import Config
 from shared_modules.utils import ensure_dir
-from time_sheets.modules.client_data import load_active_client_headers
+from time_sheets.modules.client_data import load_active_client_headers, load_internal_timesheet_headers
 from time_sheets.modules.time_sheet_factory import TimeSheetFactory
 
 
@@ -56,9 +56,11 @@ class TimeSheetBatchProcessor:
     def load_client_data(self, reporting_month: str) -> List[HeaderDataModel]:
         """
         Lädt alle im Monat aktiven Clients mitsamt Mitarbeiterdaten
-        und validiert sie gegen HeaderDataModel.
+        sowie die Sonstige-Aufwände-Datensätze für MA mit TS=WAHR.
         """
-        return load_active_client_headers(self.db_path, reporting_month)
+        client_headers = load_active_client_headers(self.db_path, reporting_month)
+        internal_headers = load_internal_timesheet_headers(self.db_path)
+        return client_headers + internal_headers
 
     def run(
         self, reporting_month: str, output_path: Optional[Path] = None, template_path: Optional[Path] = None
