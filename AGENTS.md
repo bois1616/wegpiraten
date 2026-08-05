@@ -71,6 +71,9 @@ Nicht-Ziel: langfristige Architektur, Skalierung, Funktionsausbau.
 
 ## Betriebssicherung
 
+- Die SQLite-DB ist ein abgeleitetes Artefakt: Sie wird routinemässig verworfen
+  und aus Stammdaten (`import-master`) und Timesheets (`import-sheets`) neu
+  erstellt. Ältere Leistungsdaten liegen in den Monatsarchiven (ZIP).
 - Vor manuellen DB-Änderungen ist ein Backup zu erstellen
 - Vor jedem Import ist ein DB-Snapshot zu sichern
 - Nach Abschluss eines Monats ist ein Abschluss-Backup zu erstellen
