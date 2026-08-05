@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(import *)",
+      "Bash(from *)",
+      "Bash(excel_path *)",
+      "Bash('/home/stephan/projects/wegpiraten/imports')",
+      "Bash(wb *)",
+      "Bash(excel_path)",
+      "Bash(ws *)",
+      "Bash(header_row *)",
+      "Bash(max_col *)",
+      "Bash(new_columns *)",
+      "Bash('is_consultative_adolescent_psychiatric_care',)",
+      "Bash('number_of_care_days_per_week',)",
+      "Bash('is_leaving_reason_planned',)",
+      "Bash('leaving_reason',)",
+      "Bash('custom_leaving_reason',)",
+      "Bash('after_leave_situation',)",
+      "Bash('custom_after_leave_situation',)",
+      "Bash('remarks')",
+      "Bash(])",
+      "Bash(print)",
+      "Bash(col_idx *)",
+      "Bash(ws.cell)",
+      "Bash(wb.save)",
+      "Bash(eof)",
+      "Bash(shutil.copy)",
+      "Bash(value *)",
+      "Bash(.value)",
+      "Bash(temp_path *)",
+      "Bash('/tmp/wegpiraten_datenbank.xlsx')",
+      "Bash(wb2 *)",
+      "Bash(temp_path)",
+      "Bash(ws2 *)",
+      "Bash(wb3 *)",
+      "Bash('/tmp/final_check.xlsx')",
+      "Bash(ws3 *)"
+    ]
+  },
+  "$version": 4
+}
