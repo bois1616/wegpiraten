@@ -498,9 +498,10 @@ def accordix_report(
     Erstellt die KFSG-Leistungsmeldung (ambulant) für Accordix als Excel-Datei.
 
     Nutzt die offizielle KJA-Vorlage und befüllt alle im Meldemonat aktiven,
-    einer Accordix-Leistungsart zuordenbaren Klient:innen. Fehlende Angaben
-    (Geburtsdatum, Geschlecht, Wohnkanton, Zuweisung etc.) bleiben leer und
-    werden manuell nachgetragen.
+    einer Accordix-Leistungsart zuordenbaren Klient:innen mit den in den
+    Stammdaten gepflegten Accordix-Feldern. Zeilen mit fehlenden oder
+    ungültigen Pflichtfeldern werden mit Begründung übersprungen; die
+    Austrittsfelder werden im Meldefile manuell nachgetragen.
     """
     console.print(f"[bold blue]Erstelle Accordix-Meldung für {month}...[/bold blue]")
 
@@ -512,9 +513,16 @@ def accordix_report(
         out_file = create_accordix_report(config, month)
         console.print(f"[bold green]Accordix-Meldung erstellt: {out_file.name}[/bold green]")
         console.print(
-            "[yellow]Hinweis: Geburtsdatum, Geschlecht, Wohnkanton, Wohnort, "
-            "Zuweisung und Austrittsangaben müssen manuell nachgetragen werden.[/yellow]"
+            "[yellow]Hinweis: Die Austrittsfelder (war geplant, Austrittsgrund, "
+            "Situation nach Austritt) müssen im Meldefile manuell nachgetragen werden.[/yellow]"
         )
+    except ValueError as e:
+        # Erwarteter Fach-Fehler (z.B. keine meldepflichtigen Leistungen):
+        # ohne Stack Trace ausgeben, die Gründe stehen in den Warnungen oben.
+        logger.warning("Accordix-Meldung nicht erstellt: {}", e)
+        console.print(f"[yellow]{e}[/yellow]")
+        console.print("[yellow]Details siehe Warnungen oben.[/yellow]")
+        raise typer.Exit(1)
     except Exception as e:
         logger.exception(f"Fehler beim Erstellen der Accordix-Meldung: {e}")
         console.print(f"[red]Fehler: {e}[/red]")
