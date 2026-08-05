@@ -20,7 +20,10 @@ database:
 # vgl. ~/proton-drive/Makefile.
 masterdata_source:
   remote_dir: "/my-files/Shared/Beatus/Wegpiraten Unterlagen"
-  file_pattern: "wegpiraten_datenbank*.xlsx"
+  # Nur die exakte Datei ist relevant; ähnlich benannte Sicherungs- oder
+  # Lookup-Versionen (z.B. wegpiraten_datenbank_ohne_Accordix.xlsx) dürfen
+  # niemals als Stammdatenquelle gewählt werden.
+  file_pattern: "wegpiraten_datenbank.xlsx"
   preferred_filename: wegpiraten_datenbank.xlsx
   proton_cli: "~/.local/bin/proton-drive"
   lockfile: "~/proton-drive/.proton.lock"
