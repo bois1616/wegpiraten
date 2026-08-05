@@ -42,6 +42,26 @@ ALLOCATION_VALUES: tuple[str, ...] = (
     "Jugendanwaltschaft",
 )
 
+# Austrittsgründe (ambulant und stationär)
+LEAVING_REASON_VALUES: tuple[str, ...] = (
+    "Abbruch durch Sorgeberechtigte/Leistungsempfänger",
+    "Abbruch durch Leistungsbesteller (KESB, Sozialdienst, Jugendanwaltschaft)",
+    "Abbruch durch KESB aufgrund Volljährigkeit",
+    "Abbruch durch Leistungserbringer aufgrund Konfliktsituationen",
+    "Abbruch durch Leistungserbringer aufgrund kurzfristig notwendigen Wechsels des Leistungsangebots",
+    "Anderer",
+)
+
+# Situation nach Austritt (ambulant)
+AFTER_LEAVE_SITUATION_VALUES: tuple[str, ...] = (
+    "weitere ambulante Leistung bei aktuellem Leistungserbringer",
+    "weitere ambulante Leistung bei anderem Leistungserbringer",
+    "stationäre Einrichtung",
+    "Pflegefamilie",
+    "keine weitere Leistung",
+    "andere",
+)
+
 # Zusätzliche Klienten-Stammdatenfelder für Accordix
 # (Excel-Spaltenname in masterdata_client = Spaltenname in der DB-Tabelle clients)
 ACCORDIX_CLIENT_FIELDS: tuple[str, ...] = (
@@ -52,6 +72,14 @@ ACCORDIX_CLIENT_FIELDS: tuple[str, ...] = (
     "canton_of_residence",
     "residence_legal_guardian",
     "allocation",
+    "is_consultative_adolescent_psychiatric_care",
+    "number_of_care_days_per_week",
+    "is_leaving_reason_planned",
+    "leaving_reason",
+    "custom_leaving_reason",
+    "after_leave_situation",
+    "custom_after_leave_situation",
+    "remarks",
 )
 
 # Pflichtfelder in Accordix (ohne diese ist eine Meldezeile ungültig)
@@ -69,6 +97,8 @@ FIELD_VALUE_LISTS: dict[str, tuple[str, ...]] = {
     "spoken_language": LANGUAGE_VALUES,
     "canton_of_residence": CANTON_VALUES,
     "allocation": ALLOCATION_VALUES,
+    "leaving_reason": LEAVING_REASON_VALUES,
+    "after_leave_situation": AFTER_LEAVE_SITUATION_VALUES,
 }
 
 

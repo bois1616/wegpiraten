@@ -247,6 +247,39 @@ entities:
         type: str
         optional: true
         excel_column: allocation
+      # Weitere Accordix-Felder (für vollständige Meldedatei)
+      - name: is_consultative_adolescent_psychiatric_care # IBF: Konsiliarische jugendpsychiatrische Versorgung
+        type: bool
+        optional: true
+        excel_column: is_consultative_adolescent_psychiatric_care
+      - name: number_of_care_days_per_week # SPT: Anzahl Betreuungstage pro Woche (3-5)
+        type: int
+        optional: true
+        excel_column: number_of_care_days_per_week
+      - name: is_leaving_reason_planned # War der Austritt geplant?
+        type: bool
+        optional: true
+        excel_column: is_leaving_reason_planned
+      - name: leaving_reason # Austrittsgrund
+        type: str
+        optional: true
+        excel_column: leaving_reason
+      - name: custom_leaving_reason # Anderer Austrittsgrund (Freitext)
+        type: str
+        optional: true
+        excel_column: custom_leaving_reason
+      - name: after_leave_situation # Situation nach Austritt
+        type: str
+        optional: true
+        excel_column: after_leave_situation
+      - name: custom_after_leave_situation # Andere Situation nach Austritt (Freitext)
+        type: str
+        optional: true
+        excel_column: custom_after_leave_situation
+      - name: remarks # Bemerkungen
+        type: str
+        optional: true
+        excel_column: remarks
 
   payer:
     fields:

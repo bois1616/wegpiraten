@@ -24,6 +24,14 @@ Feld in der SQLite-Tabelle `clients`.
 | `allocation` | Allocation | M | Zuweisung | `Einvernehmlich über Sozialdienst` / `KESB (zusammen mit Gericht)` / `Jugendanwaltschaft` |
 | `start_date` | StartDate | Q | Eintrittsdatum | TT.MM.JJJJ |
 | `end_date` | EndDate | S | Austrittsdatum | TT.MM.JJJJ, nur wenn Ende <= Meldemonat (Achtung: Bewilligungsende ungleich Austritt, siehe Warnung im Report) |
+| `is_consultative_adolescent_psychiatric_care` | IsConsultativeAdolescentPsychiatricCare | N | IBF: Konsiliarische jugendpsychiatrische Versorgung | `true`/`false`, nur für Leistungsart IBF |
+| `number_of_care_days_per_week` | NumberOfCareDaysPerWeek | O | SPT: Anzahl Betreuungstage pro Woche | 3-5, nur für Leistungsart SPT |
+| `is_leaving_reason_planned` | IsLeavingReasonPlanned | T | war der Austritt geplant? | `true`/`false`, nur bei Austritt |
+| `leaving_reason` | LeavingReason | U | Austrittsgrund | gemäss Werteliste, nur wenn Austritt nicht geplant |
+| `custom_leaving_reason` | CustomLeavingReason | V | Anderer Austrittsgrund | Freitext, nur wenn leaving_reason = "Anderer" |
+| `after_leave_situation` | AfterLeaveSituation | W | Situation nach Austritt | gemäss Werteliste |
+| `custom_after_leave_situation` | CustomAfterLeaveSituation | X | Andere Situation nach Austritt | Freitext, nur wenn after_leave_situation = "andere" |
+| `remarks` | Remarks | Z | Bemerkungen | Freitext |
 
 Die Dropdowns in den neuen Spalten sind mit dem Blatt "Wertelisten" in der
 Masterdatei verknüpft (benannte Bereiche `accordix_*`).
@@ -40,19 +48,6 @@ Masterdatei verknüpft (benannte Bereiche `accordix_*`).
 
 Nicht zugeordnet (werden nicht gemeldet, Zeile wird mit Warnung übersprungen):
 `PRIVAT`, `SONST`, `Jugendcoaching`, `Abklärung`, `med./therap. Bericht`.
-
-## Manuell im Meldefile zu ergänzen (keine Stammdaten)
-
-| Accordix-Spalte | Bezeichnung | Bemerkung |
-|---|---|---|
-| N | IBF: Konsiliarische jugendpsychiatrische Versorgung | nur für Leistungsart IBF |
-| O | SPT: Anzahl Betreuungstage pro Woche | nur für Leistungsart SPT (3-5) |
-| T | war der Austritt geplant? | Austritts-Ereignisdaten |
-| U | Austrittsgrund | nur wenn Austritt nicht geplant |
-| V | Anderer Austrittsgrund | nur wenn Austrittsgrund = "Anderer" |
-| W | Situation nach Austritt | |
-| X | Andere Situation nach Austritt | nur wenn Situation = "Andere" |
-| Z | Bemerkungen | |
 
 Definition der Wertelisten und des Mappings: `src/shared_modules/accordix.py`.
 
