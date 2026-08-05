@@ -226,6 +226,9 @@ def import_entity_data(
         logger.warning(f"Keine gültigen Datensätze für {target_table} gefunden.")
         return 0, 0, 0, {"inserted": [], "updated": [], "deactivated": []}
 
+    if target_table == "clients":
+        _validate_client_accordix(records)
+
     select_cols = [field.name for field in fields]
     if "is_active" not in select_cols:
         select_cols.append("is_active")
@@ -316,6 +319,58 @@ def import_entity_data(
             "deactivated": deactivated,
         },
     )
+
+
+def _validate_client_accordix(records: List[Dict[str, Any]]) -> None:
+    """
+    Prüft die Accordix-Felder der Klienten-Datensätze (nur Warnungen, kein Abbruch).
+
+    - Codefelder gegen die Accordix-Wertelisten
+    - Datums-Konsistenz (Geburtsdatum, Leistungsbeginn, Enddatum)
+    - Widersprüche zwischen Datensätzen derselben Person (gleiche AHV-Nr.,
+      unterschiedliche Personendaten, z.B. bei mehreren Leistungen)
+    """
+    from shared_modules.accordix import (
+        FIELD_VALUE_LISTS,
+        check_date_consistency,
+        parse_db_date,
+        validate_coded_value,
+    )
+
+    for record in records:
+        client_id = record.get("client_id") or "?"
+        for field in FIELD_VALUE_LISTS:
+            error = validate_coded_value(field, record.get(field))
+            if error:
+                logger.warning("Klient {}: Feld {}: {}", client_id, field, error)
+        for warning in check_date_consistency(
+            parse_db_date(record.get("date_of_birth")),
+            parse_db_date(record.get("start_date")),
+            parse_db_date(record.get("end_date")),
+        ):
+            logger.warning("Klient {}: {}", client_id, warning)
+
+    # Personendaten-Konsistenz über alle Zeilen mit gleicher AHV-Nr.
+    person_fields = ("date_of_birth", "gender", "uma_umf", "spoken_language", "canton_of_residence")
+    by_ahv: Dict[str, List[Dict[str, Any]]] = {}
+    for record in records:
+        ahv = str(record.get("social_security_number") or "").strip()
+        if ahv:
+            by_ahv.setdefault(ahv, []).append(record)
+    for ahv, group in by_ahv.items():
+        if len(group) < 2:
+            continue
+        for field in person_fields:
+            values = {str(rec.get(field) or "").strip() for rec in group} - {""}
+            if len(values) > 1:
+                ids = [rec.get("client_id") for rec in group]
+                logger.warning(
+                    "AHV {}: widersprüchliche Werte für {} bei {}: {}",
+                    ahv,
+                    field,
+                    ids,
+                    sorted(values),
+                )
 
 
 # Standard-Tabellen-Mapping (Excel-Tabellenname → SQLite-Tabelle, Entity-Name)

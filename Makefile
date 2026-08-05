@@ -12,6 +12,7 @@
 #   make import-sheets MONTH=2026-02                    Zeiterfassungsbögen importieren
 #   make report        MONTH=2026-02                    Arbeitszeitprotokoll erstellen
 #   make accordix      MONTH=2026-02                    Accordix-Leistungsmeldung (ambulant) erstellen
+#   make extend-master                                  Stammdaten-Datei um Accordix-Felder erweitern
 #   make validate                                       Konfiguration prüfen
 #
 # MONTH wird beim ersten Aufruf in .month gespeichert und für Folgeaufrufe
@@ -23,7 +24,7 @@
 
 CLI := .venv/bin/wegpiraten
 
-.PHONY: help invoices timesheets import-master fetch-master fetch-timesheets import-sheets report accordix validate _require-month _save-month _require-tsdir _save-tsdir
+.PHONY: help invoices timesheets import-master fetch-master fetch-timesheets import-sheets report accordix extend-master validate _require-month _save-month _require-tsdir _save-tsdir
 
 help:
 	@echo ""
@@ -40,6 +41,7 @@ help:
 	@echo "  make import-sheets MONTH=2026-02                    Zeiterfassungsbögen importieren"
 	@echo "  make report        MONTH=2026-02                    Arbeitszeitprotokoll erstellen"
 	@echo "  make accordix      MONTH=2026-02                    Accordix-Leistungsmeldung (ambulant) erstellen"
+	@echo "  make extend-master                                  Stammdaten-Datei um Accordix-Felder erweitern"
 	@echo "  make validate                                       Konfiguration prüfen"
 	@echo ""
 	@echo "  MONTH wird zwischen Aufrufen in .month gespeichert (kein erneutes Angeben nötig)."
@@ -69,6 +71,9 @@ report: _require-month _save-month
 
 accordix: _require-month _save-month
 	$(CLI) accordix $(MONTH)
+
+extend-master:
+	$(CLI) extend-master
 
 validate:
 	$(CLI) validate

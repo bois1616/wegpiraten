@@ -212,6 +212,38 @@ entities:
         type: str
         optional: true
         excel_column: application_number
+      # Accordix-Felder (KFSG-Leistungsmeldung). Alle optional, damit der
+      # Import auch für nicht meldepflichtige Klienten funktioniert;
+      # die Vollständigkeit wird bei der Accordix-Meldung geprüft.
+      - name: date_of_birth
+        type: str
+        optional: true
+        excel_column: date_of_birth
+        format: ${date_format}
+      - name: gender # m / w / d
+        type: str
+        optional: true
+        excel_column: gender
+      - name: uma_umf # Ja / Nein / Unbekannt
+        type: str
+        optional: true
+        excel_column: uma_umf
+      - name: spoken_language # DE / FR (nur bei bilingualen LE)
+        type: str
+        optional: true
+        excel_column: spoken_language
+      - name: canton_of_residence # Kantonskürzel oder Ausland
+        type: str
+        optional: true
+        excel_column: canton_of_residence
+      - name: residence_legal_guardian # PLZ/Gemeinde, nur wenn Wohnkanton BE
+        type: str
+        optional: true
+        excel_column: residence_legal_guardian
+      - name: allocation # Zuweisung gemäss Accordix-Werteliste
+        type: str
+        optional: true
+        excel_column: allocation
 
   payer:
     fields:
