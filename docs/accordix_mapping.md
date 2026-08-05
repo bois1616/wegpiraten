@@ -1,8 +1,8 @@
-# Accordix-Vokabular: Spalten-Mapping Stammdaten → Meldedatei
+# Accordix-Vokabular: Spalten-Mapping Stammdaten nach Meldedatei
 
 Zuordnung der Spalten in `masterdata_client` (Datei `wegpiraten_datenbank.xlsx`,
-Blatt «Klienten») zu den Feldern der Accordix-Meldedatei
-(`templates/Import-Accordix_ambulant_Excel-Format_V1.0_DE.xlsx`, Blatt «Ambulant»).
+Blatt "Klienten") zu den Feldern der Accordix-Meldedatei
+(`templates/Import-Accordix_ambulant_Excel-Format_V1.0_DE.xlsx`, Blatt "Ambulant").
 
 Die Spaltennamen in `masterdata_client` entsprechen jeweils dem gleichnamigen
 Feld in der SQLite-Tabelle `clients`.
@@ -20,15 +20,15 @@ Feld in der SQLite-Tabelle `clients`.
 | `spoken_language` | SpokenLanguage | G | Hauptsprache | `DE` / `FR`, nur bei bilingualen LE |
 | `canton_of_residence` | CantonOfResidence | I | Wohnkanton | Kantonskürzel oder `Ausland` (Pflicht) |
 | `residence_legal_guardian` | ResidenceLegalGuardian | J | Wohnort (Sorgeberechtigte) | PLZ und/oder Gemeinde, nur wenn Wohnkanton BE |
-| `service_type` → `service_types.code` | ServiceTypeName | L | Leistungsart | via Mapping (siehe unten) |
+| `service_type` nach `service_types.code` | ServiceTypeName | L | Leistungsart | via Mapping (siehe unten) |
 | `allocation` | Allocation | M | Zuweisung | `Einvernehmlich über Sozialdienst` / `KESB (zusammen mit Gericht)` / `Jugendanwaltschaft` |
 | `start_date` | StartDate | Q | Eintrittsdatum | TT.MM.JJJJ |
-| `end_date` | EndDate | S | Austrittsdatum | TT.MM.JJJJ, nur wenn Ende ≤ Meldemonat (Achtung: Bewilligungsende ≠ Austritt, siehe Warnung im Report) |
+| `end_date` | EndDate | S | Austrittsdatum | TT.MM.JJJJ, nur wenn Ende <= Meldemonat (Achtung: Bewilligungsende ungleich Austritt, siehe Warnung im Report) |
 
-Die Dropdowns in den neuen Spalten sind mit dem Blatt «Wertelisten» in der
+Die Dropdowns in den neuen Spalten sind mit dem Blatt "Wertelisten" in der
 Masterdatei verknüpft (benannte Bereiche `accordix_*`).
 
-## Leistungsarten-Mapping (intern → Accordix)
+## Leistungsarten-Mapping (intern nach Accordix)
 
 | `service_types.code` | ServiceTypeName (Accordix) |
 |---|---|
@@ -46,12 +46,12 @@ Nicht zugeordnet (werden nicht gemeldet, Zeile wird mit Warnung übersprungen):
 | Accordix-Spalte | Bezeichnung | Bemerkung |
 |---|---|---|
 | N | IBF: Konsiliarische jugendpsychiatrische Versorgung | nur für Leistungsart IBF |
-| O | SPT: Anzahl Betreuungstage pro Woche | nur für Leistungsart SPT (3–5) |
+| O | SPT: Anzahl Betreuungstage pro Woche | nur für Leistungsart SPT (3-5) |
 | T | war der Austritt geplant? | Austritts-Ereignisdaten |
 | U | Austrittsgrund | nur wenn Austritt nicht geplant |
-| V | Anderer Austrittsgrund | nur wenn Austrittsgrund = «Anderer» |
+| V | Anderer Austrittsgrund | nur wenn Austrittsgrund = "Anderer" |
 | W | Situation nach Austritt | |
-| X | Andere Situation nach Austritt | nur wenn Situation = «Andere» |
+| X | Andere Situation nach Austritt | nur wenn Situation = "Andere" |
 | Z | Bemerkungen | |
 
 Definition der Wertelisten und des Mappings: `src/shared_modules/accordix.py`.
