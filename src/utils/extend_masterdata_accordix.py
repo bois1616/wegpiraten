@@ -15,6 +15,10 @@ Hinweis: Die erweiterte Datei muss anschliessend wieder nach Proton Drive
 hochgeladen werden, damit die Struktur dauerhaft erhalten bleibt.
 """
 
+import re
+import shutil
+import tempfile
+import zipfile
 from pathlib import Path
 
 from loguru import logger
@@ -38,6 +42,12 @@ _FIRST_DATA_ROW = 3
 _LAST_VALIDATED_ROW = 500
 
 _PREFIX = "accordix_"
+
+# Paket-Teile, die openpyxl beim Speichern verwerfen würde, aber erhalten
+# bleiben müssen (Power Query / Datenmodell des Kunden)
+_PRESERVED_PARTS = ("xl/connections.xml", "xl/model/", "customXml/")
+
+_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 
 def _ensure_valuelist_sheet(workbook) -> None:
@@ -172,6 +182,95 @@ def _ensure_client_columns(workbook) -> None:
         sheet.column_dimensions[col_letter].width = max(current_width, 14)
 
 
+def _restore_dropped_parts(original_path: Path, new_path: Path) -> None:
+    """
+    Re-injiziert Paket-Teile, die openpyxl beim Speichern verwirft.
+
+    openpyxl entfernt beim Re-Save u.a. Power-Query-Verbindungen
+    (xl/connections.xml, customXml/*) und das Power-Pivot-Datenmodell
+    (xl/model/item.data). Diese Teile werden aus der Originaldatei
+    übernommen; Relationships und Content-Types werden entsprechend ergänzt.
+    """
+    with zipfile.ZipFile(original_path) as zf:
+        preserved = {
+            name: zf.read(name)
+            for name in zf.namelist()
+            if name == "xl/connections.xml"
+            or name.startswith("xl/model/")
+            or name.startswith("customXml/")
+        }
+    if not preserved:
+        return
+
+    with zipfile.ZipFile(new_path) as zf:
+        parts = {name: zf.read(name) for name in zf.namelist()}
+
+    missing = {name: data for name, data in preserved.items() if name not in parts}
+    if not missing:
+        return
+    logger.info(
+        "Stelle von openpyxl verworfene Paket-Teile wieder her: {}",
+        ", ".join(sorted(missing)),
+    )
+
+    # [Content_Types].xml ergänzen
+    ct = parts["[Content_Types].xml"].decode("utf-8")
+    additions: list[str] = []
+    if "xl/connections.xml" in missing and "/xl/connections.xml" not in ct:
+        additions.append(
+            '<Override PartName="/xl/connections.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"/>'
+        )
+    if any(name.startswith("xl/model/") for name in missing) and 'Extension="data"' not in ct:
+        additions.append(
+            '<Default Extension="data" ContentType="application/vnd.openxmlformats-officedocument.model+data"/>'
+        )
+    for name in sorted(missing):
+        part_name = f"/{name}"
+        if name.startswith("customXml/itemProps") and part_name not in ct:
+            additions.append(
+                f'<Override PartName="{part_name}" ContentType="application/vnd.openxmlformats-officedocument.customXmlProperties+xml"/>'
+            )
+    ct = ct.replace("</Types>", "".join(additions) + "</Types>")
+    parts["[Content_Types].xml"] = ct.encode("utf-8")
+
+    # xl/_rels/workbook.xml.rels ergänzen
+    rels_name = "xl/_rels/workbook.xml.rels"
+    rels = parts[rels_name].decode("utf-8")
+    used_ids = {int(m) for m in re.findall(r'Id="rId(\d+)"', rels)}
+    next_id = max(used_ids, default=0) + 1
+    rel_additions: list[str] = []
+
+    def _add_rel(rel_type: str, target: str) -> None:
+        nonlocal next_id
+        rel_additions.append(f'<Relationship Id="rId{next_id}" Type="{rel_type}" Target="{target}"/>')
+        next_id += 1
+
+    if "xl/connections.xml" in missing:
+        _add_rel(f"{_NS}/connections", "connections.xml")
+    if "xl/model/item.data" in missing:
+        _add_rel(f"{_NS}/powerPivotData", "model/item.data")
+    for name in sorted(missing):
+        if re.fullmatch(r"customXml/item\d+\.xml", name):
+            _add_rel(f"{_NS}/customXml", f"../{name}")
+    rels = rels.replace("</Relationships>", "".join(rel_additions) + "</Relationships>")
+    parts[rels_name] = rels.encode("utf-8")
+
+    parts.update(missing)
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".xlsx", dir=new_path.parent, delete=False
+    ) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name, data in parts.items():
+                zf.writestr(name, data)
+        tmp_path.replace(new_path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def extend_masterdata_file(excel_path: Path) -> Path:
     """
     Erweitert eine Stammdaten-Datei um die Accordix-Struktur (idempotent).
@@ -185,9 +284,20 @@ def extend_masterdata_file(excel_path: Path) -> Path:
     if not excel_path.exists():
         raise FileNotFoundError(f"Stammdaten-Datei nicht gefunden: {excel_path}")
 
-    workbook = load_workbook(excel_path)
-    _ensure_valuelist_sheet(workbook)
-    _ensure_client_columns(workbook)
-    workbook.save(excel_path)
+    # Original sichern, um von openpyxl verworfene Paket-Teile
+    # (Power Query, Datenmodell) anschliessend wiederherstellen zu können
+    with tempfile.NamedTemporaryFile(
+        suffix=".xlsx", dir=excel_path.parent, delete=False
+    ) as tmp:
+        original_copy = Path(tmp.name)
+    try:
+        shutil.copy(excel_path, original_copy)
+        workbook = load_workbook(excel_path)
+        _ensure_valuelist_sheet(workbook)
+        _ensure_client_columns(workbook)
+        workbook.save(excel_path)
+        _restore_dropped_parts(original_copy, excel_path)
+    finally:
+        original_copy.unlink(missing_ok=True)
     logger.info("Stammdaten-Datei erweitert: {}", excel_path)
     return excel_path
