@@ -4,26 +4,42 @@ Zuordnung der Spalten in `masterdata_client` (Datei `wegpiraten_datenbank.xlsx`,
 Blatt "Klienten") zu den Feldern der Accordix-Meldedatei
 (`templates/Import-Accordix_ambulant_Excel-Format_V1.0_DE.xlsx`, Blatt "Ambulant").
 
-Die Spaltennamen in `masterdata_client` entsprechen jeweils dem gleichnamigen
-Feld in der SQLite-Tabelle `clients`.
+Die Spaltenbezeichnungen entsprechen der Excel-Tabelle `masterdata_client`
+(definiert in `.config/wegpiraten_config.yaml` unter `models.client.fields[].excel_column`).
+Die Reihenfolge entspricht der Excel-Tabelle.
 
-## Aus den Stammdaten befüllte Felder
+## Vollständige Spaltenübersicht
 
-| masterdata_client (Excel/DB) | Accordix-Feld (technisch) | Accordix-Spalte | Accordix-Bezeichnung | Werte |
+| Excel-Spalte | Accordix-Feld (technisch) | Accordix-Spalte | Accordix-Bezeichnung | Werte |
 |---|---|---|---|---|
-| `last_name` | LastName | A | Nachname | Freitext |
-| `first_name` | FirstName | B | Vorname | Freitext |
+| `client_id` | — | — | nicht relevant | — |
 | `social_security_number` | SocialInsuranceNumber | C | AHV-Nummer | `756.XXXX.XXXX.XX`, darf leer sein |
+| `first_name` | FirstName | B | Vorname | Freitext |
+| `last_name` | LastName | A | Nachname | Freitext |
+| `short_code` | — | — | nicht relevant | — |
+| `sr_ap_first_name` | — | — | nicht relevant | — |
+| `sr_ap_last_name` | — | — | nicht relevant | — |
+| `sr_ap_gender` | — | — | nicht relevant | — |
+| `tenant_id` | — | — | nicht relevant | — |
+| `payer_id` | — | — | nicht relevant | — |
+| `service_requester_id` | — | — | nicht relevant | — |
+| `start_date` | StartDate | Q | Eintrittsdatum | TT.MM.JJJJ |
+| `end_date` | EndDate | S | Austrittsdatum | TT.MM.JJJJ, nur wenn Ende <= Meldemonat (Achtung: Bewilligungsende ungleich Austritt, siehe Warnung im Report) |
+| `employee_id` | — | — | nicht relevant | — |
+| `employee_2` | — | — | nicht relevant | — |
+| `allowed_travel_time` | — | — | nicht relevant | — |
+| `allowed_direct_effort` | — | — | nicht relevant | — |
+| `allowed_indirect_effort` | — | — | nicht relevant | — |
+| `service_type_id` | ServiceTypeName | L | Leistungsart | via Mapping nach `service_types.code` (siehe unten) |
+| `notes` | — | — | nicht relevant | — |
+| `application_number` | — | — | nicht relevant | — |
 | `date_of_birth` | DateOfBirth | D | Geburtsdatum | TT.MM.JJJJ (Pflicht) |
 | `gender` | Gender | E | Geschlecht | `m` / `w` / `d` (Pflicht) |
 | `uma_umf` | UmaUmfRecognition | F | UMA/UMF | `Ja` / `Nein` / `Unbekannt` (Pflicht) |
 | `spoken_language` | SpokenLanguage | G | Hauptsprache | `DE` / `FR`, nur bei bilingualen LE |
 | `canton_of_residence` | CantonOfResidence | I | Wohnkanton | Kantonskürzel oder `Ausland` (Pflicht) |
 | `residence_legal_guardian` | ResidenceLegalGuardian | J | Wohnort (Sorgeberechtigte) | PLZ und/oder Gemeinde, nur wenn Wohnkanton BE |
-| `service_type` nach `service_types.code` | ServiceTypeName | L | Leistungsart | via Mapping (siehe unten) |
 | `allocation` | Allocation | M | Zuweisung | `Einvernehmlich über Sozialdienst` / `KESB (zusammen mit Gericht)` / `Jugendanwaltschaft` |
-| `start_date` | StartDate | Q | Eintrittsdatum | TT.MM.JJJJ |
-| `end_date` | EndDate | S | Austrittsdatum | TT.MM.JJJJ, nur wenn Ende <= Meldemonat (Achtung: Bewilligungsende ungleich Austritt, siehe Warnung im Report) |
 | `is_consultative_adolescent_psychiatric_care` | IsConsultativeAdolescentPsychiatricCare | N | IBF: Konsiliarische jugendpsychiatrische Versorgung | `true`/`false`, nur für Leistungsart IBF |
 | `number_of_care_days_per_week` | NumberOfCareDaysPerWeek | O | SPT: Anzahl Betreuungstage pro Woche | 3-5, nur für Leistungsart SPT |
 | `is_leaving_reason_planned` | IsLeavingReasonPlanned | T | war der Austritt geplant? | `true`/`false`, nur bei Austritt |
@@ -33,7 +49,7 @@ Feld in der SQLite-Tabelle `clients`.
 | `custom_after_leave_situation` | CustomAfterLeaveSituation | X | Andere Situation nach Austritt | Freitext, nur wenn after_leave_situation = "andere" |
 | `remarks` | Remarks | Z | Bemerkungen | Freitext |
 
-Die Dropdowns in den neuen Spalten sind mit dem Blatt "Wertelisten" in der
+Die Dropdowns in den Accordix-Spalten sind mit dem Blatt "Wertelisten" in der
 Masterdatei verknüpft (benannte Bereiche `accordix_*`).
 
 ## Leistungsarten-Mapping (intern nach Accordix)
