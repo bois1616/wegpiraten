@@ -182,13 +182,6 @@ entities:
         excel_column: end_date
         format: ${date_format}
         optional: true
-      - name: employee_id # foreign key
-        type: str
-        excel_column: employee_id
-      - name: employee_2 # optionaler zweiter MA mit FK auf employees
-        type: str
-        optional: true
-        excel_column: employee_2
       - name: allowed_travel_time
         type: int
         optional: true
@@ -280,6 +273,21 @@ entities:
         type: str
         optional: true
         excel_column: remarks
+
+  # Relation Klient <-> Mitarbeiter (ersetzt die ehemaligen Spalten
+  # employee_id/employee_2 in der Klienten-Tabelle). Diese Spalten dienen in
+  # der Excel-Datei nur noch der Ansicht und dürfen im Code nicht mehr
+  # verwendet werden.
+  client_employee_relation:
+    fields:
+      - name: client_id
+        type: str
+        primary_key: true
+        excel_column: client_id
+      - name: employee_id
+        type: str
+        primary_key: true
+        excel_column: employee_id
 
   payer:
     fields:

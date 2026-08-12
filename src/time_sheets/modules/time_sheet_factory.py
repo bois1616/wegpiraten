@@ -70,17 +70,25 @@ class TimeSheetFactory:
 
     def _validate_header_model(self) -> None:
         """
-        Prüft einmalig, ob HeaderDataModel mit der Entity-Definition 'client' kompatibel ist.
+        Prüft einmalig, ob HeaderDataModel mit den Entity-Definitionen 'client'
+        und 'client_employee_relation' kompatibel ist. employee_id stammt aus
+        der Relation, nicht mehr aus den (nur noch zur Ansicht dienenden)
+        Spalten clients.employee_id/employee_2.
         """
         entity_cfg: EntityModelConfig | None = self.config.models.get("client")
         if entity_cfg is None:
             logger.error("Entity 'client' fehlt in der Config.")
             raise ValueError("Entity 'client' fehlt in der Config.")
 
+        relation_cfg: EntityModelConfig | None = self.config.models.get("client_employee_relation")
+        if relation_cfg is None:
+            logger.error("Entity 'client_employee_relation' fehlt in der Config.")
+            raise ValueError("Entity 'client_employee_relation' fehlt in der Config.")
+
         entity_fields = {field.name for field in entity_cfg.fields}
-        required_fields = {
+        relation_fields = {field.name for field in relation_cfg.fields}
+        required_client_fields = {
             "client_id",
-            "employee_id",
             "service_type",
             "short_code",
             "allowed_travel_time",
@@ -88,10 +96,14 @@ class TimeSheetFactory:
             "allowed_indirect_effort",
         }
 
-        if not required_fields.issubset(entity_fields):
-            missing = required_fields - entity_fields
+        if not required_client_fields.issubset(entity_fields):
+            missing = required_client_fields - entity_fields
             logger.error(f"Pflichtfelder fehlen in Entity 'client': {missing}")
             raise ValueError(f"Pflichtfelder fehlen in Entity 'client': {missing}")
+
+        if "employee_id" not in relation_fields:
+            logger.error("Pflichtfeld 'employee_id' fehlt in Entity 'client_employee_relation'.")
+            raise ValueError("Pflichtfeld 'employee_id' fehlt in Entity 'client_employee_relation'.")
 
         model_fields = set(HeaderDataModel.model_fields)
 
@@ -99,6 +111,7 @@ class TimeSheetFactory:
         extra_in_model = (
             model_fields
             - entity_fields
+            - relation_fields
             - allowed_computed_fields
             - {
                 "client_first_name",

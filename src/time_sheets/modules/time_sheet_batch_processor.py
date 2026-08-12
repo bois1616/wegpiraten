@@ -2,15 +2,24 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
+import pandas as pd
 from loguru import logger
 
 from pydantic_models.data.header_data_model import HeaderDataModel
 from shared_modules.config import Config
 from shared_modules.utils import ensure_dir
-from time_sheets.modules.client_data import load_active_client_headers, load_internal_timesheet_headers
+from time_sheets.modules.client_data import (
+    ClientEmployeePairStatus,
+    build_pair_diagnostics,
+    load_active_client_headers,
+    load_internal_timesheet_headers,
+)
 from time_sheets.modules.time_sheet_factory import TimeSheetFactory
+
+# Sentinel-client_id für Sonstige-Aufwendungen-Timesheets (nicht klientenbezogen).
+_INTERNAL_CLIENT_ID = "SA"
 
 
 class TimeSheetBatchProcessor:
@@ -28,6 +37,7 @@ class TimeSheetBatchProcessor:
 
         self.output_dir: Path = ensure_dir(prj_root / (structure.output_path or "output"))
         self.template_dir: Path = ensure_dir(prj_root / (structure.template_path or "templates"))
+        self.log_dir: Path = ensure_dir(prj_root / (getattr(structure, "log_path", None) or ".logs"))
 
         data_dir = prj_root / (structure.local_data_path or "data")
         self.db_path: Path = data_dir / self.config.database.sqlite_db_name
@@ -62,6 +72,82 @@ class TimeSheetBatchProcessor:
         internal_headers = load_internal_timesheet_headers(self.db_path)
         return client_headers + internal_headers
 
+    def _write_pair_report(
+        self,
+        pair_diagnostics: List[ClientEmployeePairStatus],
+        creation_status: Dict[Tuple[str, str], Tuple[bool, str]],
+        internal_created: int,
+        internal_total: int,
+        reporting_month: str,
+    ) -> Path:
+        """
+        Schreibt einen Report (Markdown + xlsx) über JEDES Klient-Mitarbeiter-Paar
+        aus relation_client_emp: ob dafür ein Timesheet erzeugt wurde, und falls
+        nicht, aus welchem Grund. Klärt Abweichungen zwischen "Anzahl Paare" und
+        "Anzahl erzeugter Timesheets" eindeutig, analog zum Fehlerprotokoll des
+        Timesheet-Imports.
+        """
+        stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        report_path = self.log_dir / f"timesheet_generierung_{reporting_month}_{stamp}.md"
+        report_xlsx_path = self.log_dir / f"timesheet_generierung_{reporting_month}_{stamp}.xlsx"
+
+        rows: List[Dict[str, object]] = []
+        created_count = 0
+        for entry in pair_diagnostics:
+            if entry.included:
+                success, detail = creation_status.get(
+                    (entry.client_id, entry.employee_id), (False, "nicht verarbeitet")
+                )
+                status = "Erstellt" if success else "Fehler bei Erstellung"
+                reason = detail
+                if success:
+                    created_count += 1
+            else:
+                status = "Übersprungen"
+                reason = "; ".join(entry.reasons)
+            rows.append(
+                {
+                    "client_id": entry.client_id,
+                    "employee_id": entry.employee_id,
+                    "klient": entry.client_name,
+                    "mitarbeiter": entry.employee_name,
+                    "status": status,
+                    "begruendung": reason,
+                }
+            )
+
+        lines: List[str] = [
+            "# Timesheet-Generierung Report",
+            "",
+            f"- Erfassungsmonat: {reporting_month}",
+            f"- Zeitpunkt: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"- Klient-Mitarbeiter-Paare gesamt (relation_client_emp): {len(pair_diagnostics)}",
+            f"- davon Timesheet erzeugt: {created_count}",
+            f"- davon übersprungen/fehlgeschlagen: {len(pair_diagnostics) - created_count}",
+            f"- Sonstige-Aufwendungen-Timesheets erzeugt (employees.ts, nicht in Tabelle unten): "
+            f"{internal_created}/{internal_total}",
+            f"- **Gesamt erzeugte Timesheet-Dateien: {created_count + internal_created}** "
+            f"({created_count} Klient-Paare + {internal_created} Sonstige Aufwendungen)",
+            "",
+            "| client_id | employee_id | Klient | Mitarbeiter | Status | Begründung |",
+            "|---|---|---|---|---|---|",
+        ]
+        for row in rows:
+            begruendung = str(row["begruendung"]).replace("\n", " ").replace("|", "/")
+            lines.append(
+                f"| {row['client_id']} | {row['employee_id']} | {row['klient']} | {row['mitarbeiter']} | "
+                f"{row['status']} | {begruendung} |"
+            )
+        report_path.write_text("\n".join(lines), encoding="utf-8")
+
+        df_report = pd.DataFrame(rows)
+        with pd.ExcelWriter(report_xlsx_path, engine="openpyxl") as writer:
+            df_report.to_excel(writer, sheet_name="timesheet_generierung", index=False)
+
+        logger.info("Generierungs-Report geschrieben: {}", report_path)
+        logger.info("Generierungs-Report geschrieben: {}", report_xlsx_path)
+        return report_path
+
     def run(
         self, reporting_month: str, output_path: Optional[Path] = None, template_path: Optional[Path] = None
     ) -> None:
@@ -69,10 +155,17 @@ class TimeSheetBatchProcessor:
         target_template = template_path or self.template_dir
 
         reporting_month_dt = datetime.strptime(reporting_month, "%Y-%m")
+        pair_diagnostics = build_pair_diagnostics(self.db_path, reporting_month)
         header_data = self.load_client_data(reporting_month)
         sheet_password = self.get_sheet_password()
 
+        creation_status: Dict[Tuple[str, str], Tuple[bool, str]] = {}
+        internal_created = 0
+        internal_total = 0
+
         for header_record in header_data:
+            is_internal = header_record.client_id == _INTERNAL_CLIENT_ID
+            internal_total += 1 if is_internal else 0
             try:
                 filename = self.reporting_factory.create_reporting_sheet(
                     header_data=header_record,
@@ -89,8 +182,22 @@ class TimeSheetBatchProcessor:
                         file=filename,
                     )
                 )
+                if is_internal:
+                    internal_created += 1
+                else:
+                    creation_status[(header_record.client_id, header_record.employee_id)] = (True, filename.name)
             except Exception as exc:
                 logger.error(f"Fehler beim Erstellen des Sheets für Client {header_record.client_id}: {exc}")
+                if not is_internal:
+                    creation_status[(header_record.client_id, header_record.employee_id)] = (False, str(exc))
+
+        self._write_pair_report(
+            pair_diagnostics,
+            creation_status,
+            internal_created=internal_created,
+            internal_total=internal_total,
+            reporting_month=reporting_month,
+        )
 
 
 if __name__ == "__main__":

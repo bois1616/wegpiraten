@@ -161,6 +161,16 @@ def create_target_tables(
     conn.commit()
 
 
+def _fetch_fk_reference_values(conn: sqlite3.Connection, ref_table: str, ref_column: str) -> set[str]:
+    """Liest alle vorhandenen (nicht leeren) Werte einer Referenzspalte für FK-Prüfungen."""
+    try:
+        cur = conn.execute(f"SELECT {ref_column} FROM {ref_table}")
+    except sqlite3.OperationalError as exc:
+        logger.warning("FK-Referenzwerte nicht lesbar: {}.{} ({})", ref_table, ref_column, exc)
+        return set()
+    return {str(row[0]).strip() for row in cur.fetchall() if row[0] is not None and str(row[0]).strip() != ""}
+
+
 def import_entity_data(
     source_excel: Path,
     target_conn: sqlite3.Connection,
@@ -184,6 +194,17 @@ def import_entity_data(
     mapping = {f.excel_column: f for f in fields if f.excel_column}
     required_fields = [f.name for f in fields]
 
+    # Referenzwerte für alle FK-Spalten einmalig vorladen, damit ungültige
+    # FK-Werte (Tippfehler, gelöschte Referenzen) VOR dem INSERT erkannt und
+    # einzeln übersprungen werden – statt erst als SQLite-IntegrityError
+    # aufzufallen und dabei den kompletten executemany-Batch (inkl. aller
+    # danach folgenden, gültigen Datensätze) abzubrechen.
+    fk_reference_cache: Dict[Tuple[str, str], set[str]] = {}
+    for _, ref_table, ref_column in foreign_keys or []:
+        cache_key = (ref_table, ref_column)
+        if cache_key not in fk_reference_cache:
+            fk_reference_cache[cache_key] = _fetch_fk_reference_values(target_conn, ref_table, ref_column)
+
     pk_fields = [field.name for field in fields if field.primary_key]
     records: List[Dict[str, Any]] = []
     seen_keys: set[Tuple[Any, ...]] = set()
@@ -202,19 +223,33 @@ def import_entity_data(
             seen_keys.add(pk_key)
             if foreign_keys:
                 optional_fields = {f.name for f in fields if f.optional}
-                missing_fk_fields = []
-                for column, _, _ in foreign_keys:
-                    if column in optional_fields:
-                        continue
+                missing_fk_fields: List[str] = []
+                invalid_fk_fields: List[str] = []
+                for column, ref_table, ref_column in foreign_keys:
                     value = mapped.get(column)
-                    if value is None or (isinstance(value, str) and value.strip() == ""):
-                        missing_fk_fields.append(column)
+                    is_blank = value is None or (isinstance(value, str) and value.strip() == "")
+                    if is_blank:
+                        if column not in optional_fields:
+                            missing_fk_fields.append(column)
+                        continue
+                    valid_values = fk_reference_cache.get((ref_table, ref_column), set())
+                    if str(value).strip() not in valid_values:
+                        invalid_fk_fields.append(f"{column}={value!r} (nicht in {ref_table}.{ref_column})")
                 if missing_fk_fields:
                     pk_values = {field: mapped.get(field) for field in pk_fields} if pk_fields else {}
                     logger.error(
                         "Datensatz übersprungen ({}): fehlende FK-Felder {}. PK={}",
                         target_table,
                         ", ".join(missing_fk_fields),
+                        pk_values or "n/a",
+                    )
+                    continue
+                if invalid_fk_fields:
+                    pk_values = {field: mapped.get(field) for field in pk_fields} if pk_fields else {}
+                    logger.error(
+                        "Datensatz übersprungen ({}): ungültige FK-Werte {}. PK={}",
+                        target_table,
+                        ", ".join(invalid_fk_fields),
                         pk_values or "n/a",
                     )
                     continue
@@ -381,16 +416,21 @@ DEFAULT_TABLE_MAPPINGS = {
     "masterdata_tenant": {"target": "masterdata_tenant", "entity": "tenant"},
     "service_types": {"target": "service_types", "entity": "service_type"},
     "masterdata_client": {"target": "clients", "entity": "client"},
+    # Relation Klient<->Mitarbeiter; muss nach masterdata_client und
+    # masterdata_employee importiert werden (FK-Referenzen), daher hier am Ende.
+    "relation_client_emp": {"target": "relation_client_emp", "entity": "client_employee_relation"},
 }
 
 FOREIGN_KEY_MAPPINGS: Dict[str, list[tuple[str, str, str]]] = {
     "clients": [
-        ("employee_id", "employees", "emp_id"),
-        ("employee_2", "employees", "emp_id"),
         ("tenant_id", "masterdata_tenant", "tenant_id"),
         ("payer_id", "payer", "payer_id"),
         ("service_requester_id", "service_requester", "service_requester_id"),
         ("service_type", "service_types", "service_type_id"),
+    ],
+    "relation_client_emp": [
+        ("client_id", "clients", "client_id"),
+        ("employee_id", "employees", "emp_id"),
     ],
 }
 
@@ -434,20 +474,7 @@ def _log_import_diagnostics(
                 blank_count,
             )
         values = set(series[~blanks].astype(str))
-        try:
-            cur = target_conn.cursor()
-            cur.execute(f"SELECT {ref_column} FROM {ref_table}")
-            ref_values = {str(row[0]) for row in cur.fetchall() if row[0] is not None and str(row[0]).strip() != ""}
-        except Exception as exc:
-            logger.error(
-                "FK-Prüfung fehlgeschlagen: {}.{} → {}.{} ({})",
-                target_table,
-                column,
-                ref_table,
-                ref_column,
-                exc,
-            )
-            continue
+        ref_values = _fetch_fk_reference_values(target_conn, ref_table, ref_column)
         missing = sorted(values - ref_values)
         if missing:
             sample_missing = missing[:10]
@@ -463,22 +490,6 @@ def _log_import_diagnostics(
                 len(missing),
                 sample_missing,
                 sample_rows,
-            )
-
-    # Warnung: employee_2 darf nicht identisch mit employee_id sein
-    if target_table == "clients" and "employee_id" in df_target.columns and "employee_2" in df_target.columns:
-        same_mask = (
-            df_target["employee_2"].notna()
-            & df_target["employee_2"].astype(str).str.strip().ne("")
-            & (df_target["employee_2"].astype(str).str.strip() == df_target["employee_id"].astype(str).str.strip())
-        )
-        if same_mask.any():
-            affected = df_target.loc[same_mask, "client_id"].tolist() if "client_id" in df_target.columns else []
-            logger.warning(
-                "employee_2 ist identisch mit employee_id bei {} Klient(en): {}. "
-                "employee_2 wird beim Import ignoriert.",
-                len(affected),
-                affected,
             )
 
 

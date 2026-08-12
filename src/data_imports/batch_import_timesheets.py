@@ -462,13 +462,17 @@ class TimeSheetsImporter:
         return None
 
     def _resolve_employee_id(self, client_id: Optional[str]) -> Optional[str]:
+        """Ermittelt die employee_id über relation_client_emp, sofern für den
+        Klienten genau ein aktives Klient-MA-Paar hinterlegt ist. Bei mehreren
+        (oder keinem) Paaren bleibt die employee_id offen (F5 im Sheet muss
+        dann selbst ausgefüllt sein)."""
         if not client_id:
             return None
-        sql = "SELECT employee_id FROM clients WHERE client_id = ?"
+        sql = "SELECT employee_id FROM relation_client_emp WHERE client_id = ? AND COALESCE(is_active, 1) = 1"
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(sql, (client_id,)).fetchone()
-        if row and row[0]:
-            return str(row[0]).strip()
+            rows = conn.execute(sql, (client_id,)).fetchall()
+        if len(rows) == 1 and rows[0][0]:
+            return str(rows[0][0]).strip()
         return None
 
     def _resolve_budget(self, client_id: Optional[str]) -> tuple[Optional[int], Optional[int], Optional[int]]:
@@ -496,16 +500,13 @@ class TimeSheetsImporter:
         return None
 
     def _resolve_client_employees(self, client_id: Optional[str]) -> set[str]:
-        """Liest employee_id und employee_2 (falls vorhanden) des Clients aus den Stammdaten."""
+        """Liest die aktiven Klient-MA-Paare des Clients aus relation_client_emp."""
         if not client_id:
             return set()
+        sql = "SELECT employee_id FROM relation_client_emp WHERE client_id = ? AND COALESCE(is_active, 1) = 1"
         with sqlite3.connect(self.db_path) as conn:
-            columns = {row[1] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
-            select_cols = "employee_id" + (", employee_2" if "employee_2" in columns else "")
-            row = conn.execute(f"SELECT {select_cols} FROM clients WHERE client_id = ?", (client_id,)).fetchone()
-        if not row:
-            return set()
-        return {str(value).strip() for value in row if value and str(value).strip()}
+            rows = conn.execute(sql, (client_id,)).fetchall()
+        return {str(row[0]).strip() for row in rows if row[0] and str(row[0]).strip()}
 
     def _determine_row_mapping(self, ws: Worksheet) -> Optional[tuple[RowMapping, bool]]:
         mp = self.profile.row_mapping
@@ -1082,13 +1083,14 @@ class TimeSheetsImporter:
         else:
             sheet_employee_id = str(header.get("employee_id"))
             client_employees = self._resolve_client_employees(header.get("client_id"))  # type: ignore[arg-type]
-            if client_employees and sheet_employee_id not in client_employees:
+            if sheet_employee_id not in client_employees:
                 self._record_warning(
                     file_path.name,
                     "MA-Zuordnung",
                     f"employee_id '{sheet_employee_id}' ist beim Klient '{header.get('client_id')}' "
-                    f"nicht als employee_id/employee_2 hinterlegt (hinterlegt: {sorted(client_employees)}). "
-                    "Import erfolgt trotzdem (z.B. Vertretung).",
+                    f"nicht als Klient-MA-Paar in relation_client_emp hinterlegt "
+                    f"(hinterlegt: {sorted(client_employees)}). Import erfolgt trotzdem (z.B. Vertretung "
+                    "oder manuell erzeugtes Timesheet ohne bestehendes Paar).",
                 )
 
         logger.info(
