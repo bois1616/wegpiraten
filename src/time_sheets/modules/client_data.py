@@ -21,8 +21,18 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from pydantic_models.data.header_data_model import HeaderDataModel
+from shared_modules.internal_client import (
+    INTERNAL_ALLOWED_DIRECT_EFFORT,
+    INTERNAL_ALLOWED_HOURS_PER_MONTH,
+    INTERNAL_ALLOWED_INDIRECT_EFFORT,
+    INTERNAL_ALLOWED_TRAVEL_TIME,
+    INTERNAL_CLIENT_ID,
+    INTERNAL_SERVICE_TYPE_CODE,
+    INTERNAL_SERVICE_TYPE_ID,
+    INTERNAL_SHORT_CODE,
+)
 
-_ACTIVE_CLIENTS_SQL = """
+_ACTIVE_CLIENTS_SQL = f"""
 SELECT
     c.client_id,
     c.short_code,
@@ -45,7 +55,7 @@ WHERE COALESCE(r.is_active, 1) = 1
   AND (c.end_date IS NULL OR c.end_date >= ?)
   AND COALESCE(c.is_active, 1) = 1
   AND COALESCE(e.is_active, 1) = 1
-  AND c.service_type != 'ST999'
+  AND c.service_type != '{INTERNAL_SERVICE_TYPE_ID}'
   AND COALESCE(e.ts, 1) = 1
 """
 # COALESCE(e.ts, 1): TS=FALSCH sperrt jede Timesheet-Erstellung für den MA
@@ -131,8 +141,11 @@ def build_pair_diagnostics(db_path: Path, reporting_month: str) -> List[ClientEm
             end_date = row["end_date"]
             if pd.notna(end_date) and str(end_date) < month_start:
                 reasons.append(f"Klient-Enddatum ({end_date}) liegt vor dem Erfassungsmonat")
-            if row["service_type"] == "ST999":
-                reasons.append("Klient ist interner Typ ST999 (Sonstige Aufwendungen, separat über employees.ts gesteuert)")
+            if row["service_type"] == INTERNAL_SERVICE_TYPE_ID:
+                reasons.append(
+                    f"Klient ist interner Typ {INTERNAL_SERVICE_TYPE_ID} "
+                    "(Sonstige Aufwendungen, separat über employees.ts gesteuert)"
+                )
 
         if pd.isna(row["employee_found"]):
             reasons.append("employee_id nicht in Stammdaten (employees) gefunden")
@@ -206,14 +219,14 @@ def load_internal_timesheet_headers(db_path: Path) -> List[HeaderDataModel]:
         try:
             row_dict = {str(key): value for key, value in row.to_dict().items()}
             header = HeaderDataModel(
-                client_id="SA",
+                client_id=INTERNAL_CLIENT_ID,
                 employee_id=row_dict["employee_id"],
-                service_type="SONST",
-                short_code="Sonst.Aufw.",
-                allowed_hours_per_month=2500.0,
-                allowed_travel_time=1000.0,
-                allowed_direct_effort=1000.0,
-                allowed_indirect_effort=500.0,
+                service_type=INTERNAL_SERVICE_TYPE_CODE,
+                short_code=INTERNAL_SHORT_CODE,
+                allowed_hours_per_month=INTERNAL_ALLOWED_HOURS_PER_MONTH,
+                allowed_travel_time=float(INTERNAL_ALLOWED_TRAVEL_TIME),
+                allowed_direct_effort=float(INTERNAL_ALLOWED_DIRECT_EFFORT),
+                allowed_indirect_effort=float(INTERNAL_ALLOWED_INDIRECT_EFFORT),
                 employee_first_name=row_dict.get("employee_first_name"),
                 employee_last_name=row_dict.get("employee_last_name"),
             )

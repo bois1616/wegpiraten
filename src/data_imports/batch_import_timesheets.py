@@ -18,8 +18,8 @@
 # mit assert (“prüfe einmal und dann traue”).
 # Zeilen werden defensiv konvertiert und validiert.
 # Transaktionale Inserts mit Rollback bei Fehler.
-# Pfade: Die Quelle wird aus der Config (structure.imports_path) abgeleitet;
-# falls dieser Pfad nicht existiert, wird auf prj_root/import bzw.
+# Pfade: Die Quelle wird aus der Config (structure.imports_path, relativ zu
+# prj_root) abgeleitet; falls dieser Pfad nicht existiert, wird auf
 # prj_root/data_imports zurückgefallen.
 # Die verarbeiteten Dateien werden in ein Unterverzeichnis importiert verschoben,
 #  welches bei Bedarf angelegt wird.
@@ -51,6 +51,7 @@ from pydantic_models.data.invoice_row_model import InvoiceRowModel
 from pydantic_models.data.row_mapping import RowMapping
 from pydantic_models.data.timesheet_import_profile import TimeSheetImportProfile
 from shared_modules.config import Config
+from shared_modules.internal_client import INTERNAL_CLIENT_ID
 from shared_modules.month_period import MonthPeriod, get_month_period
 from shared_modules.utils import (
     choose_existing_path,
@@ -163,23 +164,16 @@ class TimeSheetsImporter:
         self.output_dir = ensure_dir(prj_root / (getattr(self.config.structure, "output_path", None) or "output"))
         self.log_dir = ensure_dir(prj_root / (getattr(self.config.structure, "log_path", None) or ".logs"))
 
-        cfg_imports_path = getattr(self.config.structure, "imports_path", None) or self.config.get(
-            "structure.imports_path", None
-        )
-        cfg_done_path = getattr(self.config.structure, "done_path", None) or self.config.get(
-            "structure.done_path", None
-        )
-        default_import = prj_root / "import"
+        # Config.get_imports_path/get_done_path lösen relative Angaben gegen
+        # prj_root auf. Ein direktes Path(structure.imports_path) würde gegen das
+        # Arbeitsverzeichnis auflösen und damit fremde Verzeichnisse treffen.
+        imports_dir = self.config.get_imports_path()
         fallback_local = prj_root / "data_imports"
 
         # Kandidatenliste: nimm den ersten existierenden Pfad
-        candidates: List[Optional[Path]] = [
-            Path(cfg_imports_path) if cfg_imports_path else None,
-            default_import,
-            fallback_local,
-        ]
-        self.source_dir = ensure_dir(choose_existing_path(candidates, default_import))
-        self.done_dir = ensure_dir(Path(cfg_done_path) if cfg_done_path else (prj_root / "done"))
+        candidates: List[Optional[Path]] = [imports_dir, fallback_local]
+        self.source_dir = ensure_dir(choose_existing_path(candidates, imports_dir))
+        self.done_dir = ensure_dir(self.config.get_done_path())
 
         logger.info(f"DB: {self.db_path}")
         logger.info(f"Quelle: {self.source_dir}")
@@ -1080,7 +1074,9 @@ class TimeSheetsImporter:
 
         if not header.get("employee_id"):
             logger.warning("employee_id fehlt im Header – Import erfolgt ohne employee_id ({})", file_path.name)
-        else:
+        # Sonstige Aufwendungen sind nicht klientenbezogen; für den Sentinel-Klienten
+        # existiert bewusst kein Klient-MA-Paar, das geprüft werden könnte.
+        elif header.get("client_id") != INTERNAL_CLIENT_ID:
             sheet_employee_id = str(header.get("employee_id"))
             client_employees = self._resolve_client_employees(header.get("client_id"))  # type: ignore[arg-type]
             if sheet_employee_id not in client_employees:

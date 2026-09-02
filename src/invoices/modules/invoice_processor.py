@@ -11,6 +11,7 @@ from pandas._typing import Scalar
 
 from shared_modules.config import Config
 from shared_modules.entity import LegalPerson, PrivatePerson
+from shared_modules.internal_client import INTERNAL_SERVICE_TYPE_ID
 from shared_modules.month_period import MonthPeriod, get_month_period
 from shared_modules.utils import (
     clear_path,
@@ -187,8 +188,9 @@ class InvoiceProcessor:
             )
         LEFT JOIN service_types st_id ON c.service_type = st_id.service_type_id
         WHERE sd.service_date BETWEEN ? AND ?
+          AND COALESCE(c.service_type, '') <> ?
         """
-            params: List[Scalar] = [start_date, end_date]
+            params: List[Scalar] = [start_date, end_date, INTERNAL_SERVICE_TYPE_ID]
 
             if self.filter.payer:
                 sql += " AND c.payer_id = ?"

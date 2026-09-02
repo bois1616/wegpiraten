@@ -17,6 +17,7 @@ from loguru import logger
 
 from pydantic_models.config.entity_model_config import FieldConfig
 from shared_modules.config import Config
+from shared_modules.internal_client import INTERNAL_CLIENT_FIELDS, INTERNAL_CLIENT_ID
 from shared_modules.utils import ensure_dir
 
 
@@ -171,6 +172,13 @@ def _fetch_fk_reference_values(conn: sqlite3.Connection, ref_table: str, ref_col
     return {str(row[0]).strip() for row in cur.fetchall() if row[0] is not None and str(row[0]).strip() != ""}
 
 
+def _build_internal_client_record(fields: list[FieldConfig]) -> Dict[str, Any]:
+    """Baut den Sentinel-Klienten 'SA' als regulären Stammdatensatz."""
+    record: Dict[str, Any] = {field.name: None for field in fields}
+    record.update(INTERNAL_CLIENT_FIELDS)
+    return record
+
+
 def import_entity_data(
     source_excel: Path,
     target_conn: sqlite3.Connection,
@@ -263,6 +271,14 @@ def import_entity_data(
 
     if target_table == "clients":
         _validate_client_accordix(records)
+        if any(str(rec.get("client_id") or "").strip() == INTERNAL_CLIENT_ID for rec in records):
+            logger.warning(
+                "Klient '{}' steht bereits in den Excel-Stammdaten; der systemseitige Datensatz "
+                "für Sonstige Aufwendungen wird nicht ergänzt.",
+                INTERNAL_CLIENT_ID,
+            )
+        else:
+            records.append(_build_internal_client_record(fields))
 
     select_cols = [field.name for field in fields]
     if "is_active" not in select_cols:
@@ -506,17 +522,12 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
     """
     # Pfade aus Config
     prj_root = Path(config.structure.prj_root)
-    imports_path = Path(getattr(config.structure, "imports_path", None) or "import")
+    imports_path = config.get_imports_path()
     local_data_path = config.structure.local_data_path or "data"
-    done_path_cfg = getattr(config.structure, "done_path", None) or "done"
 
     # Dateinamen
     sqlite_db_name = config.database.sqlite_db_name or "Wegpiraten Datenbank.sqlite3"
     db_name = config.database.db_name or "Wegpiraten Datenbank.xlsx"
-
-    # Quelldatei und Ziel-DB
-    if not imports_path.is_absolute():
-        imports_path = prj_root / imports_path
 
     if source_override:
         source_excel_path = source_override
@@ -575,8 +586,7 @@ def run_import(config: Config, source_override: Optional[Path] = None) -> int:
         _write_report(config, report)
 
     if source_excel_path.parent.resolve() == imports_path.resolve():
-        done_dir_base = Path(done_path_cfg)
-        done_dir = ensure_dir(done_dir_base if done_dir_base.is_absolute() else (prj_root / done_dir_base))
+        done_dir = ensure_dir(config.get_done_path())
         target_path = done_dir / source_excel_path.name
         shutil.move(str(source_excel_path), str(target_path))
         logger.info(f"Stammdatendatei verschoben nach: {target_path}")

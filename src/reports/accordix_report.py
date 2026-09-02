@@ -34,6 +34,7 @@ from shared_modules.accordix import (
     validate_coded_value,
 )
 from shared_modules.config import Config
+from shared_modules.internal_client import INTERNAL_SERVICE_TYPE_ID
 from shared_modules.month_period import get_month_period
 from shared_modules.utils import ensure_dir
 
@@ -81,6 +82,7 @@ FROM clients c
 LEFT JOIN service_types st ON c.service_type = st.service_type_id
 WHERE date(c.start_date) <= date(:period_end)
   AND (c.end_date IS NULL OR date(c.end_date) >= date(:period_start))
+  AND COALESCE(c.service_type, '') <> :internal_service_type
 ORDER BY c.last_name, c.first_name
 """
 
@@ -144,6 +146,7 @@ def create_accordix_report(config: Config, reporting_month: str) -> Path:
             {
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
+                "internal_service_type": INTERNAL_SERVICE_TYPE_ID,
             },
         )
         column_names = [desc[0] for desc in cursor.description]

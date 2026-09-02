@@ -9,6 +9,7 @@ from loguru import logger
 
 from pydantic_models.data.header_data_model import HeaderDataModel
 from shared_modules.config import Config
+from shared_modules.internal_client import INTERNAL_CLIENT_ID
 from shared_modules.utils import ensure_dir
 from time_sheets.modules.client_data import (
     ClientEmployeePairStatus,
@@ -17,9 +18,6 @@ from time_sheets.modules.client_data import (
     load_internal_timesheet_headers,
 )
 from time_sheets.modules.time_sheet_factory import TimeSheetFactory
-
-# Sentinel-client_id für Sonstige-Aufwendungen-Timesheets (nicht klientenbezogen).
-_INTERNAL_CLIENT_ID = "SA"
 
 
 class TimeSheetBatchProcessor:
@@ -164,7 +162,7 @@ class TimeSheetBatchProcessor:
         internal_total = 0
 
         for header_record in header_data:
-            is_internal = header_record.client_id == _INTERNAL_CLIENT_ID
+            is_internal = header_record.client_id == INTERNAL_CLIENT_ID
             internal_total += 1 if is_internal else 0
             try:
                 filename = self.reporting_factory.create_reporting_sheet(

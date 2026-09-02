@@ -326,6 +326,16 @@ class Config:
         prj_root = Path(self.structure.prj_root)
         return prj_root / (self.structure.tmp_path or ".tmp")
 
+    def get_imports_path(self) -> Path:
+        """Gibt den Import-Pfad zurück."""
+        prj_root = Path(self.structure.prj_root)
+        return prj_root / (self.structure.imports_path or "import")
+
+    def get_done_path(self) -> Path:
+        """Gibt den Done-Pfad zurück."""
+        prj_root = Path(self.structure.prj_root)
+        return prj_root / (self.structure.done_path or "done")
+
     def get_expected_columns(self) -> ExpectedColumnsConfig:
         """
         Gibt die erwarteten Spalten für die Rechnungsverarbeitung zurück,
