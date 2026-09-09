@@ -356,6 +356,11 @@ entities:
         excel_column: from_date
         format: ${date_format}
         optional: true
+      - name: to_date
+        type: str
+        excel_column: to_date
+        format: ${date_format}
+        optional: true
       - name: notes
         type: str
         excel_column: notes
