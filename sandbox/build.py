@@ -37,10 +37,8 @@ DST = Path(os.environ.get("WEGPIRATEN_DST", SANDBOX / "wegpiraten_datenbank_neu.
 DATA = SANDBOX / "migration_v2_neu.json"
 REPORTS_SEED = SANDBOX / "reports_import.json"
 # Handarbeit (Rollen in Zuordnung MA, Berichte) stammt aus der bisherigen Sandbox-Datei.
-# Familien und Kind-Familie-Zuordnung werden nicht übernommen: die Sandbox trägt dort nur
-# Demonstrationszeilen (Nipote, Burri), keine Daten.
+# Die Familie ist seit 25.09.2026 ein Freitextfeld am Kind und wird mit übernommen.
 HAND = Path(os.environ.get("WEGPIRATEN_HAND", DST))
-CARRY_FAMILIES = False
 # Blattschutz aus (24.09.2026): Sortieren scheitert, sobald ein Blatt gesperrte Formelzellen
 # enthält – »Geschützte Zellen können nicht geändert werden«. Die grauen Spalten bleiben
 # als Markierung, gesperrt sind sie nicht mehr.
@@ -68,9 +66,8 @@ OPEN = Protection(locked=False)
 # ------------------------------------------------------------ Spaltenauflösung
 
 SHEETS = {"K": "Kinder", "A": "Aufträge", "B": "Betreuungen",
-          "Z": "Zuordnung MA", "P": "Ansprechpersonen", "F": "Familien",
-          "R": "Berichte"}
-TOKEN = re.compile(r"\{([KABZPFR])\.([a-z_]+)\}")
+          "Z": "Zuordnung MA", "P": "Ansprechpersonen", "R": "Berichte"}
+TOKEN = re.compile(r"\{([KABZPR])\.([a-z_]+)\}")
 MODEL = {}
 
 
@@ -362,8 +359,8 @@ INTRO = {
         "Eine Zeile ist ein Kind in einem Auftrag, mit Eintritt und Austritt. Jede "
         "Zeile hier ist genau eine Zeile der Accordix-Meldung — was hier fehlt, fehlt "
         "dort. Der Eintritt ist der Beginn der Betreuung dieses Kindes, nicht der "
-        "Beginn der Bewilligung. Kommt ein jüngeres Geschwister dazu, im Blatt "
-        "»Familien« das Indexkind prüfen.",
+        "Beginn der Bewilligung. Kommt ein jüngeres Geschwister dazu, ändert sich das "
+        "Indexkind von selbst: es ist das jüngste Kind der Familie.",
     "Zuordnung MA":
         "Wer arbeitet auf welchem Auftrag. Diese Liste allein steuert, für wen ein "
         "Erfassungsbogen erzeugt wird: eine fehlende Zeile erzeugt keinen Bogen, eine "
@@ -373,14 +370,9 @@ INTRO = {
         "Jedes Kind genau einmal, unabhängig davon, wie viele Aufträge es hat. "
         "Geburtsdatum, Geschlecht, UMA/UMF und Wohnkanton verlangt Accordix. Das "
         "Kurzzeichen steht im Erfassungsbogen und im Dateinamen. »Familie« nur bei "
-        "Geschwistern füllen; dann bestimmt das Blatt »Familien«, über welches Kind "
-        "abgerechnet wird.",
-    "Familien":
-        "Nur nötig, wo Geschwister betreut werden. Die Familie hält fest, über welches "
-        "Kind abgerechnet wird — in der Regel das jüngste. Diese eine Zelle bestimmt "
-        "Kurzzeichen und Indexkind aller Aufträge der Familie. Sie ändert sich "
-        "nicht, wenn ein Auftrag ausläuft; sie ändert sich, wenn ein jüngeres Kind "
-        "dazukommt.",
+        "Geschwistern füllen, als freier Text, bei allen Geschwistern gleich (z.B. "
+        "»Muster Interlaken«). Das jüngste Kind der Familie ist das Indexkind, über "
+        "das abgerechnet wird; dafür braucht jedes Kind einer Familie ein Geburtsdatum.",
     "Ansprechpersonen":
         "Die zuständige Person beim Leistungsbesteller; sie erscheint als Anrede auf "
         "der Rechnung. Wechselt die Zuständigkeit, hier eine neue Zeile anlegen und "
@@ -405,7 +397,7 @@ INTRO = {
 KINDER = [
     {"name": "person_id", "label": "Kind-Nr", "required": True, "width": 11},
     {"name": "short_code", "label": "Kurzzeichen", "required": True, "width": 11},
-    {"name": "family_id", "label": "Familie (nur bei Geschwistern)", "width": 22},
+    {"name": "family_id", "label": "Familie (Freitext, nur bei Geschwistern)", "width": 24},
     {"name": "social_security_number", "label": "AHV-Nummer", "width": 19},
     {"name": "last_name", "label": "Nachname", "required": True, "width": 20},
     {"name": "first_name", "label": "Vorname", "required": True, "width": 18},
@@ -459,13 +451,67 @@ KINDER = [
                    '$'"{K.person_id}"'{row}))',
     },
     {
+        "name": "family_size",
+        "label": "▸ Kinder in der Familie",
+        "auto": True,
+        "width": 11,
+        "formula": '=IF($'"{K.family_id}"'{row}="","",COUNTIF($'"{K.family_id}"'$3:$'"{K.family_id}"'${MAX},'
+                   '$'"{K.family_id}"'{row}))',
+    },
+    {
+        "name": "family_max_dob",
+        "label": "▸ Jüngstes Geburtsdatum der Familie",
+        "auto": True,
+        "hidden": True,
+        "kind": "date",
+        "width": 12,
+        # Liest die Datumsspalte direkt und nicht über INDEX: der Leerzellen-Schutz
+        # macht aus einem Datum sonst Text.
+        "formula": '=IF($'"{K.family_id}"'{row}="","",IFERROR(SUMPRODUCT(MAX(('
+                   '$'"{K.family_id}"'$3:$'"{K.family_id}"'${MAX}=$'"{K.family_id}"'{row})'
+                   '*($'"{K.date_of_birth}"'$3:$'"{K.date_of_birth}"'${MAX}))),""))',
+    },
+    {
+        "name": "family_key",
+        "label": "▸ Schlüssel Familie und Geburtsdatum",
+        "auto": True,
+        "hidden": True,
+        "width": 14,
+        "formula": '=IF($'"{K.family_id}"'{row}="","",$'"{K.family_id}"'{row}&"|"&N($'"{K.date_of_birth}"'{row}))',
+    },
+    {
+        "name": "index_person_id",
+        "label": "▸ Indexkind",
+        "auto": True,
+        "width": 12,
+        # Ohne Familie ist das Kind selbst das Indexkind, sonst das jüngste der Familie.
+        # Gleiches Geburtsdatum: das erste in der Liste, dazu meldet index_check einen Hinweis.
+        "formula": '=IF($'"{K.person_id}"'{row}="","",IF($'"{K.family_id}"'{row}="",$'"{K.person_id}"'{row},'
+                   'IF(N($'"{K.family_max_dob}"'{row})=0,"",IFERROR(INDEX($'"{K.person_id}"'$3:$'"{K.person_id}"'${MAX},'
+                   'MATCH($'"{K.family_id}"'{row}&"|"&$'"{K.family_max_dob}"'{row},'
+                   '$'"{K.family_key}"'$3:$'"{K.family_key}"'${MAX},0)),""))))',
+    },
+    {
+        "name": "index_check",
+        "status": ["Geburtsdatum fehlt"],
+        "label": "▸ Familie plausibel?",
+        "auto": True,
+        "width": 18,
+        "formula": '=IF($'"{K.person_id}"'{row}="","",IF($'"{K.family_id}"'{row}="","ok",'
+                   'IF(N($'"{K.date_of_birth}"'{row})=0,"Geburtsdatum fehlt",'
+                   'IF($'"{K.family_size}"'{row}=1,"nur ein Kind",'
+                   'IF(COUNTIF($'"{K.family_key}"'$3:$'"{K.family_key}"'${MAX},'
+                   '$'"{K.family_id}"'{row}&"|"&$'"{K.family_max_dob}"'{row})>1,'
+                   '"gleiches Geburtsdatum","ok")))))',
+    },
+    {
         "name": "display_name",
         "label": "▸ Kind (Nr und Name)",
         "auto": True,
         "hidden": True,
         "width": 30,
-        # Speist die Auswahlliste im Blatt Familien. Die Nummer steht vorne, damit
-        # sie sich wieder abschneiden lässt; getrennt wird am ersten Leerzeichen.
+        # Anzeige mit Nummer und Name. Die Nummer steht vorne, damit sie sich wieder
+        # abschneiden lässt; getrennt wird am ersten Leerzeichen.
         "formula": '=IF($'"{K.person_id}"'{row}="","",'
                    '$'"{K.person_id}"'{row}&" — "&$'"{K.last_name}"'{row}&", "'
                    '&$'"{K.first_name}"'{row})',
@@ -626,15 +672,12 @@ AUFTRAEGE = [
         "label": "▸ Indexkind",
         "auto": True,
         "width": 13,
-        "formula": '=IF($'"{A.mandate_id}"'{row}="","",'
-                   'IF($'"{A.family_id}"'{row}<>"",IFERROR(INDEX('
-                   'Familien!$'"{F.index_person_id}"'$3:'
-                   '$'"{F.index_person_id}"'${MAX},'
-                   'MATCH($'"{A.family_id}"'{row},'
-                   'Familien!$'"{F.family_id}"'$3:$'"{F.family_id}"'${MAX},0)),""),'
-                   'IFERROR(INDEX(Betreuungen!$'"{B.person_id}"'$3:'
-                   '$'"{B.person_id}"'${MAX},MATCH($'"{A.mandate_id}"'{row},'
-                   'Betreuungen!$'"{B.mandate_id}"'$3:$'"{B.mandate_id}"'${MAX},0)),"")))',
+        # Das Indexkind steht am Kind (jüngstes der Familie, sonst es selbst); der Auftrag
+        # erbt es über die erste Betreuungszeile.
+        "formula": '=IF($'"{A.mandate_id}"'{row}="","",IFERROR(INDEX('
+                   'Betreuungen!$'"{B.index_person_id}"'$3:$'"{B.index_person_id}"'${MAX},'
+                   'MATCH($'"{A.mandate_id}"'{row},'
+                   'Betreuungen!$'"{B.mandate_id}"'$3:$'"{B.mandate_id}"'${MAX},0)),""))',
     },
     {
         "name": "family_check",
@@ -892,6 +935,17 @@ BETREUUNGEN = [
                    'Kinder!$'"{K.person_id}"'$3:$'"{K.person_id}"'${MAX},0)),""))',
     },
     {
+        "name": "index_person_id",
+        "label": "▸ Indexkind des Kindes",
+        "auto": True,
+        "hidden": True,
+        "width": 11,
+        "formula": '=IF($'"{B.person_id}"'{row}="","",IFERROR(INDEX('
+                   'Kinder!$'"{K.index_person_id}"'$3:$'"{K.index_person_id}"'${MAX},'
+                   'MATCH($'"{B.person_id}"'{row},'
+                   'Kinder!$'"{K.person_id}"'$3:$'"{K.person_id}"'${MAX},0)),""))',
+    },
+    {
         "name": "person_dob",
         "label": "▸ Geburtsdatum des Kindes",
         "auto": True,
@@ -951,77 +1005,6 @@ ANSPRECHPERSONEN = [
         "formula": '=IF($'"{P.contact_person_id}"'{row}="","",'
                    'COUNTIF(Aufträge!$'"{A.contact_person_id}"'$3:'
                    '$'"{A.contact_person_id}"'${MAX},$'"{P.contact_person_id}"'{row}))',
-    },
-]
-
-FAMILIEN = [
-    {"name": "family_id", "label": "Familie", "required": True, "width": 26},
-    {"name": "index_person", "label": "Indexkind", "required": True, "width": 32},
-    {"name": "notes", "label": "Bemerkung (intern)", "width": 46},
-    {
-        "name": "index_person_id",
-        "label": "▸ Indexkind (Nr)",
-        "auto": True,
-        "width": 13,
-        # Gewählt wird »C1068 — Nipote, Yarrah Orion«, gespeichert wird C1068.
-        # Eine von Hand getippte blosse Nummer bleibt ebenfalls gültig.
-        "formula": '=IF($'"{F.index_person}"'{row}="","",'
-                   'IF(ISNUMBER(FIND(" ",$'"{F.index_person}"'{row})),'
-                   'LEFT($'"{F.index_person}"'{row},'
-                   'FIND(" ",$'"{F.index_person}"'{row})-1),'
-                   '$'"{F.index_person}"'{row}))',
-    },
-    {
-        "name": "person_count",
-        "label": "▸ Kinder",
-        "auto": True,
-        "width": 9,
-        "formula": '=IF($'"{F.family_id}"'{row}="","",'
-                   'COUNTIF(Kinder!$'"{K.family_id}"'$3:$'"{K.family_id}"'${MAX},'
-                   '$'"{F.family_id}"'{row}))',
-    },
-    {
-        "name": "index_person_dob",
-        "label": "▸ Geburtsdatum Indexkind",
-        "auto": True,
-        "hidden": True,
-        "kind": "date",
-        "width": 12,
-        "formula": '=IF($'"{F.index_person_id}"'{row}="","",IFERROR(INDEX('
-                   'Kinder!$'"{K.date_of_birth}"'$3:$'"{K.date_of_birth}"'${MAX},'
-                   'MATCH($'"{F.index_person_id}"'{row},'
-                   'Kinder!$'"{K.person_id}"'$3:$'"{K.person_id}"'${MAX},0)),""))',
-    },
-    {
-        "name": "index_family",
-        "label": "▸ Familie des Indexkinds",
-        "auto": True,
-        "hidden": True,
-        "width": 12,
-        "formula": '=IF($'"{F.index_person_id}"'{row}="","",IFERROR(INDEX('
-                   'Kinder!$'"{K.family_id}"'$3:$'"{K.family_id}"'${MAX},'
-                   'MATCH($'"{F.index_person_id}"'{row},'
-                   'Kinder!$'"{K.person_id}"'$3:$'"{K.person_id}"'${MAX},0)),""))',
-    },
-    {
-        "name": "index_check",
-        "status": ["fehlt", "gehört nicht zu dieser Familie"],
-        "label": "▸ Indexkind plausibel?",
-        "auto": True,
-        "width": 20,
-        # Der Altersvergleich liest bewusst die Datumsspalte oben und nicht INDEX
-        # direkt: der Leerzellen-Schutz macht aus einem Datum sonst Text, und N()
-        # davon ist 0 – dann gilt jedes Kind als jünger.
-        "formula": '=IF($'"{F.family_id}"'{row}="","",'
-                   'IF($'"{F.person_count}"'{row}=0,"ohne Kinder",'
-                   'IF($'"{F.index_person_id}"'{row}="","fehlt",'
-                   'IF($'"{F.index_family}"'{row}<>$'"{F.family_id}"'{row},'
-                   '"gehört nicht zu dieser Familie",'
-                   'IF(SUMPRODUCT(MAX((Kinder!$'"{K.family_id}"'$3:'
-                   '$'"{K.family_id}"'${MAX}=$'"{F.family_id}"'{row})'
-                   '*(Kinder!$'"{K.date_of_birth}"'$3:'
-                   '$'"{K.date_of_birth}"'${MAX})))>N($'"{F.index_person_dob}"'{row}),'
-                   '"nicht das jüngste Kind","ok")))))',
     },
 ]
 
@@ -1222,8 +1205,7 @@ BERICHTE = [
 ]
 
 MODEL.update({"K": KINDER, "A": AUFTRAEGE, "B": BETREUUNGEN,
-              "Z": ZUORDNUNG, "P": ANSPRECHPERSONEN, "F": FAMILIEN,
-              "R": BERICHTE})
+              "Z": ZUORDNUNG, "P": ANSPRECHPERSONEN, "R": BERICHTE})
 
 
 # ------------------------------------------------ Meldungen der einzelnen Zeile
@@ -1247,14 +1229,17 @@ KINDER += issue_columns(
     fehler=[
         (f'COUNTIF({_r("K", "person_id")},{_c("K", "person_id")})>1',
          "Kind-Nr doppelt vergeben"),
-        (f'AND({_c("K", "family_id")}<>"",'
-         f'COUNTIF({_r("F", "family_id")},{_c("K", "family_id")})=0)',
-         "Familie gibt es im Blatt Familien nicht"),
+        (f'{_c("K", "index_check")}="Geburtsdatum fehlt"',
+         "Kind einer Familie ohne Geburtsdatum: das Indexkind lässt sich nicht bestimmen"),
     ],
     hinweise=[
         (f'{_c("K", "short_code_check")}="fehlt"', "Kurzzeichen fehlt"),
         (f'{_c("K", "short_code_check")}="doppelt"',
          "Kurzzeichen ist doppelt vergeben"),
+        (f'{_c("K", "index_check")}="nur ein Kind"',
+         "Die Familie hat nur dieses Kind: Tippfehler bei der Familie?"),
+        (f'{_c("K", "index_check")}="gleiches Geburtsdatum"',
+         "Mehrere Kinder der Familie mit demselben jüngsten Geburtsdatum: Indexkind ist das erste in der Liste"),
         (f'{_c("K", "spelling_check")}="Schreibweise prüfen"',
          "Codewert weicht in der Schreibweise von der Werteliste ab"),
         (f'AND({_c("K", "social_security_number")}<>"",'
@@ -1367,22 +1352,6 @@ ZUORDNUNG += issue_columns(
          "Für diesen Auftrag ist niemand als primäre Betreuungsperson (P) markiert"),
         (f'{_c("Z", "role_check")}="doppelt"',
          "Für diesen Auftrag ist mehr als eine primäre Betreuungsperson (P) markiert"),
-    ])
-
-FAMILIEN += issue_columns(
-    "F", _c("F", "family_id"),
-    fehler=[
-        (f'COUNTIF({_r("F", "family_id")},{_c("F", "family_id")})>1',
-         "Familie doppelt angelegt"),
-        (f'{_c("F", "index_check")}="fehlt"', "Familie ohne Indexkind"),
-        (f'{_c("F", "index_check")}="gehört nicht zu dieser Familie"',
-         "Das Indexkind steht im Blatt Kinder bei einer anderen Familie"),
-    ],
-    hinweise=[
-        (f'{_c("F", "index_check")}="nicht das jüngste Kind"',
-         "Das Indexkind ist nicht das jüngste Kind der Familie"),
-        (f'{_c("F", "index_check")}="ohne Kinder"',
-         "Keinem Kind ist diese Familie zugeordnet – die Zeile kann gelöscht werden"),
     ])
 
 ANSPRECHPERSONEN += issue_columns(
@@ -1629,25 +1598,15 @@ CHECKS = [
      "Ohne Indexkind entsteht keine Rechnung.",
      '=SUMPRODUCT((Aufträge!${A.mandate_id}$3:${A.mandate_id}${MAX}<>"")'
      '*(Aufträge!${A.index_person_id}$3:${A.index_person_id}${MAX}=""))'),
-    ("Fehler", "Kind zeigt auf eine Familie, die es nicht gibt",
-     "Das Feld darf leer bleiben – dann ist das Kind selbst das Indexkind. "
-     "Steht etwas drin, muss es im Blatt Familien stehen.",
-     '=SUMPRODUCT((Kinder!${K.family_id}$3:${K.family_id}${MAX}<>"")'
-     '*(COUNTIF(Familien!${F.family_id}$3:${F.family_id}${MAX},'
-     'Kinder!${K.family_id}$3:${K.family_id}${MAX})=0))'),
+    ("Fehler", "Kind einer Familie ohne Geburtsdatum",
+     "Das Indexkind ist das jüngste Kind der Familie. Ohne Geburtsdatum lässt es "
+     "sich nicht bestimmen, und Accordix verlangt es ohnehin.",
+     '=COUNTIF(Kinder!${K.index_check}$3:${K.index_check}${MAX},"Geburtsdatum fehlt")'),
     ("Fehler", "Auftrag betreut Geschwister, aber ohne Familie",
      "Bei mehr als einem Kind im Auftrag ist ohne Familie nicht bestimmt, über "
-     "welches Kind abgerechnet wird. Dann eine Familie anlegen, beide Kinder "
-     "eintragen und dort das jüngste als Indexkind setzen.",
+     "welches Kind abgerechnet wird. Dann bei beiden Kindern dieselbe Familie eintragen.",
      '=COUNTIF(Aufträge!${A.family_check}$3:${A.family_check}${MAX},'
      '"Geschwister ohne Familie")'),
-    ("Fehler", "Familie ohne Indexkind",
-     "Je Familie ein Kind, über das abgerechnet wird – das jüngste.",
-     '=COUNTIF(Familien!${F.index_check}$3:${F.index_check}${MAX},"fehlt")'),
-    ("Fehler", "Indexkind gehört nicht zu seiner Familie",
-     "Das eingetragene Kind steht im Blatt Kinder bei einer anderen Familie.",
-     '=COUNTIF(Familien!${F.index_check}$3:${F.index_check}${MAX},'
-     '"gehört nicht zu dieser Familie")'),
     ("Fehler", "Auftrag ohne jede Betreuung",
      "Ein Auftrag, in dem kein Kind betreut wird, ist unvollständig erfasst.",
      '=SUMPRODUCT((Aufträge!${A.mandate_id}$3:${A.mandate_id}${MAX}<>"")'
@@ -1726,15 +1685,13 @@ CHECKS = [
      "oder der Auftrag gehört auf die neue Leistungsart umgestellt.",
      '=COUNTIF(Aufträge!${A.service_type_check}$3:${A.service_type_check}${MAX},'
      '"Leistungsart ausgelaufen")'),
-    ("Hinweis", "Indexkind ist nicht das jüngste Kind der Familie",
-     "Die Regel lautet: über das jüngste Kind. Bei Patchwork-Konstellationen kann "
-     "eine andere Wahl richtig sein – dann bleibt der Hinweis stehen.",
-     '=COUNTIF(Familien!${F.index_check}$3:${F.index_check}${MAX},'
-     '"nicht das jüngste Kind")'),
-    ("Hinweis", "Familie ohne Kinder",
-     "Bleibt übrig, wenn zwei Familien zusammengelegt wurden: die Kinder tragen "
-     "jetzt die andere Nummer. Die leere Zeile kann gelöscht werden.",
-     '=COUNTIF(Familien!${F.index_check}$3:${F.index_check}${MAX},"ohne Kinder")'),
+    ("Hinweis", "Familie mit nur einem Kind",
+     "Vermutlich ein Tippfehler bei der Familie: Geschwister müssen bei allen Kindern "
+     "denselben Text tragen.",
+     '=COUNTIF(Kinder!${K.index_check}$3:${K.index_check}${MAX},"nur ein Kind")'),
+    ("Hinweis", "Kinder einer Familie mit gleichem Geburtsdatum",
+     "Zwillinge oder ein Erfassungsfehler. Indexkind ist das erste dieser Kinder in der Liste.",
+     '=COUNTIF(Kinder!${K.index_check}$3:${K.index_check}${MAX},"gleiches Geburtsdatum")'),
     ("Hinweis", "Auftrag betreut Kinder aus mehreren Familien",
      "Dann ist unklar, über welche Familie abgerechnet wird. Entweder gehören die "
      "Kinder doch zu einer Familie, oder es sind zwei Aufträge.",
@@ -1842,7 +1799,7 @@ CHECKS = [
 ]
 
 
-CHECK_SHEETS = ("Aufträge", "Betreuungen", "'Zuordnung MA'", "Kinder", "Familien",
+CHECK_SHEETS = ("Aufträge", "Betreuungen", "'Zuordnung MA'", "Kinder",
                 "Ansprechpersonen", "Berichte", "Leistungstypen")
 
 
@@ -1932,11 +1889,11 @@ def build_pruefungen(wb):
 # ----------------------------------------------------------------- Fehlerliste
 
 FEHLER_BLAETTER = [("A", "Aufträge"), ("B", "Betreuungen"), ("Z", "Zuordnung MA"),
-                   ("K", "Kinder"), ("F", "Familien"), ("P", "Ansprechpersonen"),
+                   ("K", "Kinder"), ("P", "Ansprechpersonen"),
                    ("R", "Berichte")]
 FEHLER_SCHLUESSEL = {"A": ["mandate_id"], "B": ["mandate_id", "person_id"],
                      "Z": ["mandate_id", "employee_id"], "K": ["person_id"],
-                     "F": ["family_id"], "P": ["contact_person_id"],
+                     "P": ["contact_person_id"],
                      "R": ["report_id"]}
 FEHLER_ZEILEN = 200
 
@@ -2063,8 +2020,6 @@ LISTEN_ROWS = [
      "bei Personalwechsel"),
     ("Kinder", "Wer wird betreut?", "ein Kind, ein einziges Mal",
      "selten – Umzug, Namensänderung, nachgereichte AHV-Nummer"),
-    ("Familien", "Über welches Kind wird abgerechnet?", "eine Familie",
-     "nur bei Geschwistern – und wenn ein jüngeres Kind dazukommt"),
     ("Ansprechpersonen", "Wer ist beim Leistungsbesteller zuständig?",
      "eine Person bei einem Besteller", "bei Wechsel der Zuständigkeit"),
 ]
@@ -2237,23 +2192,23 @@ def build_anleitung(wb, stats):
     r = para(ws, r, "Familie, Betreuungskind, Indexkind", size=12, bold=True)
     r = para(
         ws, r,
-        "Jedes Kind gehört zu einer Familie. Die Familie trägt das Indexkind – "
-        "in der Regel das jüngste. Der Auftrag erbt es über die Kinder, die in ihm "
-        "betreut werden; im Blatt »Aufträge« stehen Familie und Indexkind "
-        "deshalb grau. Wandert die Abrechnung auf ein Neugeborenes, ändert sich eine "
-        "Zelle im Blatt »Familien«, und alle Aufträge der Familie ziehen nach.",
-        height=62,
+        "Geschwister tragen im Blatt »Kinder« bei »Familie« denselben freien Text, "
+        "z.B. »Muster Interlaken«. Eine eigene Familientabelle gibt es nicht. Das "
+        "Indexkind, über das abgerechnet wird, ist das jüngste Kind der Familie, "
+        "bestimmt aus dem Geburtsdatum; ohne Familie ist das Kind selbst das Indexkind. "
+        "Der Auftrag erbt es über die Kinder, die in ihm betreut werden; im Blatt "
+        "»Aufträge« stehen Familie und Indexkind deshalb grau. Kommt ein Neugeborenes "
+        "dazu, wird es das Indexkind, sobald es sein Geburtsdatum trägt.",
+        height=78,
     )
     r = para(
         ws, r,
         "Aus den Altdaten liess sich keine Familie ableiten. Nachname und Wohnort "
-        "reichen nicht: der Wohnort ist eine Gemeinde, und C1002 Luan und C1068 Yarrah "
-        "Nipote aus Meiringen sind zwei Familien, kein Geschwisterpaar. Deshalb hat "
-        "jedes Kind zunächst eine eigene Familie bekommen. Geschwister werden von Hand "
-        "zusammengelegt: bei beiden Kindern dieselbe Familien-Nr eintragen und in der "
-        "Familie das jüngere Kind als Indexkind setzen. Die übrig gebliebene "
-        "Familie meldet sich dann als »Familie ohne Kinder«.",
-        height=78,
+        "reichen nicht: der Wohnort ist eine Gemeinde, und zwei Kinder Nipote aus "
+        "Meiringen sind zwei Familien, kein Geschwisterpaar. Geschwister werden von Hand "
+        "eingetragen. Tippfehler bei der Familie zeigt der Hinweis »Familie mit nur "
+        "einem Kind«, ein Kind der Familie ohne Geburtsdatum ist ein Fehler.",
+        height=64,
     )
     r += 1
     r = para(ws, r, "Betreuungskind und Indexkind sind zweierlei", size=12, bold=True)
@@ -2499,13 +2454,6 @@ def define_names(wb):
         "liste_auftrag": _rng("Aufträge", resolve("{A.mandate_id}"), TOP, MAX),
         "liste_ansprechperson": _rng(
             "Ansprechpersonen", resolve("{P.contact_person_id}"), TOP, MAX),
-        "liste_familie": _rng("Familien", resolve("{F.family_id}"), TOP, MAX),
-        # Anzeigespalte, gezählt über die Nummernspalte: COUNTA würde die 2000
-        # Formelzellen darunter mitzählen, weil "" für COUNTA nicht leer ist.
-        "liste_kind_namen": (
-            f'OFFSET(Kinder!${resolve("{K.display_name}")}${TOP},0,0,'
-            f'MAX(1,COUNTA(Kinder!${resolve("{K.person_id}")}${TOP}:'
-            f'${resolve("{K.person_id}")}${MAX})),1)'),
         # Dieselbe Idee für den Vorgängerauftrag: die Anzeigespalte statt der
         # blossen Nummer, gezählt über mandate_id.
         "liste_auftrag_namen": (
@@ -2552,9 +2500,6 @@ def apply_validations(wb):
            'LEFT($'"{K.social_security_number}"'3,4)="756."))', "AHV-Nummer",
            'Format 756.1234.5678.90. Wo keine Nummer vorliegt, bleibt das Feld leer '
            'oder erhält den Eintrag "Privat".')
-    add_dv(k, "{K.family_id}", "list", "liste_familie", "Familie",
-           "Leer lassen, solange das Kind allein steht – dann ist es selbst das "
-           "Indexkind. Geschwister tragen dieselbe Familien-Nr.")
     add_dv(k, "{K.date_of_birth}", "date", "DATE(1990,1,1)", "Geburtsdatum",
            "Datum zwischen 1990 und heute.", formula2="TODAY()", operator="between")
     add_dv(k, "{K.gender}", "list", "accordix_gender", "Geschlecht", "m, w oder d.")
@@ -2631,14 +2576,6 @@ def apply_validations(wb):
            "Leistungsbesteller", "Auswahl aus dem Blatt Leistungsbesteller.")
     add_dv(p, "{P.gender}", "list", "liste_anrede", "Anrede", "Frau oder Herr.")
 
-    f = wb["Familien"]
-    add_dv(f, "{F.family_id}", "custom",
-           'COUNTIF($'"{F.family_id}"'$3:$'"{F.family_id}"'${MAX},'
-           '$'"{F.family_id}"'3)=1', "Familien-Nr", unique)
-    add_dv(f, "{F.index_person}", "list", "liste_kind_namen", "Indexkind",
-           "Auswahl aus dem Blatt Kinder – das jüngste Kind dieser Familie. "
-           "Gespeichert wird die Nummer vor dem Gedankenstrich.")
-
     z = wb["Zuordnung MA"]
     add_dv(z, "{Z.mandate_id}", "list", "liste_auftrag", "Auftrag-Nr",
            "Auftrag-Nr aus dem Blatt Aufträge.")
@@ -2701,12 +2638,6 @@ def apply_conditional_formatting(wb):
         _range("A", "index_person_id"),
         _rule('AND($'"{A.mandate_id}"'3<>"",$'"{A.index_person_id}"'3="")', C_BAD),
     )
-    k.conditional_formatting.add(
-        _range("K", "family_id"),
-        _rule('AND($'"{K.family_id}"'3<>"",'
-              'COUNTIF(Familien!$'"{F.family_id}"'$3:$'"{F.family_id}"'${MAX},'
-              '$'"{K.family_id}"'3)=0)', C_BAD),
-    )
     a.conditional_formatting.add(
         _range("A", "contact_person_id"),
         _rule('AND($'"{A.contact_person_id}"'3<>"",'
@@ -2762,7 +2693,7 @@ def apply_conditional_formatting(wb):
 
 SHEET_ORDER = [
     "Anleitung", "Prüfungen",
-    "Kinder", "Familien", "Zuordnung MA", "Aufträge", "Betreuungen",
+    "Kinder", "Zuordnung MA", "Aufträge", "Betreuungen",
     "Ansprechpersonen", "Berichte", "Fehlerliste",
     "Leistungstypen", "Leistungsbesteller", "Kostenträger", "Mitarbeiter", "Büros",
     "Wertelisten", "Hilfsdaten", "Klienten (alt)",
@@ -2841,25 +2772,23 @@ def verify_excel_strict(wb):
 
 
 def carry_over_handwork(persons, relations):
-    """Familien, Rollen und Berichte aus der vorhandenen Zieldatei übernehmen.
+    """Familie am Kind, Rollen und Berichte aus der vorhandenen Zieldatei übernehmen.
 
     Alles andere entsteht aus migration_v2.json und wird beim Bauen neu geschrieben.
-    Familien, die Rolle in Zuordnung MA und alle Berichte sind die Ausnahme: sie
+    Die Familie am Kind, die Rolle in Zuordnung MA und alle Berichte sind die Ausnahme: sie
     entstehen nur von Hand, weil migration_v2.json sie nicht kennt. Ohne diesen
     Schritt wäre jeder Neubau ein Datenverlust – `relations` wird dabei in place
     um `role` ergänzt.
     """
     if not HAND.exists():
-        return [], []
+        return []
     alt = openpyxl.load_workbook(HAND, data_only=True)
-    if "Familien" not in alt.sheetnames:
-        return [], []
 
     def kopfzeile(ws):
         """Die vorhandene Datei kann noch die alte Zeilenaufteilung tragen."""
         for r in (TOP - 1, 2, 3, 1):
             if ws.cell(row=r, column=1).value in (
-                    "family_id", "person_id", "mandate_id", "report_id"):
+                    "person_id", "mandate_id", "report_id"):
                 return r
         raise SystemExit(f"{ws.title}: Feldnamenzeile nicht gefunden")
 
@@ -2870,32 +2799,6 @@ def carry_over_handwork(persons, relations):
     def wert(ws, row, sp, name):
         return ws.cell(row=row, column=sp[name]).value if name in sp else None
 
-    fs = alt["Familien"]
-    kopf = kopfzeile(fs)
-    sp = spalten(fs, kopf)
-    anzeige = {p["person_id"]: f'{p["person_id"]} — {p["last_name"]}, {p["first_name"]}'
-               for p in persons}
-    families = []
-    for row in range(kopf + 1, MAX + 1):
-        fid = fs.cell(row=row, column=sp["family_id"]).value
-        if not fid:
-            continue
-        # Die vorhandene Datei kann die blosse Nummer tragen oder schon die Auswahl
-        # mit Namen; gespeichert wird beides Mal auf die Anzeigeform normalisiert.
-        wahl = wert(fs, row, sp, "index_person") \
-            or wert(fs, row, sp, "index_person_id") \
-            or wert(fs, row, sp, "billing_person") \
-            or wert(fs, row, sp, "billing_person_id")
-        if wahl:
-            wahl = anzeige.get(str(wahl).split(" ")[0], wahl)
-        if not CARRY_FAMILIES:
-            continue
-        families.append({
-            "family_id": fid,
-            "index_person": wahl,
-            "notes": wert(fs, row, sp, "notes"),
-        })
-
     ks = alt["Kinder"]
     kopf = kopfzeile(ks)
     sp = spalten(ks, kopf)
@@ -2905,7 +2808,7 @@ def carry_over_handwork(persons, relations):
         if not pid:
             continue
         fid = wert(ks, row, sp, "family_id")
-        if fid and CARRY_FAMILIES:
+        if fid:
             zuordnung[pid] = fid
     for p in persons:
         if p["person_id"] in zuordnung:
@@ -2948,18 +2851,17 @@ def carry_over_handwork(persons, relations):
                 "notes": wert(rs, row, sp, "notes"),
             })
 
-    if families or zuordnung or rollen or berichte:
-        print(f"übernommen aus der vorhandenen Datei: {len(families)} Familien, "
-              f"{len(zuordnung)} Kind-Familie-Zuordnungen, {len(rollen)} Rollen, "
-              f"{len(berichte)} Berichte")
-    return families, berichte
+    if zuordnung or rollen or berichte:
+        print(f"übernommen aus der vorhandenen Datei: {len(zuordnung)} Familienangaben, "
+              f"{len(rollen)} Rollen, {len(berichte)} Berichte")
+    return berichte
 
 
 def main():
     data = json.loads(DATA.read_text(encoding="utf-8"))
     # keep_links=False wirft die externe Verknüpfung der Quelldatei weg: sie zeigt auf
     # eine Proton-Drive-Konfliktkopie derselben Datei auf einem fremden Rechner.
-    data["families"], data["reports"] = carry_over_handwork(
+    data["reports"] = carry_over_handwork(
         data["persons"], data["relations"])
 
     single = collections.Counter(r["mandate_id"] for r in data["relations"])
@@ -2994,7 +2896,6 @@ def main():
         ("Kinder", "person", KINDER, data["persons"], f"C{TOP}"),
         ("Ansprechpersonen", "masterdata_contact_person", ANSPRECHPERSONEN,
          data["contacts"], f"B{TOP}"),
-        ("Familien", "masterdata_family", FAMILIEN, data["families"], f"B{TOP}"),
         ("Berichte", "report", BERICHTE, data["reports"], f"B{TOP}"),
     ]
     for title, table_name, columns, records, freeze in sheets:
