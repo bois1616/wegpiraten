@@ -26,4 +26,16 @@ wegpiraten.log
 archiv/
 data/
 .codex
-sandbox/
+# sandbox/
+
+# Sandbox enthält Personendaten (Namen, AHV-Nummern, Telefon). Getrackt werden nur die
+# Skripte, alles andere bleibt lokal. Neue Dateien dort sind damit standardmässig ignoriert.
+sandbox/*
+!sandbox/build.py
+!sandbox/prepare.py
+!sandbox/migrate.py
+!sandbox/import_reports.py
+!sandbox/excel_pruefung.ps1
+!sandbox/mandate_numbers.json
+.~lock.*#
+*.bak
