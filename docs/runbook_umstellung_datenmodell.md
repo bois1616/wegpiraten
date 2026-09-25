@@ -13,12 +13,12 @@ der Klientenliste vom 24.09.2026, keine Produktivdatei.
 
 | Vorher | Jetzt |
 |---|---|
-| Blatt «Klienten»: eine Zeile pro Auftrag, Kind und Auftrag vermischt | Sieben Blätter: Kinder, Aufträge, Betreuungen, Familien, Ansprechpersonen, Zuordnung MA, Berichte |
+| Zwei Tabellen: «Klienten» (eine Zeile pro Auftrag, Kind und Auftrag vermischt) und «Relation Klient-MA» | Sieben Blätter: Kinder, Aufträge, Betreuungen, Familien, Ansprechpersonen, Zuordnung MA, Berichte |
 | Klientennummer C1002 | Kind behält C1002, der Auftrag heisst A-Jahr-Zähler, z.B. A26001. Die alte Nummer steht in der Bemerkung des Auftrags |
 | Verlängerung überschreibt das Enddatum | Verlängerung ist ein neuer Auftrag mit Vorgänger |
 | Geschwister sind nicht darstellbar | Familie mit Indexkind (dem jüngsten Kind) |
-| Mitarbeitende hängen am Klienten | Mitarbeitende hängen am Auftrag, mit Rolle P (primär) oder S (unterstützend) |
-| Berichte stehen in der Klientenübersicht als Farbe im Monatsraster | Blatt «Berichte» mit Fälligkeit, Berichtsform, Status |
+| Mitarbeitende hängen am Klienten («Relation Klient-MA») | Mitarbeitende hängen am Auftrag, mit Rolle P (primär) oder S (unterstützend) |
+| Berichte gab es in der Datenbank nicht | Neu: Blatt «Berichte» mit Fälligkeit, Berichtsform, Status. Die Erstbefüllung stammt aus der Klientenübersicht (Farben im Monatsraster) |
 | Kontrolle von Hand | Blätter «Prüfungen» (offene Punkte) und «Fehlerliste» (zeilenweise) |
 
 ## Einmalig zu tun

@@ -17,7 +17,8 @@ Abrechnung läuft aber pro Auftrag. Beide Sichten passen nicht in eine Tabelle.
 
 ## Die neue Struktur
 
-Statt einer Liste gibt es sieben, die je eine Frage beantworten.
+Statt der bisherigen zwei Listen (Klienten und Zuordnung der Mitarbeitenden) gibt es sieben, die je eine
+Frage beantworten. Die Berichtsliste ist ganz neu, es gab bisher keine.
 
 | Liste | Frage | Eine Zeile ist |
 |---|---|---|
