@@ -13,10 +13,10 @@ der Klientenliste vom 24.09.2026, keine Produktivdatei.
 
 | Vorher | Jetzt |
 |---|---|
-| Zwei Tabellen: «Klienten» (eine Zeile pro Auftrag, Kind und Auftrag vermischt) und «Relation Klient-MA» | Sieben Blätter: Kinder, Aufträge, Betreuungen, Familien, Ansprechpersonen, Zuordnung MA, Berichte |
+| Zwei Tabellen: «Klienten» (eine Zeile pro Auftrag, Kind und Auftrag vermischt) und «Relation Klient-MA» | Sechs Blätter: Kinder, Aufträge, Betreuungen, Ansprechpersonen, Zuordnung MA, Berichte |
 | Klientennummer C1002 | Kind behält C1002, der Auftrag heisst A-Jahr-Zähler, z.B. A26001. Die alte Nummer steht in der Bemerkung des Auftrags |
 | Verlängerung überschreibt das Enddatum | Verlängerung ist ein neuer Auftrag mit Vorgänger |
-| Geschwister sind nicht darstellbar | Familie mit Indexkind (dem jüngsten Kind) |
+| Geschwister sind nicht darstellbar | Geschwister tragen bei «Kinder» denselben Familientext, das jüngste Kind ist das Indexkind |
 | Mitarbeitende hängen am Klienten («Relation Klient-MA») | Mitarbeitende hängen am Auftrag. Die Rolle P (primär) oder S (unterstützend) gilt nur für die Berichtspflichten |
 | Berichte gab es in der Datenbank nicht | Neu: Blatt «Berichte» mit Fälligkeit, Berichtsform, Status. Die Erstbefüllung stammt aus der Klientenübersicht (Farben im Monatsraster) |
 | Kontrolle von Hand | Blätter «Prüfungen» (offene Punkte) und «Fehlerliste» (zeilenweise) |
@@ -34,9 +34,10 @@ Die Reihenfolge ist absichtlich so gewählt: Fehler zuerst, dann Fachfragen, dan
    Bewilligung abgelaufen ist, sieht man am Feld «Bewilligung bis», nicht in der Geschäftsnummer.
 3. **Rollen in «Zuordnung MA» prüfen.** Sie bestimmen nur, wer die Berichte bekommt. Pro Auftrag genau eine Person mit P. Bei Aufträgen mit
    nur einer Person setzt der Aufbau P selbst. Wer vertritt, wer dauerhaft betreut, entscheidet Wegpiraten.
-4. **Familien erfassen**, wo Geschwister betreut werden. Zuerst im Blatt «Kinder» die Familie
-   eintragen, dann im Blatt «Familien» das jüngste Kind als Indexkind wählen. Ohne Familie gilt
-   das Kind selbst als Indexkind, das ist bei Einzelkindern richtig.
+4. **Familien erfassen**, wo Geschwister betreut werden. Im Blatt «Kinder» bei jedem der Geschwister
+   dasselbe Wort in «Familie» eintragen, zum Beispiel «Muster Interlaken». Das jüngste Kind ist das Indexkind,
+   dafür braucht jedes Kind der Familie ein Geburtsdatum (sonst ein Fehler). Ohne Familie gilt das
+   Kind selbst als Indexkind. Eine Familie mit nur einem Kind meldet sich als Hinweis, meist ein Tippfehler.
 5. **Folgeaufträge nachtragen**, wo die Klientenliste eine Verlängerung überschrieben hat.
    Erledigt für Yahia, Nipote (Yarrah Orion) und Gorlov. Offen für Duarte Torres und Loosli:
    Wegpiraten nennt das Ende des alten und den Beginn des neuen Auftrags.
@@ -55,11 +56,11 @@ Auftrag, Betreuung, Zuordnung MA, Berichte.
 | Neues Kind, erster Auftrag | neue Zeile | neue Zeile | neue Zeile | Zuordnung MA, Berichte |
 | Kind war früher schon betreut | | neue Zeile | neue Zeile | |
 | Zweite Leistung für dasselbe Kind | | neue Zeile | neue Zeile | |
-| Geschwister kommt in einen laufenden Auftrag | neue Zeile, Familie eintragen | | neue Zeile | Indexkind in «Familien» prüfen |
+| Geschwister kommt in einen laufenden Auftrag | neue Zeile, gleicher Familientext | | neue Zeile | |
 | Ein Kind tritt aus, der Auftrag läuft weiter | | | Austritt und Grund auf dieser Zeile | |
 | Der ganze Auftrag endet | | «Bewilligung bis» | Austritt auf allen Zeilen | |
 | Verlängerung | | neuer Auftrag mit Vorgänger | neue Zeile je weiterbetreutem Kind, Eintritt bleibt | Zuordnung MA und Berichte übernehmen |
-| Neugeborenes in der Familie | neue Zeile | neuer Auftrag mit Vorgänger, für die ganze Familie | neue Zeile für das Neugeborene, falls betreut | Indexkind wechselt zum jüngsten Kind |
+| Neugeborenes in der Familie | neue Zeile mit Geburtsdatum, gleicher Familientext | neuer Auftrag mit Vorgänger, für die ganze Familie | neue Zeile für das Neugeborene, falls betreut | Das Indexkind wechselt von selbst zum jüngsten Kind |
 | Vertretung, Krankheit, Ferien | | | | Zeile in «Zuordnung MA» ergänzen, danach entfernen |
 | Dauerhafter Wechsel der Betreuung | | | | Zuordnung anpassen, Rolle P neu setzen, damit die Berichte an die richtige Person gehen |
 | Kontingent ändert sich | | neuer Auftrag (Folgeauftrag) | | |
@@ -88,7 +89,7 @@ entfernen, sonst entsteht ein Bogen ohne Stunden.
 
 Erst nach der Annahme des Modells durch Stephan, vorher bleiben `src/` und die Datenbank unberührt.
 
-1. Import: `import-master` liest die neuen Blätter (Kinder, Aufträge, Betreuungen, Familien,
+1. Import: `import-master` liest die neuen Blätter (Kinder, Aufträge, Betreuungen,
    Ansprechpersonen, Zuordnung MA, Berichte) statt der Klientenliste. Die Zuordnung der
    Blätter zu den Tabellen steht in `DEFAULT_TABLE_MAPPINGS`.
 2. Rechnung und Zeiterfassung: die Verbindung `JOIN clients` in `invoice_processor.py` und

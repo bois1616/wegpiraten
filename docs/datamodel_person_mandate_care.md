@@ -25,11 +25,16 @@ existing data is deferred to the eventual migration. Same day, later: the
 `report` entity is built as a PoC — see [report](#report) — expected to change
 once Wegpiraten has looked at it.
 
+Revised 2026-09-25: the `family` entity is dropped. The family is a free-text field
+`person.family_id`; the index child is derived as the youngest child of the family from
+the date of birth, a child of a family without one is an error (see [Family](#family-no-table)).
+The history below describes the earlier table.
+
 Revised 2026-09-04 after two rounds of review: the ID prefixes, the short code
 moving to the child, contact persons becoming their own entity, the separation of
 *Betreuungskind* from *Indexkind*, and `family` as the entity that carries
 the index child. The last two reverse changes made earlier the same day; the
-reasoning is under [mandate_person](#mandate_person) and [family](#family).
+reasoning is under [mandate_person](#mandate_person).
 
 This model is a workaround for a workbook, not a general case-management schema.
 It is cut to what the Accordix report and the invoice need. Where it stops short
@@ -42,14 +47,14 @@ English. The mapping is fixed:
 
 | Domain term | Entity | Excel table | Excel sheet |
 | --- | --- | --- | --- |
-| Familie | family | `masterdata_family` | Familien |
+| Familie | family | `person.family_id` (free text) | Kinder |
 | Kind | person | `person` | Kinder |
 | Auftrag | mandate | `mandate` | Aufträge |
 | Betreuung | care | `mandate_person` | Betreuungen |
 | Ansprechperson | contact person | `masterdata_contact_person` | Ansprechpersonen |
 | Zuordnung Mitarbeitende | mandate–employee link | `relation_mandate_emp` | Zuordnung MA |
 | Betreuungskind | cared-for child | `mandate_person` row | Betreuungen |
-| Indexkind | index child | `family.index_person_id` | — |
+| Indexkind | index child | derived: youngest child of the family, else the child itself | — |
 | Kurzzeichen | short code | `person.short_code` | — |
 | Bewilligung von / bis | authorisation period | `mandate.start_date` / `end_date` | — |
 | Eintritt / Austritt | care period | `mandate_person.start_date` / `end_date` — Eintritt is entered by hand | — |
@@ -163,7 +168,7 @@ mandate is running.
 | --- | --- | --- | --- |
 | `person_id` | text | no | PK; `C` + digits |
 | `short_code` | text | yes | Kurzzeichen; appears in timesheet cell C8 and in the file name |
-| `family_id` | text | **yes** | → `family`; set only where siblings exist |
+| `family_id` | text | **yes** | free text, identical for all siblings; set only where siblings exist |
 | `social_security_number` | text | yes | AHV; format `756.NNNN.NNNN.NN`, 16 chars |
 | `last_name`, `first_name` | text | no | |
 | `date_of_birth` | date | yes | required by Accordix |
@@ -266,8 +271,8 @@ report a child to Accordix who is not in care.
 
 The rule Wegpiraten applies is *the youngest child of the family*, and it does not
 move when a mandate expires. That makes the index child a property of the
-family, which is why it lives on `family` and not here. A mandate inherits it
-through the children it cares for.
+family, which is why it is derived from the family's children and not stored here. A
+mandate inherits it through the children it cares for.
 
 `start_date` is the Accordix entry (*Eintritt*) and a **manual entry**: it is
 neither the current authorisation nor the first mandate on record. It can predate
@@ -279,56 +284,44 @@ that is an artefact of the old model having one date, not a rule. On a renewal
 the entry date carries over from the predecessor's care row; invariant 21
 watches for that.
 
-### family
+### Family (no table)
 
-The entity that carries relationship knowledge. Added 2026-09-04, after two
-attempts to put the index child somewhere else both failed.
+Until 2026-09-25 a `family` table carried the family and named its index child. It is
+gone, for one reason: the index child is derivable. The rule Wegpiraten applies is *the
+youngest child of the family*, which the date of birth already says, and the table had
+never been filled (0 rows in the real data). What it cost: a family had to be created
+before a child could be assigned to it, the index child had to be picked from a dropdown,
+and five checks watched the table against the children.
 
-| Field | Type | Null | Note |
-| --- | --- | --- | --- |
-| `family_id` | text | no | PK; `F` + digits |
-| `label` | text | yes | `Nachname, Wohnort`, so a human recognises the row |
-| `index_person_id` | text | no | → `person`; must belong to this family |
-| `notes` | text | yes | internal |
+Now the family is one free-text field on `person`. Siblings carry the same text, for
+example `Muster Interlaken`. Derived on the child, not stored:
 
-**It cannot be derived, and that is the whole point.** Nothing in the data
-identifies a household:
+- `family_size`: how many children carry this text.
+- `index_person_id`: the child itself where there is no family, else the youngest child
+  of the family. A mandate takes it from the first care row's child.
 
-- `residence_legal_guardian` is a municipality, not an address — Interlaken holds
-  13 children, Unterseen 9.
-- `application_number` is the KJA-FS Antrags-Nr., and it only exists where the
-  invoice goes through KJA-FS. In 29 of 86 rows it holds `beendet`, `brief`,
-  `Sonderfall`, `on hold` instead — see *Invoice delivery channels* below. A field
-  that is empty by construction for part of the corpus cannot key anything.
-- Surname plus municipality produces false positives. C1002 Luan and C1068 Yarrah
-  Orion Nipote, both Meiringen, both SPF at SR006, birth dates nine years apart —
-  the pattern the concept document had flagged as the prime sibling candidate.
-  Wegpiraten says they are two families.
+**It still cannot be derived which children belong together.** Nothing in the data
+identifies a household: `residence_legal_guardian` is a municipality, not an address, and
+surname plus municipality produces false positives (C1002 Luan and C1068 Yarrah Orion
+Nipote, both Meiringen, nine years apart: two families, said Wegpiraten). Which children
+belong together is knowledge that only a person has, and it is entered or it does not
+exist. The field stays empty until siblings actually appear.
 
-Patchwork settles it: which children belong together is relationship knowledge
-that only a person has. It gets entered or it does not exist.
+`person.family_id` is a single value with no history. A child moving between households
+is a deliberate edit, and no requirement for household history has come up.
 
-`person.family_id` is a single reference with no history. A child moving between
-households is a deliberate edit, not the silent overwrite that lost the
-`predecessor_mandate_id` chain, and no requirement for household history has come
-up. If one does, a `family_person` link table with validity dates is a lossless
-migration from here.
+**What free text gives up.**
+- A typo creates a second family. Invariant 46 (a family with one child) catches it, and
+  a mandate with children from two families is flagged by invariant 26.
+- No override: the index child is always the youngest. Wegpiraten named no exception; the
+  earlier "patchwork" caveat was ours.
+- Twins or an identical date of birth: the first child in the list wins; invariant 47 marks it.
 
-**The reference is optional, and the table starts empty.** Where a child has no
-family, the mandate takes the child it serves as the index child. That is the
-same answer the family would give for a family of one, so 82 placeholder rows
-would have carried nothing. A family gets created when siblings actually appear —
-which is the moment someone has the knowledge to fill it.
+The gate is unchanged: a mandate serving **more than one child** without a family is an
+error (invariant 28), because then nothing determines which child is billed.
 
-The gate moved with it: a mandate serving **more than one child** without a family
-is an error, because then nothing determines which child is billed. One child, no
-family, is normal.
-
-**Merging two families** is two cells: give both children the same `family_id`,
-then set that family's `index_person_id` to the younger child. Every mandate of
-both children follows, including the short code on the timesheets. The emptied
-family reports itself as *Familie ohne Kinder* and can be deleted. Verified by
-simulating the merge of C1002 and C1068 against the workbook: 0 errors, 1 warning.
+**Merging two families** is one edit: give the children the same text. Every mandate of
+those children follows, including the short code on the timesheets.
 
 ### masterdata_contact_person
 
@@ -383,7 +376,7 @@ version where the entity did not change.
 | 3 | (`mandate_id`, `person_id`) unique in `mandate_person` | error |
 | 4 | every `mandate_person.mandate_id` exists in `mandate` | error |
 | 5 | every `mandate_person.person_id` exists in `person` | error |
-| 6 | a `person.family_id`, **where set**, exists in `family` | error |
+| 6 | *(withdrawn 2026-09-25 — the family is free text, there is no table to point into)* | — |
 | 7 | *(withdrawn — the index child need not have a care row, and since it is derived it cannot be typed wrong)* | — |
 | 8 | every mandate has at least one `mandate_person` row | error |
 | 9 | `predecessor_mandate_id` exists in `mandate` | error |
@@ -401,16 +394,19 @@ version where the entity did not change.
 | 21 | on a renewal, the child's `start_date` equals the predecessor's `start_date` for that child | warning |
 | 22 | `short_code` set and unique across `person` | warning |
 | 23 | every mandate has a `contact_person_id` | warning |
-| 24 | `family.index_person_id` belongs to that family | error |
-| 25 | `family.index_person_id` is the youngest member of the family | warning — patchwork can justify otherwise |
+| 24 | *(withdrawn 2026-09-25 — the index child is derived)* | — |
+| 25 | *(withdrawn 2026-09-25 — the index child is always the youngest)* | — |
 | 26 | all children cared for in one mandate belong to one family | warning |
 | 28 | a mandate serving more than one child has a family | error |
-| 27 | every family has at least one member | warning — an emptied family after a merge |
+| 27 | *(withdrawn 2026-09-25 — there is no family table that can be left empty)* | — |
 | 29 | `mandate.service_type_id` exists in `service_types` | error |
 | 30 | a running mandate whose service type slice (`to_date`) has expired | warning |
 | 31 | an employee link on an expired mandate; timesheets are generated from the link | warning |
 | 32 | the month of the first recorded mandate start is not before the month of the care `start_date` | warning — month-rounded: entry 17.02.2026 accepts a mandate from 01.02.2026 and warns for 01.01.2026 |
-| 33 | every family has an index child | error |
+| 33 | *(withdrawn 2026-09-25 — replaced by 45)* | — |
+| 45 | every child that carries a family has a `date_of_birth`, otherwise the index child cannot be determined | error |
+| 46 | a family has more than one child | warning — typo in the free text |
+| 47 | the youngest date of birth of a family belongs to one child only | warning — twins or an entry error |
 | 34 | at least one `relation_mandate_emp` row of a mandate has `role` = `P` | warning |
 | 35 | at most one `relation_mandate_emp` row per mandate has `role` = `P` | warning |
 | 36 | `mandate.service_type_id`'s `code` is either in the Accordix mapping or on the deliberate exclusion list | warning |
@@ -481,14 +477,13 @@ correction, closing the predecessor by hand, to whoever entered the renewal.
 Invariant 21 also fires on nothing today, for a duller reason: no chain exists
 yet.
 
-Invariants 24 to 26 are what the family entity buys. 24 and 25 sit on the family,
-where the decision is made once. 26 catches the mandate that covers children from
-two families, which means either the families are wrong or it should be two
-mandates.
+Invariant 26 catches the mandate that covers children from two families, which means
+either the families are wrong or it should be two mandates. Invariants 45 to 47 guard
+the free-text family: without a date of birth the index child cannot be derived, a lone
+family is probably a typo, and identical dates make the choice arbitrary.
 
 The class of error that disappeared entirely: two mandates of one family naming
-different index children. It is unrepresentable now — they read the same family
-row.
+different index children. Both read the same derivation.
 
 Not an invariant, and not machine-checkable: a sibling who is cared for but was
 never entered is invisible. Nothing detects it. Asking whether further children
@@ -519,12 +514,9 @@ but are Caroline and Marlon Til Stauffer — merging on AHV alone would have mad
 them one child. They stay separate and invariant 14 keeps reporting them until
 the number is corrected.
 
-**Families.** None are created. A child without a family is its own index child,
-which is what the records support and what makes the model behave exactly as the
-old one did. The workbook currently carries two **demonstration rows** (`Nipote`,
-with C1002 and C1068 together, invented from the shared surname to show the
-effect, and an emptied `Burri`). They are not data. Real families are entered when
-Wegpiraten supplies the knowledge; data accuracy is a later step.
+**Families.** None are entered. A child without a family is its own index child, which is
+what the records support and what makes the model behave exactly as the old one did. Real
+families are entered when Wegpiraten supplies the knowledge.
 
 **Short codes.** Taken from the mandates of the child, which agreed in all four
 merged groups. One collision between different children needed a new value:
@@ -673,7 +665,7 @@ would read empty lookups. INDEX/MATCH computes everywhere and costs one extra
 `MATCH` per formula.
 
 **Helper columns.** `is_index_case` on Betreuungen (Ja when the row's child is the
-mandate's index child) is a visible derived column. Family, date of birth and the
+mandate's index child) is a visible derived column. Family, the index child of the child, date of birth and the
 predecessor mandate are carried into Betreuungen as hidden helpers, so that
 invariant 21 needs no nested lookup inside `SUMIFS`. The `issue_*` columns feed
 the sheet `Fehlerliste`, which collects the findings of every sheet in one place.
@@ -692,10 +684,9 @@ formula, not by parsing the file.
 **Predecessor mandate, labelled.** Wegpiraten, 22.09.2026: a bare mandate number
 in the predecessor dropdown is unreadable and error-prone. `predecessor_mandate_id`
 on Aufträge is now an auto/hidden column, extracted from a new editable
-`predecessor_choice` — same idiom as `family.index_person` → `index_person_id`.
+`predecessor_choice` (a choice plus an extraction formula, the idiom also used by `report.mandate_choice`).
 The dropdown source is `mandate_display` (`A1002 — Nipote, Yarrah Orion (SPF, bis
-31.03.2027)`) through the named range `liste_auftrag_namen`, built the same way as
-`liste_kind_namen`. **Not done:** filtering the list to the same child/family and
+31.03.2027)`) through the named range `liste_auftrag_namen`. **Not done:** filtering the list to the same child/family and
 service type. It would need either a per-(family, service type) named range
 rebuilt on every `build.py` run — workable, since the workbook is already rebuilt
 for structural changes, but every such range would have to be regenerated from
@@ -747,8 +738,8 @@ their last computed values.
 **Recalculation** of the whole workbook takes about 6 seconds in headless
 LibreOffice, with `MAX = 2000` rows of formula reserve (7.2 s measured, minus a
 1.0 s start measured on a trivial file). The quadratic formulas — invariant 20
-over every pair of care rows, invariant 25 over every family against every child
-— account for most of the growth from 4.7 s. Cheap enough at this size; worth
+over every pair of care rows and the youngest-child lookup per family — account for
+most of the growth from 4.7 s. Cheap enough at this size; worth
 remembering if `MAX` ever grows.
 
 ## Open questions
@@ -794,10 +785,10 @@ reading of each and marks it on the `Anleitung` sheet.
    disputed AHV number; C1079's mandate is ST99 `PRIVAT` via SR999, so it is a
    privately paid service rather than an authority mandate.
 
-6. **Which children are actually siblings?** All 82 start as their own family,
-   because nothing in the data says otherwise and a wrong merge is worse than no
-   merge. Every merge Wegpiraten makes is two cells. Until then the model behaves
-   exactly as it did before the family existed.
+6. **Which children are actually siblings?** All start without a family, because nothing
+   in the data says otherwise and a wrong merge is worse than no merge. Entering a family
+   is one text in the child's row. Until then the model behaves exactly as it did before
+   the family existed.
 7. ~~AP022 / AP025~~ Settled: one person, merged into AP025 on 2026-09-05, AP022
    removed. The Stauffer AHV collision (C1079 / C1083) is with Wegpiraten for
    clarification.
@@ -943,7 +934,7 @@ rather than taken on faith:
   `DEFAULT_TABLE_MAPPINGS` (plus `FOREIGN_KEY_MAPPINGS`) and reads each generically
   through a Pydantic entity model — it is not one bespoke function per table. The
   new sheets' Excel table names (`mandate`, `person`, `mandate_person`,
-  `masterdata_family`, `relation_mandate_emp`, `report`) were already chosen to be
+  `relation_mandate_emp`, `report`) were already chosen to be
   these mapping keys; see the *Glossary* table above. Adding them is entries in
   two dicts plus one entity class each, not a rewrite of the importer.
 - **"Transaktionsdaten weitgehend unbetroffen" is right about the records, not

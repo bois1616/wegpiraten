@@ -17,7 +17,7 @@ Abrechnung läuft aber pro Auftrag. Beide Sichten passen nicht in eine Tabelle.
 
 ## Die neue Struktur
 
-Statt der bisherigen zwei Listen (Klienten und Zuordnung der Mitarbeitenden) gibt es sieben, die je eine
+Statt der bisherigen zwei Listen (Klienten und Zuordnung der Mitarbeitenden) gibt es sechs, die je eine
 Frage beantworten. Die Berichtsliste ist ganz neu, es gab bisher keine.
 
 | Liste | Frage | Eine Zeile ist |
@@ -25,7 +25,6 @@ Frage beantworten. Die Berichtsliste ist ganz neu, es gab bisher keine.
 | Kinder | Wer wird betreut? | ein Kind, genau einmal |
 | Aufträge | Was hat die Behörde bewilligt? | ein Auftrag |
 | Betreuungen | Welches Kind wird in welchem Auftrag betreut, von wann bis wann? | ein Kind in einem Auftrag |
-| Familien | Welche Kinder gehören zusammen, und über wen wird abgerechnet? | eine Familie mit Geschwistern |
 | Ansprechpersonen | Wer ist beim Leistungsbesteller zuständig? | eine Person bei einem Besteller |
 | Zuordnung MA | Wer arbeitet auf welchem Auftrag? | eine Mitarbeitende an einem Auftrag |
 | Berichte | Welche Berichte sind wann fällig? | ein Bericht zu einem Auftrag |
@@ -43,7 +42,9 @@ lautlos fehlen, sobald es eine Betreuungszeile hat. Der Eintritt wird von Hand e
 er älter sein kann als jeder erfasste Auftrag.
 
 **Für Geschwister.** Bei mehreren Kindern läuft der Auftrag über das jüngste Kind, das
-Indexkind. Die Familie hält das fest, an einer einzigen Stelle. Die Rechnung entsteht einmal,
+Indexkind. Geschwister tragen bei den Kindern denselben Familiennamen als Text, das jüngste
+nach Geburtsdatum ist das Indexkind. Eine eigene Familienliste gibt es nicht, und das
+Indexkind muss niemand von Hand wählen. Die Rechnung entsteht einmal,
 die Accordix-Meldung enthält trotzdem beide Kinder. Das Kontingent steht einmal am Auftrag und
 wird einmal geprüft.
 
