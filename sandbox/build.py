@@ -1842,128 +1842,88 @@ CHECKS = [
 ]
 
 
-def build_pruefkatalog(wb):
-    """Alle Prüfungen mit Anzahl, auch die erledigten; das Blatt Prüfungen zeigt daraus nur die offenen."""
-    ws = wb.create_sheet("Prüfkatalog")
-    ws.sheet_properties.tabColor = "C00000"
+CHECK_SHEETS = ("Aufträge", "Betreuungen", "'Zuordnung MA'", "Kinder", "Familien",
+                "Ansprechpersonen", "Berichte", "Leistungstypen")
 
-    ws["A1"] = "Prüfkatalog"
-    ws["A1"].font = Font(name=FONT, size=14, bold=True)
-    ws["A2"] = (
-        "Alle Prüfungen, auch die erledigten — der Nachweis, dass sie laufen. "
-        "Das Blatt »Prüfungen« zeigt daraus nur, was offen ist."
-    )
-    ws["A2"].font = Font(name=FONT, size=10, italic=True, color="595959")
 
-    ws["A4"] = "Offene Fehler"
-    ws["A4"].font = Font(name=FONT, size=11, bold=True)
-    first, last = 7, 6 + len(CHECKS)
-    ws["B4"] = f'=SUMPRODUCT(($A${first}:$A${last}="Fehler")*($D${first}:$D${last}>0))'
-    ws["B4"].font = Font(name=FONT, size=11, bold=True)
-    ws["C4"] = '=IF($B$4=0,"Keine offenen Fehler.","Bitte die Zeilen mit Status ""prüfen"" ansehen.")'
-    ws["C4"].font = Font(name=FONT, size=11, bold=True)
-
-    headers = ["Art", "Prüfung", "Was dahintersteckt", "Anzahl", "Status"]
-    for idx, text in enumerate(headers, start=1):
-        cell = ws.cell(row=6, column=idx, value=text)
-        cell.font = Font(name=FONT, size=10, bold=True)
-        cell.fill = PatternFill("solid", fgColor=C_TECH)
-        cell.border = BORDER
-
-    for offset, (art, titel, erklaerung, formel) in enumerate(CHECKS):
-        row = first + offset
-        ws.cell(row=row, column=1, value=art).font = Font(name=FONT, size=10, bold=True)
-        ws.cell(row=row, column=2, value=titel).font = Font(name=FONT, size=10)
-        ws.cell(row=row, column=3, value=erklaerung).font = Font(
-            name=FONT, size=10, color="595959"
-        )
-        ws.cell(row=row, column=4, value=resolve(formel)).font = Font(name=FONT, size=10)
-        ws.cell(row=row, column=5, value=f'=IF($D{row}=0,"ok","prüfen")').font = Font(
-            name=FONT, size=10, bold=True
-        )
-        for col in range(1, 6):
-            ws.cell(row=row, column=col).border = BORDER
-            ws.cell(row=row, column=col).alignment = Alignment(
-                vertical="top", wrap_text=col in (2, 3)
-            )
-
-    table = Table(displayName="pruefkatalog", ref=f"A6:E{last}")
-    table.tableStyleInfo = TableStyleInfo(name="TableStyleLight15", showRowStripes=True)
-    ws.add_table(table)
-
-    ws.conditional_formatting.add(
-        f"A{first}:E{last}",
-        FormulaRule(formula=[f'AND($D{first}>0,$A{first}="Fehler")'],
-                    fill=PatternFill("solid", fgColor=C_BAD)),
-    )
-    ws.conditional_formatting.add(
-        f"A{first}:E{last}",
-        FormulaRule(formula=[f'AND($D{first}>0,$A{first}="Hinweis")'],
-                    fill=PatternFill("solid", fgColor=C_HINT)),
-    )
-
-    ws.cell(row=6, column=6, value="lfd. offen")
-    for row in range(first, last + 1):
-        ws.cell(row=row, column=6, value=f'=IF($D{row}>0,N($F{row - 1})+1,N($F{row - 1}))')
-    ws.column_dimensions["F"].hidden = True
-    for letter, width in [("A", 10), ("B", 46), ("C", 62), ("D", 9), ("E", 10)]:
-        ws.column_dimensions[letter].width = width
-    ws.freeze_panes = "A7"
-    protect(ws)
+def check_sheet(formel):
+    """Blatt, in dem die Prüfung ihren Fehler findet: das erste, das die Formel nennt."""
+    hits = sorted((formel.index(name), name) for name in CHECK_SHEETS if name in formel)
+    if not hits:
+        return ""
+    # Eine Summe aus mehreren COUNTIF nennt alle Blätter, sonst zählt das erste.
+    chosen = hits if "+COUNTIF(" in formel else hits[:1]
+    return ", ".join(name.strip("'") for _, name in chosen)
 
 
 def build_pruefungen(wb):
-    """Nur die offenen Prüfungen, aus dem Katalog gezogen (Zeile k = k-te offene Prüfung)."""
+    """Nur die offenen Prüfungen, mit dem Blatt, in dem der Fehler steckt.
+
+    Der Katalog aller Prüfungen liegt in den versteckten Spalten H:M desselben Blatts;
+    die Anzeige links zieht sich Zeile k = k-te offene Prüfung heraus.
+    """
     ws = wb.create_sheet("Prüfungen")
     ws.sheet_properties.tabColor = "C00000"
     n = len(CHECKS)
     first, last = 7, 6 + n
+    cat = {"art": "H", "blatt": "I", "titel": "J", "erkl": "K", "anz": "L", "lfd": "M"}
 
     ws["A1"] = "Prüfungen"
     ws["A1"].font = Font(name=FONT, size=14, bold=True)
     ws["A2"] = (
         "Rechnet sich bei jeder Änderung neu und zeigt nur, was offen ist. »Fehler« muss "
         "bereinigt werden, »Hinweis« ist zu prüfen und kann im Einzelfall richtig sein. "
-        "Alle Prüfungen samt der erledigten stehen im Blatt »Prüfkatalog«."
+        "Die Spalte »Blatt« sagt, wo der Fehler steckt; die einzelnen Zeilen nennt die »Fehlerliste«."
     )
     ws["A2"].font = Font(name=FONT, size=10, italic=True, color="595959")
 
     ws["A4"] = "Offene Fehler"
     ws["A4"].font = Font(name=FONT, size=11, bold=True)
-    ws["B4"] = (f'=SUMPRODUCT((Prüfkatalog!$A${first}:$A${last}="Fehler")'
-                f'*(Prüfkatalog!$D${first}:$D${last}>0))')
+    art, anz = cat["art"], cat["anz"]
+    ws["B4"] = f'=SUMPRODUCT(({art}{first}:{art}{last}="Fehler")*({anz}{first}:{anz}{last}>0))'
     ws["B4"].font = Font(name=FONT, size=11, bold=True)
-    ws["C4"] = (f'=IF($B$4=0,"Keine offenen Fehler.","")&IF(COUNTIF(Prüfkatalog!$D${first}:'
-                f'$D${last},">0")=0,"",COUNTIF(Prüfkatalog!$D${first}:$D${last},">0")&" von {n} '
-                f'Prüfungen sind offen.")')
+    ws["C4"] = (f'=IF($B$4=0,"Keine offenen Fehler. ","")&IF(COUNTIF({anz}{first}:{anz}{last},">0")=0,"",'
+                f'COUNTIF({anz}{first}:{anz}{last},">0")&" von {n} Prüfungen sind offen.")')
     ws["C4"].font = Font(name=FONT, size=11, bold=True)
 
-    for idx, text in enumerate(["Art", "Prüfung", "Was dahintersteckt", "Anzahl"], start=1):
+    for idx, text in enumerate(["Art", "Blatt", "Prüfung", "Was dahintersteckt", "Anzahl"], start=1):
         cell = ws.cell(row=6, column=idx, value=text)
         cell.font = Font(name=FONT, size=10, bold=True)
         cell.fill = PatternFill("solid", fgColor=C_TECH)
         cell.border = BORDER
+    ws["H6"] = "Katalog (alle Prüfungen)"
+    ws["H6"].font = Font(name=FONT, size=10, italic=True)
+
+    for offset, (kind, titel, erklaerung, formel) in enumerate(CHECKS):
+        row = first + offset
+        ws[f'{cat["art"]}{row}'] = kind
+        ws[f'{cat["blatt"]}{row}'] = check_sheet(formel)
+        ws[f'{cat["titel"]}{row}'] = titel
+        ws[f'{cat["erkl"]}{row}'] = erklaerung
+        ws[f'{cat["anz"]}{row}'] = resolve(formel)
+        prev = f'N({cat["lfd"]}{row - 1})'
+        ws[f'{cat["lfd"]}{row}'] = f'=IF({cat["anz"]}{row}>0,{prev}+1,{prev})'
+    for letter in cat.values():
+        ws.column_dimensions[letter].hidden = True
 
     for row in range(first, last + 1):
-        for col, src in ((1, "A"), (2, "B"), (3, "C"), (4, "D")):
+        for col, key in ((1, "art"), (2, "blatt"), (3, "titel"), (4, "erkl"), (5, "anz")):
+            src = cat[key]
             cell = ws.cell(row=row, column=col, value=(
-                f'=IFERROR(INDEX(Prüfkatalog!${src}${first}:${src}${last},'
-                f'MATCH(ROW()-{first - 1},Prüfkatalog!$F${first}:$F${last},0)),"")'))
+                f'=IFERROR(INDEX(${src}${first}:${src}${last},'
+                f'MATCH(ROW()-{first - 1},${cat["lfd"]}${first}:${cat["lfd"]}${last},0)),"")'))
             cell.font = Font(name=FONT, size=10, bold=col == 1,
-                             color="595959" if col == 3 else "000000")
-            cell.alignment = Alignment(vertical="top", wrap_text=col in (2, 3))
+                             color="595959" if col == 4 else "000000")
+            cell.alignment = Alignment(vertical="top", wrap_text=col in (2, 3, 4))
 
+    for kind, colour in (("Fehler", C_BAD), ("Hinweis", C_HINT)):
+        ws.conditional_formatting.add(
+            f"A{first}:E{last}",
+            FormulaRule(formula=[f'$A{first}="{kind}"'], fill=PatternFill("solid", fgColor=colour)))
     ws.conditional_formatting.add(
-        f"A{first}:D{last}",
-        FormulaRule(formula=[f'$A{first}="Fehler"'], fill=PatternFill("solid", fgColor=C_BAD)))
-    ws.conditional_formatting.add(
-        f"A{first}:D{last}",
-        FormulaRule(formula=[f'$A{first}="Hinweis"'], fill=PatternFill("solid", fgColor=C_HINT)))
-    ws.conditional_formatting.add(
-        f"A{first}:D{last}",
-        FormulaRule(formula=[f'$A{first}<>""'], border=BORDER))
+        f"A{first}:E{last}", FormulaRule(formula=[f'$A{first}<>""'], border=BORDER))
 
-    for letter, width in [("A", 10), ("B", 46), ("C", 62), ("D", 9)]:
+    for letter, width in [("A", 10), ("B", 20), ("C", 46), ("D", 62), ("E", 9)]:
         ws.column_dimensions[letter].width = width
     ws.freeze_panes = "A7"
     protect(ws)
@@ -2415,7 +2375,7 @@ def build_anleitung(wb, stats):
     )
     r = para(
         ws, r,
-        "Blatt »Prüfungen«:  dieselben Sachverhalte gezählt statt aufgezählt — es zeigt nur die offenen, alle stehen im »Prüfkatalog« — mit einer "
+        "Blatt »Prüfungen«:  dieselben Sachverhalte gezählt statt aufgezählt — es zeigt nur die offenen und das Blatt, in dem der Fehler steckt — mit einer "
         "Erklärung je Prüfung. »Fehler« muss bereinigt werden, »Hinweis« kann im "
         "Einzelfall richtig sein.",
         height=32,
@@ -2801,8 +2761,8 @@ def apply_conditional_formatting(wb):
 # ------------------------------------------------------------------------ Main
 
 SHEET_ORDER = [
-    "Anleitung", "Prüfungen", "Prüfkatalog",
-    "Aufträge", "Betreuungen", "Zuordnung MA", "Kinder", "Familien",
+    "Anleitung", "Prüfungen",
+    "Kinder", "Familien", "Zuordnung MA", "Aufträge", "Betreuungen",
     "Ansprechpersonen", "Berichte", "Fehlerliste",
     "Leistungstypen", "Leistungsbesteller", "Kostenträger", "Mitarbeiter", "Büros",
     "Wertelisten", "Hilfsdaten", "Klienten (alt)",
@@ -3051,7 +3011,6 @@ def main():
     extend_leistungstypen(wb)
     build_wertelisten(wb)
     build_fehlerliste(wb)
-    build_pruefkatalog(wb)
     build_pruefungen(wb)
     build_anleitung(wb, data["stats"])
 
