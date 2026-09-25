@@ -2920,8 +2920,12 @@ def main():
     apply_validations(wb)
     apply_conditional_formatting(wb)
 
-    wb._sheets = [wb[name] for name in SHEET_ORDER if name in wb.sheetnames] + [
-        ws for ws in wb.worksheets if ws.title not in SHEET_ORDER
+    order = SHEET_ORDER
+    if HAND.exists():
+        # Die Reihenfolge, die jemand in der vorhandenen Datei eingestellt hat, gilt weiter.
+        order = openpyxl.load_workbook(HAND, read_only=True).sheetnames
+    wb._sheets = [wb[name] for name in order if name in wb.sheetnames] + [
+        ws for ws in wb.worksheets if ws.title not in order
     ]
     wb.active = 0
     namen = verify_excel_strict(wb)
