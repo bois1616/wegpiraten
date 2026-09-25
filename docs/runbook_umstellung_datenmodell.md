@@ -17,7 +17,7 @@ der Klientenliste vom 24.09.2026, keine Produktivdatei.
 | Klientennummer C1002 | Kind behält C1002, der Auftrag heisst A-Jahr-Zähler, z.B. A26001. Die alte Nummer steht in der Bemerkung des Auftrags |
 | Verlängerung überschreibt das Enddatum | Verlängerung ist ein neuer Auftrag mit Vorgänger |
 | Geschwister sind nicht darstellbar | Familie mit Indexkind (dem jüngsten Kind) |
-| Mitarbeitende hängen am Klienten («Relation Klient-MA») | Mitarbeitende hängen am Auftrag, mit Rolle P (primär) oder S (unterstützend) |
+| Mitarbeitende hängen am Klienten («Relation Klient-MA») | Mitarbeitende hängen am Auftrag. Die Rolle P (primär) oder S (unterstützend) gilt nur für die Berichtspflichten |
 | Berichte gab es in der Datenbank nicht | Neu: Blatt «Berichte» mit Fälligkeit, Berichtsform, Status. Die Erstbefüllung stammt aus der Klientenübersicht (Farben im Monatsraster) |
 | Kontrolle von Hand | Blätter «Prüfungen» (offene Punkte) und «Fehlerliste» (zeilenweise) |
 
@@ -32,7 +32,7 @@ Die Reihenfolge ist absichtlich so gewählt: Fehler zuerst, dann Fachfragen, dan
    yymmddnnn, zum Beispiel 260819008 für den achten Auftrag vom 19.08.2026. Das Datum ist das des Auftrags, nicht der Bewilligung.
    Aktuell weichen 14 Aufträge ab (Text wie «beendet» oder «on hold» statt Nummer), einer hat keine. Ob eine
    Bewilligung abgelaufen ist, sieht man am Feld «Bewilligung bis», nicht in der Geschäftsnummer.
-3. **Rollen in «Zuordnung MA» prüfen.** Pro Auftrag genau eine Person mit P. Bei Aufträgen mit
+3. **Rollen in «Zuordnung MA» prüfen.** Sie bestimmen nur, wer die Berichte bekommt. Pro Auftrag genau eine Person mit P. Bei Aufträgen mit
    nur einer Person setzt der Aufbau P selbst. Wer vertritt, wer dauerhaft betreut, entscheidet Wegpiraten.
 4. **Familien erfassen**, wo Geschwister betreut werden. Zuerst im Blatt «Kinder» die Familie
    eintragen, dann im Blatt «Familien» das jüngste Kind als Indexkind wählen. Ohne Familie gilt
@@ -61,13 +61,13 @@ Auftrag, Betreuung, Zuordnung MA, Berichte.
 | Verlängerung | | neuer Auftrag mit Vorgänger | neue Zeile je weiterbetreutem Kind, Eintritt bleibt | Zuordnung MA und Berichte übernehmen |
 | Neugeborenes in der Familie | neue Zeile | neuer Auftrag mit Vorgänger, für die ganze Familie | neue Zeile für das Neugeborene, falls betreut | Indexkind wechselt zum jüngsten Kind |
 | Vertretung, Krankheit, Ferien | | | | Zeile in «Zuordnung MA» ergänzen, danach entfernen |
-| Dauerhafter Wechsel der Betreuung | | | | Zuordnung anpassen, Rolle P neu setzen |
+| Dauerhafter Wechsel der Betreuung | | | | Zuordnung anpassen, Rolle P neu setzen, damit die Berichte an die richtige Person gehen |
 | Kontingent ändert sich | | neuer Auftrag (Folgeauftrag) | | |
 | Umzug der Familie | Wohnort ändern | | | |
 | AHV-Nummer wird nachgereicht | eine Zelle | | | |
 | Bericht erledigt | | | | Status «erledigt», «Erledigt am» eintragen |
 
-Bei einer Vertretung darf die Rolle P auf der Stammperson bleiben. Die Erfassungsbögen
+Bei einer Vertretung bleibt die Rolle P auf der Stammperson, die Berichte gehen weiter an sie. Die Erfassungsbögen
 entstehen für jede Zeile der Zuordnung, deshalb die Vertretung nach dem Einsatz wieder
 entfernen, sonst entsteht ein Bogen ohne Stunden.
 

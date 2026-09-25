@@ -61,7 +61,8 @@ eine Vertretung wegen Krankheit oder Ferien einsetzt, ergänzt eine Zeile in der
 nimmt sie danach wieder heraus. Aus der Zuordnung entstehen die Erfassungsbögen, für jede
 zugeordnete Person einer. Auf Rechnung und Kontingent hat das keinen Einfluss. Eine Person
 pro Auftrag gilt als primäre Betreuungsperson (die der KESB benannte), die anderen als
-unterstützend.
+unterstützend. Diese Rolle zählt nur für die Berichtspflichten: Sie bestimmt, wer die Berichte
+bekommt, nicht wer Erfassungsbögen erhält oder abrechnet.
 
 **Für die Rechnung.** Die Rechnungsnummer läuft über die Auftragsnummer und ist damit
 eindeutig, auch wenn ein Kind zwei Aufträge zugleich hat. Bei Perren, Burri, Levic und Zwinggi
