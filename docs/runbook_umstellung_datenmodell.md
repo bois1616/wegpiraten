@@ -32,7 +32,7 @@ Die Reihenfolge ist absichtlich so gewählt: Fehler zuerst, dann Fachfragen, dan
    yymmddnnn, zum Beispiel 260819008 für den achten Auftrag vom 19.08.2026. Das Datum ist das des Auftrags, nicht der Bewilligung.
    Aktuell weichen 14 Aufträge ab (Text wie «beendet» oder «on hold» statt Nummer), einer hat keine. Ob eine
    Bewilligung abgelaufen ist, sieht man am Feld «Bewilligung bis», nicht in der Geschäftsnummer.
-3. **Rollen in «Zuordnung MA» prüfen.** Sie bestimmen nur, wer die Berichte bekommt. Pro Auftrag genau eine Person mit P. Bei Aufträgen mit
+3. **Rollen in «Zuordnung MA» prüfen.** Sie bestimmen nur, wer die Berichte erstellen muss. Pro Auftrag genau eine Person mit P. Bei Aufträgen mit
    nur einer Person setzt der Aufbau P selbst. Wer vertritt, wer dauerhaft betreut, entscheidet Wegpiraten.
 4. **Familien erfassen**, wo Geschwister betreut werden. Im Blatt «Kinder» bei jedem der Geschwister
    dasselbe Wort in «Familie» eintragen, zum Beispiel «Muster Interlaken». Das jüngste Kind ist das Indexkind,
@@ -62,13 +62,13 @@ Auftrag, Betreuung, Zuordnung MA, Berichte.
 | Verlängerung | | neuer Auftrag mit Vorgänger | neue Zeile je weiterbetreutem Kind, Eintritt bleibt | Zuordnung MA und Berichte übernehmen |
 | Neugeborenes in der Familie | neue Zeile mit Geburtsdatum, gleicher Familientext | neuer Auftrag mit Vorgänger, für die ganze Familie | neue Zeile für das Neugeborene, falls betreut | Das Indexkind wechselt von selbst zum jüngsten Kind |
 | Vertretung, Krankheit, Ferien | | | | Zeile in «Zuordnung MA» ergänzen, danach entfernen |
-| Dauerhafter Wechsel der Betreuung | | | | Zuordnung anpassen, Rolle P neu setzen, damit die Berichte an die richtige Person gehen |
+| Dauerhafter Wechsel der Betreuung | | | | Zuordnung anpassen, Rolle P neu setzen, damit die richtige Person die Berichte erstellt |
 | Kontingent ändert sich | | neuer Auftrag (Folgeauftrag) | | |
 | Umzug der Familie | Wohnort ändern | | | |
 | AHV-Nummer wird nachgereicht | eine Zelle | | | |
 | Bericht erledigt | | | | Status «erledigt», «Erledigt am» eintragen |
 
-Bei einer Vertretung bleibt die Rolle P auf der Stammperson, die Berichte gehen weiter an sie. Die Erfassungsbögen
+Bei einer Vertretung bleibt die Rolle P auf der Stammperson, sie erstellt weiterhin die Berichte. Die Erfassungsbögen
 entstehen für jede Zeile der Zuordnung, deshalb die Vertretung nach dem Einsatz wieder
 entfernen, sonst entsteht ein Bogen ohne Stunden.
 
@@ -98,7 +98,8 @@ Erst nach der Annahme des Modells durch Stephan, vorher bleiben `src/` und die D
    Erfassungsbögen tragen die alte Nummer in Zelle G8, dort muss der Import beide Formen kennen.
    Auch bestehende Rechnungsnummern ändern sich, weil die Rechnungsnummer aus der
    Auftragsnummer entsteht.
-4. Danach ein Report-Generator für die Berichte (Terminzettel je Monat und Mitarbeitende), als
-   eigenes Programm getrennt von der Zeiterfassung.
+4. Danach die monatliche Aufgabenliste je Mitarbeitende aus der Berichtsliste. Sie soll am
+   Monatsanfang zusammen mit den Erfassungsbögen entstehen. Ob im selben Lauf oder als eigenes
+   Programm daneben, ist noch zu entscheiden.
 5. Bereinigung der Altdaten nach der Migration der echten Daten. Was die Prüfungen dabei
    aufdecken, gehört zum Zweck der Übung.

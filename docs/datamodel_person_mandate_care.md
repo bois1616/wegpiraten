@@ -357,8 +357,8 @@ double invoicing.
 (*primäre Betreuungsperson*), the one named to the KESB. Recorded here rather
 than as a new entity because it is a property of the mandate–employee link, not
 a fact about either side alone. It changes nothing about timesheet generation or
-invoicing — both stay keyed on the link as before — it only decides who a report
-gets assigned to (see *Reporting* below). Invariants 34–35 keep it to exactly one
+invoicing — both stay keyed on the link as before — it only decides who has to
+write a report (see *Reporting* below). Invariants 34–35 keep it to exactly one
 `P` per mandate; unset is a warning, not an error, because the field is new. A mandate with exactly one
 employee gets `P` automatically in the migration build.
 
@@ -907,9 +907,11 @@ where they live for now. A recurring rule that spawns its own rows, and the
 | 40 | `status` = `erledigt` and `completed_date` empty | warning |
 | 41 | `mandate_id` set but no `relation_mandate_emp` row of that mandate has `role` = `P` (assignment cannot resolve) | warning |
 
-**Monthly task list ("Terminzettel"), proposal, still not built.** Wegpiraten's
-own proposal: alongside timesheet generation, list what is due this month per
-employee. Wegpiraten's own caution, 22.09.2026: if built, as its **own `make`
+**Monthly task list ("Terminzettel"), goal, still not built.** The goal (Stephan,
+2026-09-25): from the report list, a monthly to-do list per employee, created at the start
+of each month together with the timesheets — the employee is the primary care person
+(`role` = `P`) of the mandate, who has to write the report. Wegpiraten's earlier proposal was
+the same: alongside timesheet generation, list what is due this month per employee. Wegpiraten's own caution, 22.09.2026: if built, as its **own `make`
 target, run separately from timesheet generation** — not folded into that
 pipeline, because a shared failure point there is worse than one more manual
 step. Still not started, and still not started on purpose: it reads `report`,

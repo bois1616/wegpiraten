@@ -62,8 +62,8 @@ eine Vertretung wegen Krankheit oder Ferien einsetzt, ergänzt eine Zeile in der
 nimmt sie danach wieder heraus. Aus der Zuordnung entstehen die Erfassungsbögen, für jede
 zugeordnete Person einer. Auf Rechnung und Kontingent hat das keinen Einfluss. Eine Person
 pro Auftrag gilt als primäre Betreuungsperson (die der KESB benannte), die anderen als
-unterstützend. Diese Rolle zählt nur für die Berichtspflichten: Sie bestimmt, wer die Berichte
-bekommt, nicht wer Erfassungsbögen erhält oder abrechnet.
+unterstützend. Diese Rolle zählt nur für die Berichtspflichten: Die primäre Betreuungsperson muss die
+Berichte erstellen. Auf Erfassungsbögen und Abrechnung hat sie keinen Einfluss.
 
 **Für die Rechnung.** Die Rechnungsnummer läuft über die Auftragsnummer und ist damit
 eindeutig, auch wenn ein Kind zwei Aufträge zugleich hat. Bei Perren, Burri, Levic und Zwinggi
@@ -74,8 +74,10 @@ als Datum und einmal als Zahl erfasst ist (Burri), kann nicht mehr entstehen. Ei
 nachgereichte AHV-Nummer wird an einer Stelle eingetragen.
 
 **Für die Berichte.** Berichte hängen am Auftrag, berichtet wird über die Familie. Die Liste
-kennt Bericht, Zwischenbericht und Abschlussbericht. Zuständig ist automatisch die primäre
-Betreuungsperson. Ein Bericht ohne erkennbare zuständige Person wird markiert.
+kennt Bericht, Zwischenbericht und Abschlussbericht. Wer den Bericht erstellen muss, ist automatisch die primäre
+Betreuungsperson. Ein Bericht ohne erkennbare zuständige Person wird markiert. Ziel ist eine
+monatliche Aufgabenliste je Mitarbeitende, die am Monatsanfang zusammen mit den Erfassungsbögen
+entsteht.
 
 **Für die Kontrolle der Daten.** Das Workbook prüft sich selbst: fehlende Pflichtangaben,
 Verweise ins Leere, doppelte AHV-Nummern, abgelaufene Bewilligungen mit offener Betreuung,

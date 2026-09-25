@@ -384,8 +384,9 @@ INTRO = {
         "erledigter Bericht zu einem Auftrag — berichtet wird über die Familie, deshalb "
         "hängt die Zeile am Auftrag. Rote Zellen der Übersicht sind »Bericht«, orange "
         "»Zwischenbericht«, blaue »Abschlussbericht«; ohne Datum in der Zelle gilt die Monatsmitte. Zuständig ist "
-        "automatisch die primäre Betreuungsperson (Rolle P) aus »Zuordnung MA«. Rhythmus "
-        "und Intervall stehen am Auftrag.",
+        "automatisch die primäre Betreuungsperson (Rolle P) aus »Zuordnung MA«: sie muss den "
+        "Bericht erstellen. Ziel ist eine Aufgabenliste je Mitarbeitende, die am Monatsanfang "
+        "zusammen mit den Erfassungsbögen entsteht. Rhythmus und Intervall stehen am Auftrag.",
 }
 
 
@@ -1075,7 +1076,7 @@ ZUORDNUNG = [
         "width": 16,
         # Wegpiraten, 22.09.2026: es gibt immer eine primäre Betreuungsperson, die
         # der KESB gegenüber benannt ist. Ändert nichts an Timesheets oder
-        # Rechnung, legt nur fest, wer die Berichte zugeteilt bekommt.
+        # Rechnung, legt nur fest, wer die Berichte erstellen muss.
         "formula": '=IF($'"{Z.mandate_id}"'{row}="","",'
                    'IF(COUNTIFS($'"{Z.mandate_id}"'$3:$'"{Z.mandate_id}"'${MAX},'
                    '$'"{Z.mandate_id}"'{row},$'"{Z.role}"'$3:$'"{Z.role}"'${MAX},'
@@ -1783,7 +1784,7 @@ CHECKS = [
      "Wegpiraten, 22.09.2026: es gibt immer eine primäre Betreuungsperson, die der "
      "KESB gegenüber benannt ist. In der Zuordnung MA mit Rolle P markieren – "
      "ändert nichts an Timesheet oder Rechnung, legt nur fest, wer die Berichte "
-     "zugeteilt bekommt.",
+     "erstellen muss.",
      "=COUNTIF('Zuordnung MA'!${Z.role_check}$3:${Z.role_check}${MAX},"
      '"fehlt")'),
     ("Hinweis", "Mehr als eine primäre Betreuungsperson auf demselben Auftrag",
@@ -2583,7 +2584,7 @@ def apply_validations(wb):
            "Mitarbeiter-Nr aus dem Blatt Mitarbeiter.")
     add_dv(z, "{Z.role}", "list", "liste_rolle", "Rolle",
            "P = primäre Betreuungsperson, der KESB gegenüber benannt. "
-           "S = unterstützend. Ändert nichts an Timesheet oder Rechnung.")
+           "S = unterstützend. P erstellt die Berichte des Auftrags. Ändert nichts an Timesheet oder Rechnung.")
 
     r = wb["Berichte"]
     add_dv(r, "{R.mandate_choice}", "list", "liste_auftrag_namen", "Auftrag",
