@@ -766,7 +766,7 @@ AUFTRAEGE = [
     },
     {
         "name": "application_number_check",
-        "status": ["fehlt", "Notation", "Datum ungültig"],
+        "status": ["fehlt", "Notation", "Datum ungültig", "doppelt"],
         "label": "▸ Geschäftsnummer gültig?",
         "auto": True,
         "width": 16,
@@ -781,7 +781,9 @@ AUFTRAEGE = [
                    'VALUE(MID(' + APP_T + ',5,2))>=1,'
                    'DAY(DATE(2000+VALUE(LEFT(' + APP_T + ',2)),VALUE(MID(' + APP_T + ',3,2)),'
                    'VALUE(MID(' + APP_T + ',5,2))))=VALUE(MID(' + APP_T + ',5,2))),'
-                   '"ok","Datum ungültig")),"Notation"))))',
+                   'IF(SUMPRODUCT((${A.payer_id}$3:${A.payer_id}${MAX}="P1000")'
+                   '*(TRIM(${A.application_number}$3:${A.application_number}${MAX}&"")='
+                   + APP_T + '))>1,"doppelt","ok"),"Datum ungültig")),"Notation"))))',
     },
     spelling_column("{A.mandate_id}", [("{A.allocation}", "accordix_allocation")]),
 ]
@@ -1267,6 +1269,8 @@ AUFTRAEGE += issue_columns(
         (f'{_c("A", "application_number_check")}="fehlt"', "Geschäftsnummer fehlt"),
         (f'{_c("A", "application_number_check")}="Notation"',
          "Geschäftsnummer beim Kostenträger P1000 entspricht nicht yymmddnnn"),
+        (f'{_c("A", "application_number_check")}="doppelt"',
+         "Geschäftsnummer beim Kostenträger P1000 kommt mehrfach vor: Copy&Paste?"),
         (f'{_c("A", "application_number_check")}="Datum ungültig"',
          "Geschäftsnummer beim Kostenträger P1000 enthält ein Datum, das es nicht gibt"),
         (f'AND({_c("A", "predecessor_mandate_id")}<>"",'
@@ -1676,6 +1680,12 @@ CHECKS = [
      "Die Ziffern 3 bis 6 sind Monat und Tag, z.B. ist 260631002 ein 31. Juni.",
      '=COUNTIF(Aufträge!${A.application_number_check}$3:'
      '${A.application_number_check}${MAX},"Datum ungültig")'),
+    ("Fehler", "Geschäftsnummer beim KJA (P1000) kommt mehrfach vor",
+     "Eine gültige Nummer bezeichnet genau einen Auftrag. Meist ein Copy&Paste-Fehler, "
+     "etwa bei einer Verlängerung, die die Nummer des Vorgängers behält. Texte wie "
+     "»beendet« zählen hier nicht, sie sind schon als falsche Notation gemeldet.",
+     '=COUNTIF(Aufträge!${A.application_number_check}$3:'
+     '${A.application_number_check}${MAX},"doppelt")'),
     ("Fehler", "Leistungsart des Auftrags gibt es nicht",
      "Abgleich gegen das Blatt Leistungstypen.",
      '=COUNTIF(Aufträge!${A.service_type_check}$3:${A.service_type_check}${MAX},'

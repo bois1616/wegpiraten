@@ -407,6 +407,7 @@ version where the entity did not change.
 | 45 | every child that carries a family has a `date_of_birth`, otherwise the index child cannot be determined | error |
 | 46 | a family has more than one child | warning — typo in the free text |
 | 47 | the youngest date of birth of a family belongs to one child only | warning — twins or an entry error |
+| 48 | payer `P1000`: a valid `application_number` (invariants 43, 44 pass) occurs on one mandate only | error |
 | 34 | at least one `relation_mandate_emp` row of a mandate has `role` = `P` | warning |
 | 35 | at most one `relation_mandate_emp` row per mandate has `role` = `P` | warning |
 | 36 | `mandate.service_type_id`'s `code` is either in the Accordix mapping or on the deliberate exclusion list | warning |
@@ -577,6 +578,10 @@ number is only used to check length and plausibility (`260631002` names a date t
 exist). Deviations are marked as errors (invariants 43, 44).
 
 **A missing entry is an error for every payer** (invariant 42).
+
+**A valid number appears once** (invariant 48): a KJA number names one order, so a duplicate is
+usually a copy-and-paste error, typically a renewal that kept the predecessor's number. Texts such
+as `beendet` are excluded, they are already reported as a wrong notation (invariant 43).
 
 **Payer other than `P1000`: free text without semantics, until further notice.** That can
 change. KESB mostly — not without exceptions — use `yyyy-nnnn`, for example `2024-1987`.
