@@ -10,10 +10,10 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** DM-02 (Fragenliste) und DM-04 (Build-Spezifikation)
+- **Zuletzt erledigt:** DM-02 A1/A2 entschieden (Accordix nach Kostenträger, Einführungsgespräch einmalig), DM-03 erledigt
 - **In Arbeit:** nichts
-- **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md` (hängt an keiner Antwort); parallel DM-10 `[Haiku]`, DM-03 `[Opus]` ist mit DM-02 A6 vorbereitet
-- **Wartet auf Stephan:** Antworten auf die drei Regeln in `docs/dev/dm02_fachfragen.md`, Gruppe A (blockieren nichts, Vorschläge gelten bis dahin)
+- **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md` (hängt an keiner Antwort); parallel DM-10 `[Haiku]`
+- **Wartet auf Stephan:** DM-02 A3 (Ankündigung der neuen Rechnungsnummern an KJA-FS), blockiert nichts
 - **Entwürfe ohne Opus-Review:** keine
 - **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
 
@@ -38,6 +38,13 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-09
+
+- **DM-02 A1 und A2 entschieden, DM-03 erledigt** `[Opus 5.5]` (Status: erledigt): Stephan:
+  Accordix-Pflicht hängt am Kostenträger, P1000 ja, andere bisher nein; das Einführungsgespräch
+  gibt es einmalig, nicht pro Monat. Geprüft an der alten Datei: KOB läuft nur auf einem Auftrag
+  eines anderen Kostenträgers, fällt also heraus; 19 SPF/UWB-Aufträge anderer Kostenträger werden
+  künftig ebenfalls nicht gemeldet. Eingetragen in `dm02_fachfragen.md`, `dm04_build_spezifikation.md`
+  («Entscheide aus DM-02») und im Backlog bei DM-03, DM-40, DM-41. Prüfung: keine Codeänderung.
 
 - **Grundsatz «markieren statt pflegen» eingearbeitet** `[Opus 5.5]` (Status: erledigt): Stephan:
   Datenpflege ist nicht Aufgabe der Umstellung, Inkonsistenzen werden benannt und markiert und
