@@ -39,6 +39,14 @@ Regeln:
 
 ## 2026-10-09
 
+- **Korrektur: Berichte und Folgeaufträge doch übernehmen** `[Opus 5.5]` (Status: erledigt):
+  Stephan: Berichte und Auftragsverkettung übernehmen, aber als «zu prüfen» markieren. DM-04:
+  `FOLLOW_UPS` bleibt (mit der Korrektur der Vorgängernummer bei C1024), Berichte über
+  `carry_over_handwork` (ohne Familie und Rolle). Markierung: fester Vorsatz `ZU PRÜFEN:` in der
+  Bemerkung, neue Hinweis-Prüfung «Übernommene Angabe zu prüfen» (Invariante 50), verschwindet,
+  sobald der Vorsatz gelöscht ist. Erwartet: 94 Aufträge, 153 Berichte, 6 markierte Aufträge.
+  `import_reports.py` hat damit weiter keinen Zweck (die Berichte stehen schon im Testbuild).
+
 - **Nur Originaldaten** `[Opus 5.5]` (Status: erledigt): Stephan: relevant sind nur die Daten aus
   der originalen Datenbank, alle Ergänzungen im Testbuild sind Demo. DM-04 neu gefasst: keine
   Übernahme aus dem Testbuild (`WEGPIRATEN_HAND` ins Leere, kein Berichts-Seed), `FOLLOW_UPS`

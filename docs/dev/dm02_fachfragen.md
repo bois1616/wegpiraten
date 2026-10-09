@@ -39,7 +39,7 @@ finalen Build (DM-05, Schritt 8). «Markiert» heisst: Das Workbook zeigt den Be
 | # | Befund | Markiert | Wirkung, solange er offen ist |
 | --- | --- | --- | --- |
 | B1 | **Familien:** keine erfasst. Die Einträge im Testbuild (u.a. Nipote) waren Demo; Familien definiert der Kunde in der initialen und laufenden Datenpflege. | nein (leer ist gültig) | jedes Kind ist sein eigenes Indexkind, wie im alten Modell |
-| B2 | **Folgeaufträge C1024, C1068, C1082:** am 25.09. von Wegpiraten bestätigt, im finalen Build aber nicht enthalten, weil die Vorgängerwerte nicht aus der originalen Datenbank stammen. Wegpiraten legt sie an (Typischer Vorgang «Verlängerung erfassen»). | nein; steht in dieser Liste | die Kette fehlt; Rechnungen laufen auf dem bestehenden Auftrag |
+| B2 | **Folgeaufträge C1024, C1068, C1082:** übernommen, Vorgängerwerte aus dem Stand 02.09.; Nachfolger von C1068 und C1082 tragen die Geschäftsnummer des Vorgängers | ja, «zu prüfen» und «kommt mehrfach vor» | zwei Rechnungen mit derselben Geschäftsnummer im Dateinamen |
 | B3 | C1000 (neue Geschäftsnummer) und C1065 (neues Ende) seit 24.09. geändert wie eine überschriebene Verlängerung; C1011, C1015 ebenso (seit 25.09. offen) | nein; steht in dieser Liste | Kette und altes Kontingent fehlen; Rechnung läuft auf dem bestehenden Auftrag |
 | B4 | 14 KJA-Aufträge mit «beendet» oder «on hold» statt Geschäftsnummer: A24008, A24009, A24011, A24012, A24015, A24016, A25006, A25009, A25010, A25019, A26004, A26006, A26009 (on hold), A26010 | ja | Rechnungen sind nicht Teil der Stammdaten; ob auf diesen Aufträgen noch Stunden anfallen, zeigen erst die Bögen. Fällt eine Rechnung an, steht der Text statt einer Nummer im Dateinamen (korrigiert 2026-10-09: «ohne Rechnung» war eine Annahme, keine Prüfung) |
 | B5 | C1091 (neu seit 24.09.) ohne Geschäftsnummer | ja | Rechnung mit «PRÜFEN» im Dateinamen, wie heute schon |
@@ -59,9 +59,9 @@ finalen Build (DM-05, Schritt 8). «Markiert» heisst: Das Workbook zeigt den Be
 - **Status vergangener Berichte:** bleibt leer, so in Ordnung.
 - **Notation der Geschäftsnummern anderer Kostenträger:** vorläufig nicht prüfen.
 - **Filtern der Vorgänger-Auswahl:** später zu klären.
-- **Berichtsliste:** startet leer. Die 153 Berichte im Testbuild kamen aus der Klientenübersicht,
-  nicht aus der Datenbank, und waren damit Demo; Wegpiraten trägt die Termine von Hand ein. Die
-  48 Abweichungen in `klaerung_berichte_2026-09-25.md` sind damit gegenstandslos.
+- **Berichtsliste:** die 153 Berichte aus der Klientenübersicht werden übernommen und als «zu prüfen»
+  markiert (Korrektur Stephan, 2026-10-09). Die 48 Abweichungen in `klaerung_berichte_2026-09-25.md`
+  gehören zu dieser Prüfung und gehen mit der Befundliste an Wegpiraten.
 
 ## Was mit den Antworten passiert
 
