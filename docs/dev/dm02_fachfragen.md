@@ -47,7 +47,7 @@ finalen Build (DM-05, Schritt 8). «Markiert» heisst: Das Workbook zeigt den Be
 | B7 | Familie bei C1035 (Perren) und C1050 (Burri) mit nur einem Kind | ja, Hinweis | keine |
 | B8 | 13 Austritte ohne Grund, 7 betreute Kinder ohne Accordix-Pflichtfeld, 16 Codewerte in abweichender Schreibweise | ja | Accordix kann die Zeilen ablehnen |
 | B9 | 9 Aufträge mit abgelaufener Bewilligung und offener Betreuung, 23 Zuordnungen auf ausgelaufene Aufträge | ja | auf ausgelaufene Aufträge entsteht kein Bogen (DM-20); das wird gemeldet |
-| B10 | Zuordnungen, die seit 24.09. neu sind und mehr als eine Person am Auftrag haben, ohne Rolle P/S | ja, «ohne primäre Betreuungsperson» | Berichte ohne zuständige Person |
+| B10 | Rollen P/S: im Testbuild nur ein best guess (Stephan, 2026-10-09). Der finale Build setzt P nur bei Aufträgen mit genau einer Person; bei allen anderen fehlt die Rolle | ja, «ohne primäre Betreuungsperson» | Berichte dieser Aufträge ohne zuständige Person |
 
 ## C: entschieden oder zurückgestellt (Stephan, 2026-10-09)
 

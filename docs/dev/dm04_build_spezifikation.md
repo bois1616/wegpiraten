@@ -40,7 +40,7 @@ Testbuilds; damit wurde der Vergleich unten gemacht.
 | --- | --- | --- |
 | Kinder, Aufträge, Betreuungen, Ansprechpersonen | alte Datei 09.10. | `migrate.py` → `prepare.py` → `build.py`, wie im Testbuild |
 | Zuordnung MA (welche Paare) | alte Datei 09.10. | wie oben |
-| Zuordnung MA (Rolle P/S) | Testbuild | `carry_over_handwork`, Schlüssel (Auftrag, Mitarbeitende) |
+| Zuordnung MA (Rolle P/S) | **neu gesetzt** | P nur, wo genau eine Person am Auftrag arbeitet, sonst leer; die Rollen im Testbuild waren ein best guess (Stephan, 2026-10-09) |
 | Kinder (Familie) | **keine**: leer übergeben | Die Einträge im Testbuild waren Demo (Stephan, 2026-10-09); Familien definiert der Kunde |
 | Berichte (ganzes Blatt) | Testbuild | `carry_over_handwork` |
 | Stammdaten (Kostenträger, Leistungsbesteller, Leistungstypen, Mitarbeiter, Büros, Hilfsdaten, Wertelisten) | alte Datei 09.10. | wie im Testbuild |
@@ -64,13 +64,14 @@ Jeder Schritt ist für sich stabil; bricht die Sitzung ab, gilt der letzte im Lo
    `build_mandate_numbers` bereits). Erwartet: C1089 bis C1091 und jeder neue Folgeauftrag bekommen
    die nächsten Zähler ab `A26047`, nach Beginn und alter Klientennummer. Die 91 bestehenden Nummern
    bleiben gleich; das wird im Log mit einem Vergleich vorher/nachher belegt.
-4. **Handarbeit.** `carry_over_handwork` übernimmt Rolle und Berichte unverändert. **Die Familie
+4. **Handarbeit.** `carry_over_handwork` übernimmt nur die Berichte. **Die Rollen werden nicht
+   übernommen**, sondern neu gesetzt: P, wo genau eine Person am Auftrag arbeitet, sonst leer (die
+   Prüfung «Auftrag ohne primäre Betreuungsperson» markiert es). Die Rollen im Testbuild waren ein
+   best guess (Stephan, 2026-10-09); die Übernahme von `role` ebenfalls per Schalter abschalten. **Die Familie
    wird nicht übernommen**: Die Einträge im Testbuild (Nipote, Stauffer, Perren, Burri) waren zu
    Demo-Zwecken gesetzt, und Familien definiert der Kunde (Stephan, 2026-10-09). Dafür in
    `carry_over_handwork` die Übernahme von `family_id` abschalten (Schalter, nicht löschen); das Feld
    bleibt leer, wie nach der ersten Migration.
-   - Neue Zuordnungen ohne Rolle: ist die Person die einzige am Auftrag, P (wie bisher); sonst leer
-     lassen, die Prüfung «Auftrag ohne primäre Betreuungsperson» markiert es.
    - Berichte, deren Auftrag es nicht mehr gibt, melden; es darf keiner verloren gehen. Erwartet:
      153 Berichte, alle zugeordnet.
 5. **Schreibweisen** werden nicht angeglichen. Die Prüfung «Schreibweise eines Codewerts» markiert sie.
@@ -91,7 +92,7 @@ Jeder Schritt ist für sich stabil; bricht die Sitzung ab, gilt der letzte im Lo
 
 - Die 91 eingefrorenen Nummern sind unverändert, neue Nummern beginnen bei `A26047`.
 - Kein Kind trägt eine Familie.
-- 153 Berichte übernommen, Rollen aller Paare aus dem Testbuild übernommen, die noch existieren.
+- 153 Berichte übernommen. Rolle P genau bei den Aufträgen mit einer einzigen Person, sonst keine Rolle.
 - Jede Abweichung zum Testbuild ist erklärt (Schritt 7).
 - Jeder Fehler und Hinweis im Blatt «Prüfungen» steht in der Befundliste. Offene Befunde halten die
   Übergabe nicht auf.
