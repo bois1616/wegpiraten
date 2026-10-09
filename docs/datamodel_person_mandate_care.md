@@ -828,16 +828,14 @@ reading of each and marks it on the `Anleitung` sheet.
 10. **Free-text application numbers of other payers.** KESB mostly use `yyyy-nnnn`
     (`2024-1987`), not without exceptions. No effect today. It could matter for
     case-level reporting; then a notation per payer would have to be decided, as for
-    `P1000`. Open with Wegpiraten.
-11. **`Bericht` vs. `Zwischenbericht`.** Treated as two forms of report. Where they
-    differ — content, recipient, deadline — is unclear.
-12. **Are there cadences tied to the Leistungsbesteller?** The cadence stays on the
-    mandate for now, as an optional field. If the reports of one requester follow one
-    rhythm, it would move there.
-13. **Abschlussbericht per mandate.** Imported from the blue cells. Does every mandate
-    in a chain get one, or only the last?
-14. **State of past reports.** Where does the done-state of reports before today come
-    from? Their `status` is empty.
+    `P1000`. **Deferred 2026-10-09 (Stephan):** not checked for now.
+11. ~~`Bericht` vs. `Zwischenbericht`~~ **Settled 2026-10-09 (Stephan):** no semantics. The
+    form is a label, a reminder for the month; nothing branches on it.
+12. **Cadences — deferred 2026-10-09 (Stephan).** Due dates are entered by hand for now;
+    if a rhythm comes, it belongs on the mandate rather than the requester.
+13. ~~Abschlussbericht per mandate~~ **Settled 2026-10-09 (Stephan): only the last mandate of
+    a chain.** An `Abschlussbericht` on a mandate that has a successor is a data finding.
+14. ~~State of past reports~~ **Settled 2026-10-09 (Stephan):** stays empty.
 
 ## Reporting
 
@@ -868,7 +866,7 @@ One row is one concrete report, due or done, for one mandate.
 | `report_id` | text | no | PK; `R` + digits |
 | `mandate_id` | text | no | → `mandate`; entered via a labelled choice, same idiom as `predecessor_mandate_id` |
 | `due_date` | date | yes | when the report is due |
-| `report_form` | code | yes | `Bericht` / `Zwischenbericht` / `Abschlussbericht` — what distinguishes the first two is not yet clear (open question 11) |
+| `report_form` | code | yes | `Bericht` / `Zwischenbericht` / `Abschlussbericht` — a label without semantics (open question 11) |
 | `status` | code | yes | `offen` / `erledigt` / `entfällt` |
 | `completed_date` | date | yes | |
 | `notes` | text | yes | free text for anything the fields above don't capture — recipient detail, coordination between two staff on the same family, tandem notes |

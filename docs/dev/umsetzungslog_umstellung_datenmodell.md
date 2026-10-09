@@ -39,6 +39,16 @@ Regeln:
 
 ## 2026-10-09
 
+- **DM-02 Gruppe B und C beantwortet** `[Opus 5.5]` (Status: erledigt): Stephan: B1 bis B10 sind
+  Datenpflege bei Wegpiraten. Die Familie Nipote im Testbuild war ein Demo-Eintrag; Familien
+  definiert der Kunde. Folge: Der finale Build übernimmt keine Familien aus dem Testbuild
+  (DM-04 Schritt 4, Schalter in `carry_over_handwork`). B4 korrigiert: «ohne Rechnung» war meine
+  Annahme, Rechnungen sind nicht Teil der Stammdaten. Gruppe C: Bericht/Zwischenbericht nur Text,
+  Abschlussbericht nur am letzten Auftrag einer Kette (neue Prüfung DM-63, P1), Rhythmen
+  zurückgestellt, Status vergangener Berichte bleibt leer, Notation anderer Kostenträger wird nicht
+  geprüft, Vorgänger-Filter später. Datenmodell, Fragen 10 bis 14, nachgeführt. Offen: ob die
+  Rollen P/S im Testbuild echt sind (Frage an Stephan).
+
 - **DM-02 A3 entschieden** `[Opus 5.5]` (Status: erledigt): Stephan: kein Kostenträger, auch das
   KJA nicht, muss über den geänderten Nummernkreis der Rechnungen informiert werden. Damit ist
   DM-02 Gruppe A vollständig entschieden.

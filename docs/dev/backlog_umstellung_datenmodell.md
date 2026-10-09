@@ -169,9 +169,11 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 
 - [ ] [P1] [Import] **DM-61** Workbook-Prüfungen und Python-Prüfung abgleichen. `[Sonnet]`. Hinweis: Hinweis-Invarianten (14–36) zusätzlich im Import als Warnung ausgeben, damit eine im Workbook übersehene Prüfung im Log steht.
 
+- [ ] [P1] [Workbook] **DM-63** Prüfung «Abschlussbericht auf einem Auftrag mit Nachfolger» (Hinweis). `[Sonnet]`. Hinweis: Abschlussberichte gibt es nur für den letzten Auftrag einer Kette (Stephan, 2026-10-09). Neue Prüfung im Workbook nach dem Muster der bestehenden (`build.py`, Blatt «Prüfungen»), neue Invariantennummer 49 im Datenmodell. Nur markieren. Wenn sie vor der Übergabe fertig wird, mit DM-05 bauen; sonst ist sie die erste Strukturänderung am Kunden-Workbook nach DM-07.
+
 ## P2 Nice
 
-- [ ] [P2] [Report] **DM-70** Monatliche Aufgabenliste je Mitarbeitende («Terminzettel»). `[Opus]` spezifiziert, `[Sonnet]` setzt um. Hinweis: aus `report`, zuständig ist die Person mit Rolle P. Eigenes `make`-Target neben den Erfassungsbögen, nicht in deren Lauf (Wunsch von Wegpiraten). Bewusst erst nach einer Runde echter Nutzung der Berichtsliste und nach den Fragen 11–14.
+- [ ] [P2] [Report] **DM-70** Monatliche Aufgabenliste je Mitarbeitende («Terminzettel»). `[Opus]` spezifiziert, `[Sonnet]` setzt um. Hinweis: aus `report`, zuständig ist die Person mit Rolle P. Eigenes `make`-Target neben den Erfassungsbögen, nicht in deren Lauf (Wunsch von Wegpiraten). Liest nur `due_date` und `report_form` als Text (Bericht/Zwischenbericht ohne Semantik, Stephan 2026-10-09); Rhythmen sind zurückgestellt, Termine werden von Hand eingetragen. Bewusst erst nach einer Runde echter Nutzung der Berichtsliste.
 - [ ] [P2] [Rechnung] **DM-71** Folgeauftragskette auf der Rechnung oder in der Übersicht sichtbar machen. `[Sonnet]`. Hinweis: nur wenn Wegpiraten es wünscht; heute nicht verlangt.
 
 ## Abhängigkeiten

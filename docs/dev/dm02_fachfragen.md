@@ -32,15 +32,16 @@ Drei Gruppen:
 
 ## B: Datenbefunde
 
-Nachzuführen nach dem finalen Build (DM-05, Schritt 8). «Markiert» heisst: Das Workbook zeigt den
-Befund im Blatt «Prüfungen»; wo nicht, steht es in der Spalte.
+Alle Befunde sind Datenpflege und Sache von Wegpiraten (Stephan, 2026-10-09). Nachzuführen nach dem
+finalen Build (DM-05, Schritt 8). «Markiert» heisst: Das Workbook zeigt den Befund im Blatt
+«Prüfungen»; wo nicht, steht es in der Spalte.
 
 | # | Befund | Markiert | Wirkung, solange er offen ist |
 | --- | --- | --- | --- |
-| B1 | **Nipote:** im Testbuild eine Familie (C1002, C1068), laut Klärung vom 24.09. nach Wegpiraten zwei | nein, die Daten sind formal gültig; steht in dieser Liste | C1068 ist Indexkind auch des Auftrags von C1002: dessen Rechnung trägt Name und AHV-Nummer von C1068 |
+| B1 | **Nipote:** im Testbuild eine Familie (C1002, C1068). Laut Stephan (2026-10-09) war der Eintrag nur zu Demo-Zwecken, nach seiner Kenntnis keine Geschwister, wird geprüft. Familien definiert der Kunde, in der initialen und der laufenden Datenpflege. | entfällt: der finale Build übernimmt keine Familien aus dem Testbuild (DM-04, Schritt 4) | keine, solange die Familie leer ist |
 | B2 | Folgeaufträge von C1068 und C1082 tragen die Geschäftsnummer des Vorgängers | ja, «kommt mehrfach vor» | zwei Rechnungen mit derselben Nummer im Dateinamen; die Programme markieren sie |
 | B3 | C1000 (neue Geschäftsnummer) und C1065 (neues Ende) seit 24.09. geändert wie eine überschriebene Verlängerung; C1011, C1015 ebenso (seit 25.09. offen) | nein; steht in dieser Liste | Kette und altes Kontingent fehlen; Rechnung läuft auf dem bestehenden Auftrag |
-| B4 | 14 KJA-Aufträge mit «beendet» oder «on hold» statt Geschäftsnummer: A24008, A24009, A24011, A24012, A24015, A24016, A25006, A25009, A25010, A25019, A26004, A26006, A26009 (on hold), A26010 | ja | beendete Aufträge ohne Rechnung, ausser A26009 |
+| B4 | 14 KJA-Aufträge mit «beendet» oder «on hold» statt Geschäftsnummer: A24008, A24009, A24011, A24012, A24015, A24016, A25006, A25009, A25010, A25019, A26004, A26006, A26009 (on hold), A26010 | ja | Rechnungen sind nicht Teil der Stammdaten; ob auf diesen Aufträgen noch Stunden anfallen, zeigen erst die Bögen. Fällt eine Rechnung an, steht der Text statt einer Nummer im Dateinamen (korrigiert 2026-10-09: «ohne Rechnung» war eine Annahme, keine Prüfung) |
 | B5 | C1091 (neu seit 24.09.) ohne Geschäftsnummer | ja | Rechnung mit «PRÜFEN» im Dateinamen, wie heute schon |
 | B6 | Stauffer: C1079 ohne Geburtsdatum trotz Familie; C1079 und C1083 mit derselben AHV-Nummer | ja | Indexkind nicht bestimmbar (die Programme markieren den Auftrag) |
 | B7 | Familie bei C1035 (Perren) und C1050 (Burri) mit nur einem Kind | ja, Hinweis | keine |
@@ -48,19 +49,19 @@ Befund im Blatt «Prüfungen»; wo nicht, steht es in der Spalte.
 | B9 | 9 Aufträge mit abgelaufener Bewilligung und offener Betreuung, 23 Zuordnungen auf ausgelaufene Aufträge | ja | auf ausgelaufene Aufträge entsteht kein Bogen (DM-20); das wird gemeldet |
 | B10 | Zuordnungen, die seit 24.09. neu sind und mehr als eine Person am Auftrag haben, ohne Rolle P/S | ja, «ohne primäre Betreuungsperson» | Berichte ohne zuständige Person |
 
-## C: kann warten
+## C: entschieden oder zurückgestellt (Stephan, 2026-10-09)
 
-- Bericht und Zwischenbericht: worin unterscheiden sie sich (Datenmodell, Frage 11)?
-- Abschlussbericht für jeden Auftrag einer Kette oder nur den letzten (Frage 13)?
-- Berichtsrhythmen beim Leistungsbesteller statt am Auftrag (Frage 12)?
-- Erledigt-Stand der 64 vergangenen Berichte (Frage 14). Vorschlag: auf «entfällt» setzen, wer
-  einen Bericht als erledigt kennt, trägt ihn nach.
+- **Bericht und Zwischenbericht:** nur Text ohne Semantik, eine Erinnerung für den Monat.
+- **Abschlussbericht:** nur für den letzten Auftrag einer Kette. Ein Abschlussbericht auf einem
+  Auftrag mit Nachfolger ist damit ein Datenbefund; das Workbook soll ihn markieren (DM-63).
+- **Berichtsrhythmen:** zurückgestellt. Termine werden zunächst von Hand eingetragen; wenn ein
+  Rhythmus kommt, eher am Auftrag.
+- **Status vergangener Berichte:** bleibt leer, so in Ordnung.
+- **Notation der Geschäftsnummern anderer Kostenträger:** vorläufig nicht prüfen.
+- **Filtern der Vorgänger-Auswahl:** später zu klären.
 - Die 48 Abweichungen zwischen Mitarbeiterblättern und Klientenübersicht
-  (`klaerung_berichte_2026-09-25.md`): betreffen die Berichtsliste, nicht die Stammdaten. Wo dort ein
-  anderes Ende oder ein anderer Besteller steht, ist eher die Übersicht veraltet; die Stammdaten
-  gelten.
-- Notation der Geschäftsnummern anderer Kostenträger, KESB `yyyy-nnnn` (Frage 10).
-- Filtern der Vorgänger-Auswahl nach Kind und Leistungsart (Datenmodell, «Excel-specific decisions»).
+  (`klaerung_berichte_2026-09-25.md`): Datenpflege der Berichtsliste, gehen mit der Liste B an
+  Wegpiraten.
 
 ## Was mit den Antworten passiert
 

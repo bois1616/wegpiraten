@@ -41,7 +41,7 @@ Testbuilds; damit wurde der Vergleich unten gemacht.
 | Kinder, Aufträge, Betreuungen, Ansprechpersonen | alte Datei 09.10. | `migrate.py` → `prepare.py` → `build.py`, wie im Testbuild |
 | Zuordnung MA (welche Paare) | alte Datei 09.10. | wie oben |
 | Zuordnung MA (Rolle P/S) | Testbuild | `carry_over_handwork`, Schlüssel (Auftrag, Mitarbeitende) |
-| Kinder (Familie) | Testbuild, korrigiert nach DM-02 A1 und B4 | `carry_over_handwork` |
+| Kinder (Familie) | **keine**: leer übergeben | Die Einträge im Testbuild waren Demo (Stephan, 2026-10-09); Familien definiert der Kunde |
 | Berichte (ganzes Blatt) | Testbuild | `carry_over_handwork` |
 | Stammdaten (Kostenträger, Leistungsbesteller, Leistungstypen, Mitarbeiter, Büros, Hilfsdaten, Wertelisten) | alte Datei 09.10. | wie im Testbuild |
 
@@ -64,9 +64,11 @@ Jeder Schritt ist für sich stabil; bricht die Sitzung ab, gilt der letzte im Lo
    `build_mandate_numbers` bereits). Erwartet: C1089 bis C1091 und jeder neue Folgeauftrag bekommen
    die nächsten Zähler ab `A26047`, nach Beginn und alter Klientennummer. Die 91 bestehenden Nummern
    bleiben gleich; das wird im Log mit einem Vergleich vorher/nachher belegt.
-4. **Handarbeit.** `carry_over_handwork` übernimmt Familie, Rolle und Berichte unverändert, auch
-   wo sie fragwürdig sind (Nipote eine Familie, Perren und Burri je eine Familie mit einem Kind):
-   die Prüfungen im Workbook markieren das bereits.
+4. **Handarbeit.** `carry_over_handwork` übernimmt Rolle und Berichte unverändert. **Die Familie
+   wird nicht übernommen**: Die Einträge im Testbuild (Nipote, Stauffer, Perren, Burri) waren zu
+   Demo-Zwecken gesetzt, und Familien definiert der Kunde (Stephan, 2026-10-09). Dafür in
+   `carry_over_handwork` die Übernahme von `family_id` abschalten (Schalter, nicht löschen); das Feld
+   bleibt leer, wie nach der ersten Migration.
    - Neue Zuordnungen ohne Rolle: ist die Person die einzige am Auftrag, P (wie bisher); sonst leer
      lassen, die Prüfung «Auftrag ohne primäre Betreuungsperson» markiert es.
    - Berichte, deren Auftrag es nicht mehr gibt, melden; es darf keiner verloren gehen. Erwartet:
@@ -81,13 +83,14 @@ Jeder Schritt ist für sich stabil; bricht die Sitzung ab, gilt der letzte im Lo
    auflisten; Stephan entscheidet, ob die Korrektur in den Build gehört (dann wie Schritt 2) oder
    als Befund bleibt.
 8. **Zählung, Prüfstand und Befundliste:** Kinder, Aufträge, Betreuungen, Zuordnungen, Berichte,
-   Familien ins Log; Blatt «Prüfungen» mit Anzahl je Prüfung, verglichen mit dem Stand im Testbuild
+   Familien (erwartet: 0) ins Log; Blatt «Prüfungen» mit Anzahl je Prüfung, verglichen mit dem Stand im Testbuild
    (4 Fehlerarten, 8 Hinweisarten am 30.09.). Die Befunde aus `dm02_fachfragen.md`, Gruppe B, mit dem
    Stand nach dem Build nachführen; die Liste geht mit dem Workbook an Wegpiraten.
 
 ## Abnahme
 
 - Die 91 eingefrorenen Nummern sind unverändert, neue Nummern beginnen bei `A26047`.
+- Kein Kind trägt eine Familie.
 - 153 Berichte übernommen, Rollen aller Paare aus dem Testbuild übernommen, die noch existieren.
 - Jede Abweichung zum Testbuild ist erklärt (Schritt 7).
 - Jeder Fehler und Hinweis im Blatt «Prüfungen» steht in der Befundliste. Offene Befunde halten die
