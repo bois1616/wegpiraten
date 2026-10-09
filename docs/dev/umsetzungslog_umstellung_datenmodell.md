@@ -10,9 +10,9 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** DM-02 A1 bis A3 entschieden (Accordix nach Kostenträger, Einführungsgespräch einmalig), DM-03 erledigt
+- **Zuletzt erledigt:** DM-02, DM-03, DM-04 vollständig (alle Fragen beantwortet; Build-Spezifikation final: Originaldaten, Berichte und Folgeaufträge markiert «ZU PRÜFEN:», keine Familien, Rolle P nur wo eindeutig)
 - **In Arbeit:** nichts
-- **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md` (hängt an keiner Antwort); parallel DM-10 `[Haiku]`
+- **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md`; parallel DM-10 `[Haiku]`
 - **Wartet auf Stephan:** nichts
 - **Entwürfe ohne Opus-Review:** keine
 - **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
