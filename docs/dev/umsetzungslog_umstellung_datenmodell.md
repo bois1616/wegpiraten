@@ -39,6 +39,14 @@ Regeln:
 
 ## 2026-10-09
 
+- **Nur Originaldaten** `[Opus 5.5]` (Status: erledigt): Stephan: relevant sind nur die Daten aus
+  der originalen Datenbank, alle Ergänzungen im Testbuild sind Demo. DM-04 neu gefasst: keine
+  Übernahme aus dem Testbuild (`WEGPIRATEN_HAND` ins Leere, kein Berichts-Seed), `FOLLOW_UPS`
+  leer (die drei bestätigten Folgeaufträge legt Wegpiraten als Datenpflege an, Befund B2), Berichte
+  und Familien leer, Rolle P nur wo eindeutig. Neue Abnahme: Vollständigkeit gegen das Original
+  (Schritt 7) statt Differenz zum Testbuild. Die Nummern A26042, A26045, A26046 bleiben unbenutzt.
+  Damit wird `import_reports.py` gegenstandslos (DM-07).
+
 - **Rollen P/S neu setzen** `[Opus 5.5]` (Status: erledigt): Stephan: Die Rollen im Testbuild
   waren ein best guess, Datenpflege. Der finale Build übernimmt sie nicht, sondern setzt P nur, wo
   genau eine Person am Auftrag arbeitet (DM-04 Schritt 4, Befund B10). Aus dem Testbuild kommen

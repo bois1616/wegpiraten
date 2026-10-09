@@ -3,19 +3,23 @@
 Stand 2026-10-09, `[Opus 5.5]`. Vorgabe für DM-05 (`[Sonnet]`). Ergebnis ist das Workbook, das
 Wegpiraten Ende Oktober bekommt; danach ist das Workbook beim Kunden die einzige Quelle.
 
-## Grundsatz: Daten werden übernommen, nicht gepflegt
+## Grundsatz: nur die Daten der originalen Datenbank
 
-Stephan, 2026-10-09: Datenpflege ist nicht Aufgabe der Umstellung. Der Build übernimmt die Daten so,
-wie sie in der Quelle stehen. Inkonsistenzen werden benannt und markiert (Blatt «Prüfungen»,
-«Fehlerliste», Logeintrag), aber nicht korrigiert und nicht als Grund genommen, den Build anzuhalten.
-Ausnahme ist nur, was der Build selbst falsch machen würde (Schritt 2).
+Stephan, 2026-10-09: **Relevant sind nur die Daten aus der originalen Datenbank**
+(`sandbox/wegpiraten_datenbank.xlsx`). Alles, was der Testbuild `_neu.xlsx` darüber hinaus enthält
+(Familien, Rollen P/S, Berichte, nachgetragene Folgeaufträge), ist Demo und wird nicht übernommen.
+Der Build überführt die Originaldaten in die neue Struktur, ohne sie zu pflegen. Inkonsistenzen
+werden benannt und markiert (Blatt «Prüfungen», «Fehlerliste», Befundliste), aber nicht korrigiert
+und nicht als Grund genommen, den Build anzuhalten. Abgeleitet werden nur Werte, die sich aus den
+Originaldaten eindeutig ergeben: Kinder (Zusammenführung nach AHV-Nummer und Name), Ansprechpersonen,
+Kurzzeichen, Auftragsnummern und die Rolle P, wo genau eine Person am Auftrag arbeitet.
 
 ## Ausgangslage, geprüft am 2026-10-09
 
 | Datei | Stand | Inhalt |
 | --- | --- | --- |
 | `sandbox/wegpiraten_datenbank.xlsx` | 09.10., eingefroren | alte Struktur, von Wegpiraten bis heute gepflegt: 91 Klienten, 97 Zuordnungen |
-| `sandbox/wegpiraten_datenbank_neu.xlsx` | 30.09. | Testbuild aus der Datei vom 24.09. (88 Klienten) plus Handarbeit: 84 Kinder, 91 Aufträge, 91 Betreuungen, 101 Zuordnungen, 153 Berichte |
+| `sandbox/wegpiraten_datenbank_neu.xlsx` | 30.09. | Testbuild aus der Datei vom 24.09. (88 Klienten) plus Demo-Ergänzungen: 84 Kinder, 91 Aufträge (davon 3 nachgetragene Folgeaufträge), 91 Betreuungen, 101 Zuordnungen, 153 Berichte; nur noch Strukturvorlage |
 | `sandbox/mandate_numbers.json` | 25.09. | 91 eingefrorene Auftragsnummern (alte Klientennummer bzw. `C…+` für Folgeaufträge → `A…`), höchste 2026er Nummer `A26046` |
 
 Die Datei vom 24.09. (`wegpiraten_datenbank(1).xlsx`), aus der `migrate.py` und `build.py` lesen,
@@ -38,62 +42,54 @@ Testbuilds; damit wurde der Vergleich unten gemacht.
 
 | Blatt | Quelle | Wie |
 | --- | --- | --- |
-| Kinder, Aufträge, Betreuungen, Ansprechpersonen | alte Datei 09.10. | `migrate.py` → `prepare.py` → `build.py`, wie im Testbuild |
-| Zuordnung MA (welche Paare) | alte Datei 09.10. | wie oben |
-| Zuordnung MA (Rolle P/S) | **neu gesetzt** | P nur, wo genau eine Person am Auftrag arbeitet, sonst leer; die Rollen im Testbuild waren ein best guess (Stephan, 2026-10-09) |
-| Kinder (Familie) | **keine**: leer übergeben | Die Einträge im Testbuild waren Demo (Stephan, 2026-10-09); Familien definiert der Kunde |
-| Berichte (ganzes Blatt) | Testbuild | `carry_over_handwork` |
-| Stammdaten (Kostenträger, Leistungsbesteller, Leistungstypen, Mitarbeiter, Büros, Hilfsdaten, Wertelisten) | alte Datei 09.10. | wie im Testbuild |
+| Kinder, Aufträge, Betreuungen, Ansprechpersonen | Original 09.10. | `migrate.py` → `prepare.py` → `build.py`; eine Klientenzeile wird ein Auftrag und eine Betreuung |
+| Zuordnung MA | Original 09.10. | ein Paar je Zeile der «Relation Klient-MA»; Rolle P nur, wo genau eine Person am Auftrag arbeitet, sonst leer |
+| Kinder (Familie) | **leer** | Familien definiert der Kunde |
+| Berichte | **leer** | Die 153 Berichte im Testbuild stammen aus der Klientenübersicht, nicht aus der Datenbank: Demo |
+| Stammdaten (Kostenträger, Leistungsbesteller, Leistungstypen, Mitarbeiter, Büros, Hilfsdaten, Wertelisten) | Original 09.10. | wie im Testbuild |
+
+Der Testbuild dient nur noch als Vergleich für die Struktur (Blätter, Spalten, Prüfungen), nicht für
+Inhalte.
 
 ## Schritte für DM-05
 
 Jeder Schritt ist für sich stabil; bricht die Sitzung ab, gilt der letzte im Log vermerkte.
 
-1. **Pfade.** `migrate.py` und `build.py`: `SRC` auf `wegpiraten_datenbank.xlsx`. Den Build nicht über
-   den Testbuild schreiben: `WEGPIRATEN_DST=sandbox/wegpiraten_datenbank_final.xlsx`,
-   `WEGPIRATEN_HAND=sandbox/wegpiraten_datenbank_neu.xlsx`. Der Testbuild bleibt als Vergleich
-   unverändert liegen.
-2. **Folgeaufträge.** In `prepare.py`, `FOLLOW_UPS`, nur die drei von Wegpiraten bestätigten
-   (C1024, C1068, C1082), keine neuen.
-   - C1024: Der Vorgänger behält die Nummer aus dem Stand 02.09. (250911003), der Nachfolger bekommt
-     die aus der Quelle (260918020). Dafür ein Feld `old_application_number`; heute kopiert
-     `apply_follow_ups` die Quellnummer auf beide. Das ist ein Fehler des Builds, keine Datenpflege.
-   - Alles Weitere (doppelte Nummern bei C1068/C1082, Verlängerungsmuster bei C1000/C1065, C1011,
-     C1015) bleibt, wie es ist, und steht als Befund in der Liste aus Schritt 7.
-3. **Nummern.** `mandate_numbers.json` nicht neu schreiben lassen, sondern nur ergänzen (das tut
-   `build_mandate_numbers` bereits). Erwartet: C1089 bis C1091 und jeder neue Folgeauftrag bekommen
-   die nächsten Zähler ab `A26047`, nach Beginn und alter Klientennummer. Die 91 bestehenden Nummern
-   bleiben gleich; das wird im Log mit einem Vergleich vorher/nachher belegt.
-4. **Handarbeit.** `carry_over_handwork` übernimmt nur die Berichte. **Die Rollen werden nicht
-   übernommen**, sondern neu gesetzt: P, wo genau eine Person am Auftrag arbeitet, sonst leer (die
-   Prüfung «Auftrag ohne primäre Betreuungsperson» markiert es). Die Rollen im Testbuild waren ein
-   best guess (Stephan, 2026-10-09); die Übernahme von `role` ebenfalls per Schalter abschalten. **Die Familie
-   wird nicht übernommen**: Die Einträge im Testbuild (Nipote, Stauffer, Perren, Burri) waren zu
-   Demo-Zwecken gesetzt, und Familien definiert der Kunde (Stephan, 2026-10-09). Dafür in
-   `carry_over_handwork` die Übernahme von `family_id` abschalten (Schalter, nicht löschen); das Feld
-   bleibt leer, wie nach der ersten Migration.
-   - Berichte, deren Auftrag es nicht mehr gibt, melden; es darf keiner verloren gehen. Erwartet:
-     153 Berichte, alle zugeordnet.
+1. **Pfade.** `migrate.py` und `build.py`: `SRC` auf `wegpiraten_datenbank.xlsx`. Ziel
+   `WEGPIRATEN_DST=sandbox/wegpiraten_datenbank_final.xlsx`; der Testbuild bleibt unverändert liegen.
+   `WEGPIRATEN_HAND` auf eine nicht vorhandene Datei setzen, damit `carry_over_handwork` nichts
+   übernimmt (die Funktion kehrt dann leer zurück), und `REPORTS_SEED` nicht laden.
+2. **Keine nachgetragenen Folgeaufträge.** `FOLLOW_UPS` in `prepare.py` leeren. Die drei Einträge
+   (C1024, C1068, C1082) hatte Wegpiraten am 25.09. bestätigt, ihre Vorgängerwerte stammen aber aus
+   einem älteren Stand, nicht aus der originalen Datenbank; Wegpiraten trägt sie als Datenpflege nach.
+   Damit entfällt auch der Fehler mit der Geschäftsnummer des Vorgängers bei C1024.
+3. **Nummern.** `mandate_numbers.json` nur ergänzen, nicht neu schreiben (das tut
+   `build_mandate_numbers` bereits). Die 88 Nummern der Klienten bis C1088 bleiben gleich. Die drei
+   für die Folgeaufträge vergebenen Nummern (A26042, A26045, A26046) bleiben unbenutzt und werden
+   nicht wiederverwendet. C1089 bis C1091 bekommen die nächsten Zähler ab `A26047`, nach Beginn und
+   alter Klientennummer. Vergleich vorher/nachher ins Log.
+4. **Rollen.** P, wo genau eine Person am Auftrag arbeitet (das tut der Build bereits); sonst leer.
+   Die Prüfung «Auftrag ohne primäre Betreuungsperson» markiert den Rest.
 5. **Schreibweisen** werden nicht angeglichen. Die Prüfung «Schreibweise eines Codewerts» markiert sie.
 6. **Build und Prüfung.** `verify_excel_strict` muss bestehen. Danach in LibreOffice neu berechnen
    und die gecachten Werte lesen (der Import liest `data_only=True`).
-7. **Differenz belegen.** Für jedes editierbare Feld der Blätter Kinder, Aufträge, Betreuungen,
-   Ansprechpersonen und Zuordnung MA: finaler Build gegen Testbuild. Jede Abweichung muss durch die
-   Liste «Was sich geändert hat» oder einen Entscheid aus DM-02 erklärt sein. Eine unerklärte
-   Abweichung heisst, dass im Testbuild von Hand etwas korrigiert wurde, das der Build nicht kennt:
-   auflisten; Stephan entscheidet, ob die Korrektur in den Build gehört (dann wie Schritt 2) oder
-   als Befund bleibt.
-8. **Zählung, Prüfstand und Befundliste:** Kinder, Aufträge, Betreuungen, Zuordnungen, Berichte,
-   Familien (erwartet: 0) ins Log; Blatt «Prüfungen» mit Anzahl je Prüfung, verglichen mit dem Stand im Testbuild
-   (4 Fehlerarten, 8 Hinweisarten am 30.09.). Die Befunde aus `dm02_fachfragen.md`, Gruppe B, mit dem
-   Stand nach dem Build nachführen; die Liste geht mit dem Workbook an Wegpiraten.
+7. **Vollständigkeit gegen das Original.** Jede Klientenzeile des Originals ist genau ein Auftrag mit
+   genau einer Betreuung, jedes Feld mit gleichem Wert an seinem neuen Ort (Zuordnung der Felder wie
+   in `migrate.py`); jede Zeile der «Relation Klient-MA» ist genau eine Zeile in «Zuordnung MA». Die
+   Zahl der Kinder ergibt sich aus der Zusammenführungsregel; jede Zusammenführung wird mit den
+   beteiligten Klientennummern ins Log geschrieben. Ein Wert, der fehlt oder sich verändert hat, ist
+   ein Fehler des Builds und wird behoben, nicht als Befund geführt.
+8. **Zählung, Prüfstand und Befundliste:** Kinder, Aufträge (erwartet 91), Betreuungen (91),
+   Zuordnungen (97), Berichte (0), Familien (0) ins Log; Blatt «Prüfungen» mit Anzahl je Prüfung. Die
+   Befundliste aus `dm02_fachfragen.md`, Gruppe B, mit dem Stand nach dem Build nachführen; sie geht
+   mit dem Workbook an Wegpiraten.
 
 ## Abnahme
 
-- Die 91 eingefrorenen Nummern sind unverändert, neue Nummern beginnen bei `A26047`.
-- Kein Kind trägt eine Familie.
-- 153 Berichte übernommen. Rolle P genau bei den Aufträgen mit einer einzigen Person, sonst keine Rolle.
-- Jede Abweichung zum Testbuild ist erklärt (Schritt 7).
+- Schritt 7 ohne Abweichung: Das Workbook enthält genau die Daten der originalen Datenbank, nichts
+  weniger und nichts aus dem Testbuild.
+- Die 88 bestehenden Nummern sind unverändert, neue beginnen bei `A26047`.
+- Keine Familien, keine Berichte, Rolle P nur bei Aufträgen mit einer einzigen Person.
 - Jeder Fehler und Hinweis im Blatt «Prüfungen» steht in der Befundliste. Offene Befunde halten die
   Übergabe nicht auf.
 - Danach DM-06 (Excel unter Windows) durch Stephan.
