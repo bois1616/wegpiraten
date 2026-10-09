@@ -26,8 +26,8 @@ Drei Gruppen:
 
 | # | Frage | Warum wichtig | Vorschlag, gilt bis zur Antwort |
 | --- | --- | --- | --- |
-| A1 | **KOB (`ST09`) an Accordix melden?** Kindorientierte Beratung läuft auf echten Aufträgen und hat keine Accordix-Zuordnung. | Sonst fehlen diese Kinder in der Meldung, oder sie stehen dort ohne gültige Leistungsart. | Nicht melden (Ausschlussliste), bis Wegpiraten eine Accordix-Leistungsart nennt. |
-| A2 | **Einführungsgespräch (ST99):** 15 Gratisminuten im Monat des Eintritts des Kindes oder im Startmonat jedes Auftrags? (DM-03) | Die Regel liest heute das Startdatum des Klienten; im neuen Modell hätte jede Verlängerung ein neues. | Monat des Eintritts, also einmal pro Kind und Betreuung. |
+| A1 | ~~KOB an Accordix melden?~~ **Entschieden 2026-10-09 (Stephan): Meldepflichtig ist ein Auftrag über den Kostenträger, nicht über die Leistungsart. P1000 (KJA-FS) ist meldepflichtig, alle anderen bisher nicht.** | KOB läuft heute nur auf einem Auftrag eines anderen Kostenträgers und fällt damit von selbst heraus. Neu ist: auch SPF und UWB anderer Kostenträger (19 Aufträge in der alten Datei) werden nicht gemeldet. | — |
+| A2 | ~~Einführungsgespräch (ST99)~~ **Entschieden 2026-10-09 (Stephan): Die 15 Minuten gibt es einmalig, nicht pro Monat und nicht pro Auftrag.** | Umsetzung: einmal je Kind, im Monat des Eintritts seiner ersten ST99-Betreuung; Verlängerungen lösen es nicht erneut aus (DM-03). | — |
 | A3 | **Ankündigung der neuen Rechnungsnummern.** Ab Oktober `2026-10-A26001` statt `2026-10-C1002`. Muss das KJA-FS oder eine KESB vorher informiert werden, oder prüft jemand die Nummer maschinell? | Ein Upload, der an der Nummer scheitert, fällt erst beim Versand auf. | Kurze Mitteilung an KJA-FS vor dem Lauf, Stephan entscheidet. |
 
 ## B: Datenbefunde
