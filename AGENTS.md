@@ -212,6 +212,8 @@ neu aufgesetzt; eine Datenmigration ist nicht nötig. Die Ausnahme gilt nur für
 Wer daran arbeitet, gleich welches Modell, liest zuerst den Abschnitt «Übergabe» in
 [docs/dev/umsetzungslog_umstellung_datenmodell.md](docs/dev/umsetzungslog_umstellung_datenmodell.md),
 dann [docs/dev/backlog_umstellung_datenmodell.md](docs/dev/backlog_umstellung_datenmodell.md).
+Nur beginnen, was im laufenden Kontingent fertig wird; jede Sitzung endet mit einem stabilen,
+committeten Zwischenergebnis und einem Logeintrag, damit ein anderes Modell übernehmen kann.
 
 ## Review-Regel
 

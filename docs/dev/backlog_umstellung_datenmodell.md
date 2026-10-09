@@ -75,6 +75,12 @@ Stand 2026-10-09. Gleiche Stufe heisst: darf dieselben Marken übernehmen.
 
 Regeln für den Modellwechsel:
 
+- **Nur beginnen, was im laufenden Kontingent fertig wird** (Stephan, 2026-10-09). Jede Sitzung
+  hinterlässt ein stabiles Zwischenergebnis: committet, `nox` grün oder der Grund im Log, und so
+  beschrieben, dass ein anderes Modell ohne Rückfrage weitermacht. Ist eine Aufgabe dafür zu gross,
+  wird sie vor dem Beginn im Log in Teilschritte geschnitten (`DM-nn.1`, `DM-nn.2`), von denen jeder
+  für sich stabil ist. Ein halb umgebauter Code-Pfad wird nicht committet; lieber den kleineren
+  Schritt fertig als den grösseren angefangen.
 - **Eine `[Opus]`-Aufgabe wird nicht abwärts vergeben.** Ist Opus nicht verfügbar, darf Sonnet einen
   Entwurf schreiben. Er wird im Log als «Entwurf, Opus-Review offen» markiert, und keine abhängige
   Aufgabe beginnt, bevor das Review im Log steht.
@@ -104,7 +110,7 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 
 ### Phase 0: Vorbereitung
 
-- [ ] [P0] [Git] **DM-00** Produktivstand sichern und Umstellungsbranch anlegen. `[Stephan]` für die Freigabe, Ausführung `[Haiku]`. Hinweis: lokal erledigt am 2026-10-09 (Tag `pre-datamodel-v2`, Branches `backup/pre-datamodel-v2` und `feature/datamodel-v2`, alle auf bzw. ab `e960512`). Offen: `fix/sa-sentinel-client` per Fast-Forward nach `main` übernehmen und alles pushen, beides erst nach Freigabe.
+- [x] [P0] [Git] **DM-00** Produktivstand sichern und Umstellungsbranch anlegen. `[Stephan]` für die Freigabe, Ausführung `[Haiku]`. Hinweis: erledigt 2026-10-09: `main` per Fast-Forward auf `e960512`, Tag `pre-datamodel-v2`, Branches `backup/pre-datamodel-v2` und `feature/datamodel-v2`, alles gepusht.
 - [x] [P0] [Governance] **DM-01** Ausnahme von AGENTS.md «Betriebsstabilität» festhalten. `[Stephan]`. Hinweis: von Stephan am 2026-10-09 bestätigt, in AGENTS.md eingetragen (Abschnitt «Ausnahme: Umstellung des Datenmodells»), dort auch der Verweis auf Backlog und Log für Modelle, die CLAUDE.md nicht lesen.
 - [ ] [P0] [Fach] **DM-02** Offene Fachfragen nach «blockiert die Umstellung» und «kann warten» sortieren. `[Opus]`, Antworten `[Stephan]` mit Wegpiraten. Hinweis: Blockierend nach heutiger Lesart: KOB (`ST09`) ohne Accordix-Zuordnung (melden oder ausschliessen), die Folgeaufträge Duarte Torres und Loosli (Ende alt, Beginn neu), Rechnungsnummer-Wechsel C→A gegenüber KJA-FS und KESB ankündigen. Kann warten: Fragen 10–14 im Datenmodell (KESB-Nummern, Berichtsformen, Rhythmen, Abschlussbericht, Erledigt-Stand). Ergebnis als Liste im Log.
 - [ ] [P0] [Fach] **DM-03** Einführungsgespräch (ST99) im neuen Modell festlegen. `[Opus]`, Bestätigung `[Stephan]`. Hinweis: Die Regel liest heute `clients.start_date`. Im neuen Modell gibt es drei Kandidaten: Beginn des Auftrags, Eintritt der Betreuung, Beginn des ersten Auftrags der Kette. Vorschlag: Eintritt des Indexkindes (der bleibt bei Verlängerungen gleich), sonst gäbe jede Verlängerung erneut 15 Gratisminuten.

@@ -8,12 +8,12 @@ Begleitet das [Backlog](backlog_umstellung_datenmodell.md). Muster wie
 Diesen Abschnitt liest jedes Modell zuerst und überschreibt ihn am Ende jeder Sitzung. Er ist der
 einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Begründung dafür.
 
-- **Branch:** `feature/datamodel-v2` (lokal, ab `e960512`); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (lokal, beide `e960512`); nichts gepusht
+- **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten und Datenfehler behoben; Anfang November Oktober-Abrechnung mit dem neuen Schema
 - **Zuletzt erledigt:** Plan nach Stephans Antworten nachgeführt, DM-01 erledigt (AGENTS.md)
 - **In Arbeit:** nichts
 - **Nächster Schritt:** DM-02 und DM-04 `[Opus]`, parallel DM-10 `[Haiku]`
-- **Wartet auf Stephan:** Push und Fast-Forward von `main` (DM-00), Fachfragen aus DM-02
+- **Wartet auf Stephan:** Fachfragen aus DM-02
 - **Entwürfe ohne Opus-Review:** keine
 - **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
 
@@ -36,6 +36,12 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-09
+
+- **DM-00 abgeschlossen** `[Opus 5.5]` (Status: erledigt): Mit Stephans Freigabe `main` per
+  Fast-Forward auf `e960512` (`fix/sa-sentinel-client`) gezogen, `main`, Tag `pre-datamodel-v2`,
+  `backup/pre-datamodel-v2` und `feature/datamodel-v2` gepusht. Neue Regel (Stephan): nur beginnen,
+  was im laufenden Kontingent fertig wird, stabile Zwischenergebnisse; im Backlog unter
+  «Regeln für den Modellwechsel» und in AGENTS.md.
 
 - **Plan nach Stephans Antworten nachgeführt** `[Opus 5.5]` (Status: erledigt):
   (1) Ausnahme von «Betriebsstabilität» bestätigt, in AGENTS.md eingetragen, dort auch der Einstieg
