@@ -201,6 +201,18 @@ config.get_expected_columns()
 
 ---
 
+### Ausnahme: Umstellung des Datenmodells (bestätigt 2026-10-09)
+
+Die Umstellung auf Kinder, Aufträge und Betreuungen ist absichtlich destruktiv: `clients` und
+`relation_client_emp` entfallen, das bisherige Stammdatenformat wird nicht mehr gelesen. Stephan hat
+das für den Branch `feature/datamodel-v2` und dessen Merge nach `main` bestätigt. Rückweg: Tag und
+Branch `pre-datamodel-v2` bzw. `backup/pre-datamodel-v2`. Die SQLite-Datenbank wird vor jedem Lauf
+neu aufgesetzt; eine Datenmigration ist nicht nötig. Die Ausnahme gilt nur für diese Umstellung.
+
+Wer daran arbeitet, gleich welches Modell, liest zuerst den Abschnitt «Übergabe» in
+[docs/dev/umsetzungslog_umstellung_datenmodell.md](docs/dev/umsetzungslog_umstellung_datenmodell.md),
+dann [docs/dev/backlog_umstellung_datenmodell.md](docs/dev/backlog_umstellung_datenmodell.md).
+
 ## Review-Regel
 
 Ein Patch ist nicht akzeptabel, wenn er gegen die Projektprioritäten verstößt.

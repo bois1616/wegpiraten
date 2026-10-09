@@ -8,12 +8,12 @@ Begleitet das [Backlog](backlog_umstellung_datenmodell.md). Muster wie
 Diesen Abschnitt liest jedes Modell zuerst und überschreibt ihn am Ende jeder Sitzung. Er ist der
 einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Begründung dafür.
 
-- **Branch:** `feature/datamodel-v2` (lokal, von `e960512`, noch nicht gepusht); Rückweg: Tag `pre-datamodel-v2` (lokal)
-- **Zuletzt erledigt:** Plan erstellt (Backlog, dieses Log)
+- **Branch:** `feature/datamodel-v2` (lokal, ab `e960512`); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (lokal, beide `e960512`); nichts gepusht
+- **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten und Datenfehler behoben; Anfang November Oktober-Abrechnung mit dem neuen Schema
+- **Zuletzt erledigt:** Plan nach Stephans Antworten nachgeführt, DM-01 erledigt (AGENTS.md)
 - **In Arbeit:** nichts
-- **Frist:** Ende Oktober 2026 neues Workbook bereit, Unklarheiten und Datenfehler behoben (DM-02, DM-04–06, DM-60)
-- **Nächster Schritt:** DM-02 und DM-04 `[Opus]`, parallel DM-10 `[Haiku]`; DM-00 wartet auf Freigabe
-- **Wartet auf Stephan:** DM-00 (Merge, Tag, Push), DM-01 (AGENTS.md-Ausnahme), Fachfragen aus DM-02
+- **Nächster Schritt:** DM-02 und DM-04 `[Opus]`, parallel DM-10 `[Haiku]`
+- **Wartet auf Stephan:** Push und Fast-Forward von `main` (DM-00), Fachfragen aus DM-02
 - **Entwürfe ohne Opus-Review:** keine
 - **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
 
@@ -36,6 +36,21 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-09
+
+- **Plan nach Stephans Antworten nachgeführt** `[Opus 5.5]` (Status: erledigt):
+  (1) Ausnahme von «Betriebsstabilität» bestätigt, in AGENTS.md eingetragen, dort auch der Einstieg
+  für Modelle, die CLAUDE.md nicht lesen (DM-01 erledigt). Fallback-Branch
+  `backup/pre-datamodel-v2` lokal angelegt.
+  (2) Modellklassen: GPT-6 Astra = Opus, GPT-6.1 Sol = Sonnet, GPT-6 Luna = Haiku bestätigt (nach
+  OpenAIs eigener Staffelung). Kimi K3 = Sonnet; auf Opus-Aufgaben nur als Entwurf, bis eine
+  davon ein Opus-Review bestanden hat. Tabelle im Backlog, Abschnitt «Andere Anbieter».
+  (3) Sandbox wird aufgelöst: neue Aufgabe DM-07, DM-62 darin aufgegangen. Keine Migration der
+  SQLite-Datenbank, weil sie vor jedem Lauf neu aufgesetzt wird; deshalb entfällt auch die
+  Rückwärtskompatibilität mit `clients` (DM-10, DM-53). Test-Workbook ohne `build.py` (DM-14).
+  (4) Oktober-Abrechnung mit dem neuen Schema: Die Oktober-Bögen tragen noch `C…` in G8, DM-22/23
+  sind damit für diesen Lauf Pflicht. Frist im Abschnitt «Termin und Rahmen».
+  (5) DM-50 verlangt jetzt die Schritt-für-Schritt-Anleitung und wird vor der Generalprobe
+  geschrieben, damit DM-51 genau danach läuft.
 
 - **Alte Stammdatei eingefroren** `[Opus]` (Status: erledigt): Stephan hat `wegpiraten_datenbank.xlsx`
   aus der Kundenablage verschoben; Wegpiraten bearbeitet sie nicht mehr. Quelle für den finalen

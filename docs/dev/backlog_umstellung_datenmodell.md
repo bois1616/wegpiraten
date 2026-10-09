@@ -6,18 +6,32 @@ bestätigte Modell. Fachliche Grundlage: [Konzept](../konzept_person_auftrag_lei
 Der Fortschritt steht im [Umsetzungslog](umsetzungslog_umstellung_datenmodell.md); wer übernimmt,
 liest zuerst dessen Abschnitt «Übergabe».
 
-## Termin
+## Termin und Rahmen
 
 Seit 2026-10-09 ist die alte Stammdatei eingefroren: Stephan hat `wegpiraten_datenbank.xlsx` aus der
 Kundenablage verschoben, Wegpiraten kann sie nicht mehr bearbeiten. Massgeblich ist die Kopie
-`sandbox/wegpiraten_datenbank.xlsx` (Stand 09.10.). Die nächste Stammdatenänderung von Wegpiraten
-kommt **Ende Oktober 2026**; bis dahin muss das neue Workbook stehen und die Unklarheiten und
-Datenfehler müssen behoben sein. Kritischer Pfad damit: DM-02, DM-04, DM-05, DM-06, DM-60.
+`sandbox/wegpiraten_datenbank.xlsx` (Stand 09.10.), sie ist gesichert.
 
-Offen ist, mit welchen Programmen der Oktober-Lauf Anfang November fakturiert. Die alten Programme
-können weiterlaufen, solange sie die eingefrorene alte Datei lesen und Ende Oktober keine Änderung
-an Klienten oder Zuordnungen anfällt, die den Oktober betrifft. Sonst müssen DM-11 bis DM-34 bis
-dahin fertig sein. Entscheidung `[Stephan]`, sobald DM-02 beantwortet ist.
+Zwei Fristen:
+
+1. **Ende Oktober 2026: neues Workbook beim Kunden.** Dann kommt die nächste Stammdatenänderung von
+   Wegpiraten, und bis dahin müssen die Unklarheiten und Datenfehler behoben sein. Kritischer Pfad:
+   DM-02, DM-04 bis DM-07, DM-60.
+2. **Anfang November 2026: Oktober-Abrechnung mit dem neuen Schema** (entschieden 2026-10-09). Bis
+   dahin müssen Phase 1 bis 3 und DM-50 fertig sein, die Bogenerzeugung für November ebenfalls.
+   Die Oktober-Bögen sind noch aus dem alten Modell erzeugt und tragen `C…` in G8; deshalb ist
+   DM-22/DM-23 für diesen Lauf Pflicht, nicht nur für Archivbögen.
+
+Was das Vorgehen einfacher macht (Stephan, 2026-10-09):
+
+- **Keine Migration der SQLite-Datenbank.** Wegpiraten pflegt das Workbook lokal, Stephan holt es
+  vor jedem Lauf aus der Cloud und setzt die Datenbank komplett neu auf (SQLite-Datei löschen,
+  `make import-master`). Das Schema entsteht bei jedem Import neu; es gibt keine Bestandsdaten, die
+  umgebaut werden müssten, und keine Rückwärtskompatibilität mit `clients` im Feature-Branch.
+- **Erfassungsbögen und Rechnungsvorlage bleiben, wie sie sind.** Sichtbar ändern sich nur der
+  Inhalt von G8 (Auftrags- statt Klientennummer) und die Rechnungsnummer.
+- **Die Sandbox wird aufgelöst** (DM-07). Nach der Umstellung bleibt dort nichts, was später für
+  Verwirrung sorgen kann.
 
 Format wie [backlog.md](../../backlog.md): `- [ ] [Priorität] [Bereich] Text. Hinweis: …`,
 ergänzt um eine ID (`DM-nn`) und die Modellzuordnung.
@@ -34,6 +48,31 @@ Jede höhere Stufe darf sie ebenfalls übernehmen, eine kleinere nicht.
 | `[Sonnet]` | Sonnet aufwärts | Umsetzung nach einer Vorgabe, die in dieser Datei oder in der Spezifikation einer `[Opus]`-Aufgabe steht; Tests schreiben | kann |
 | `[Haiku]` | Haiku aufwärts | mechanische Arbeit mit eindeutiger Vorgabe: Feldlisten übertragen, Umbenennungen, Prüfläufe ausführen und Ergebnis ins Log schreiben | kann |
 
+### Andere Anbieter
+
+Stand 2026-10-09. Gleiche Stufe heisst: darf dieselben Marken übernehmen.
+
+| Stufe | Claude | OpenAI | Moonshot |
+| --- | --- | --- | --- |
+| `[Opus]` | Opus 5.5 (Fable 5.1 darüber) | GPT-6 Astra | Kimi K3 nur vorläufig, siehe unten |
+| `[Sonnet]` | Sonnet 5.5 | GPT-6.1 Sol | Kimi K3 |
+| `[Haiku]` | Haiku 4.5 | GPT-6 Luna | — |
+
+- **OpenAI:** Die Einordnung folgt OpenAIs eigener Staffelung: Astra ist das Spitzenmodell für
+  Arbeit, die beim ersten Mal stimmen muss, Sol (6.1) liegt nach Anbieterangabe nahe an Astra zu
+  einem Fünftel des Preises, Luna ist für einfache Massenaufgaben. Eine Version «GPT-6.1 Luna» habe
+  ich nicht gefunden, nur GPT-6 Luna.
+- **Kimi K3:** offenes Modell mit starken Coding-Werten in Benchmarks, teils auf Höhe der
+  Spitzenmodelle. Für `[Sonnet]`-Aufgaben unbedenklich. Die `[Opus]`-Aufgaben hier sind aber
+  Fachentscheidungen auf Deutsch mit Datenverlustrisiko, und das messen die Benchmarks nicht.
+  Deshalb gilt ein K3-Ergebnis auf einer `[Opus]`-Aufgabe als «Entwurf, Opus-Review offen», bis
+  eine solche Aufgabe von einem Opus-Modell geprüft wurde und gehalten hat. Danach zählt K3 als
+  `[Opus]`, und der Eintrag im Log hält das fest.
+- **Werkzeuge anderer Anbieter lesen `CLAUDE.md` und die Claude-Skills nicht**, sondern `AGENTS.md`.
+  Deshalb verweist AGENTS.md auf dieses Backlog und das Log; mehr Kontext braucht ein fremdes Modell
+  nicht.
+- Im Log steht der genaue Modellname (z.B. `[GPT-6 Astra]`), nicht nur die Stufe.
+
 Regeln für den Modellwechsel:
 
 - **Eine `[Opus]`-Aufgabe wird nicht abwärts vergeben.** Ist Opus nicht verfügbar, darf Sonnet einen
@@ -48,16 +87,14 @@ Regeln für den Modellwechsel:
 
 ## Branch und Sicherung
 
-Empfehlung: **beides, Sicherung und neuer Branch.** Der Grund ist der Monatslauf: Rechnungen und
-Erfassungsbögen müssen während der Umstellung weiter aus dem alten Modell entstehen. Das geht nur,
-wenn der Produktivstand auf einem eigenen Branch bleibt und die Umstellung daneben läuft.
+Sicherung und neuer Branch, beides (Stephan, 2026-10-09).
 
-- Tag `pre-datamodel-v2` auf dem heutigen Produktivstand. Er ist der Rückweg, unabhängig von
-  allem, was danach auf einem Branch passiert. Ein zusätzlicher Backup-Branch bringt gegenüber
-  dem Tag nichts.
-- Umstellung auf `feature/datamodel-v2`. Monatsläufe und Notfixes laufen weiter auf `main`
-  und werden bei Bedarf in den Feature-Branch übernommen.
-- Merge in `main` erst nach der Generalprobe (DM-51), danach Tag `datamodel-v2`.
+- Rückweg: Tag `pre-datamodel-v2` und Branch `backup/pre-datamodel-v2` auf dem heutigen
+  Produktivstand (`e960512`). Der Branch ist der Fallback, auf dem notfalls ein Lauf mit dem alten
+  Modell und der gesicherten alten Datei möglich bleibt; der Tag markiert den Punkt unverrückbar.
+- Umstellung auf `feature/datamodel-v2`. Notfixes bis zur Umstellung auf `main`, bei Bedarf in den
+  Feature-Branch übernehmen.
+- Merge in `main` nach der Generalprobe (DM-51), danach Tag `datamodel-v2`.
 
 Ausgangslage am 2026-10-09: `main` steht auf `50ffaa5`. Der ausgecheckte Branch
 `fix/sa-sentinel-client` ist 16 Commits weiter (SA-Sentinel-Fix, Modell-Dokumente,
@@ -67,23 +104,24 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 
 ### Phase 0: Vorbereitung
 
-- [ ] [P0] [Git] **DM-00** Produktivstand sichern und Umstellungsbranch anlegen. `[Stephan]` für die Freigabe, Ausführung `[Haiku]`. Hinweis: zuerst `fix/sa-sentinel-client` nach `main` mergen (Fast-Forward, nur Docs, Sandbox und der SA-Fix), dann Tag `pre-datamodel-v2` auf `main`, dann `feature/datamodel-v2` von `main`. Tag und Branch erst nach Freigabe pushen.
-- [ ] [P0] [Governance] **DM-01** Ausnahme von AGENTS.md «Betriebsstabilität» festhalten. `[Stephan]`. Hinweis: Die Umstellung ist absichtlich destruktiv (Tabelle `clients` und `relation_client_emp` entfallen) und bricht das bisherige Importformat. Beides verbietet AGENTS.md heute. Stephan genehmigt die Ausnahme für diesen Branch; der Satz kommt als Abschnitt in AGENTS.md (Text vorbereiten: `[Haiku]`).
+- [ ] [P0] [Git] **DM-00** Produktivstand sichern und Umstellungsbranch anlegen. `[Stephan]` für die Freigabe, Ausführung `[Haiku]`. Hinweis: lokal erledigt am 2026-10-09 (Tag `pre-datamodel-v2`, Branches `backup/pre-datamodel-v2` und `feature/datamodel-v2`, alle auf bzw. ab `e960512`). Offen: `fix/sa-sentinel-client` per Fast-Forward nach `main` übernehmen und alles pushen, beides erst nach Freigabe.
+- [x] [P0] [Governance] **DM-01** Ausnahme von AGENTS.md «Betriebsstabilität» festhalten. `[Stephan]`. Hinweis: von Stephan am 2026-10-09 bestätigt, in AGENTS.md eingetragen (Abschnitt «Ausnahme: Umstellung des Datenmodells»), dort auch der Verweis auf Backlog und Log für Modelle, die CLAUDE.md nicht lesen.
 - [ ] [P0] [Fach] **DM-02** Offene Fachfragen nach «blockiert die Umstellung» und «kann warten» sortieren. `[Opus]`, Antworten `[Stephan]` mit Wegpiraten. Hinweis: Blockierend nach heutiger Lesart: KOB (`ST09`) ohne Accordix-Zuordnung (melden oder ausschliessen), die Folgeaufträge Duarte Torres und Loosli (Ende alt, Beginn neu), Rechnungsnummer-Wechsel C→A gegenüber KJA-FS und KESB ankündigen. Kann warten: Fragen 10–14 im Datenmodell (KESB-Nummern, Berichtsformen, Rhythmen, Abschlussbericht, Erledigt-Stand). Ergebnis als Liste im Log.
 - [ ] [P0] [Fach] **DM-03** Einführungsgespräch (ST99) im neuen Modell festlegen. `[Opus]`, Bestätigung `[Stephan]`. Hinweis: Die Regel liest heute `clients.start_date`. Im neuen Modell gibt es drei Kandidaten: Beginn des Auftrags, Eintritt der Betreuung, Beginn des ersten Auftrags der Kette. Vorschlag: Eintritt des Indexkindes (der bleibt bei Verlängerungen gleich), sonst gäbe jede Verlängerung erneut 15 Gratisminuten.
-- [ ] [P0] [Daten] **DM-04** Datenstand für den finalen Build zusammenführen. `[Opus]`. Hinweis: Die alte Struktur ist seit 09.10. eingefroren (`sandbox/wegpiraten_datenbank.xlsx`), die Handarbeit (Familien, Rollen P/S, Berichte, Korrekturen) liegt in `sandbox/wegpiraten_datenbank_neu.xlsx` (Stand 30.09.). Ein Neubau aus der alten Datei allein verliert die Handarbeit. `migrate.py` und `build.py` lesen noch `wegpiraten_datenbank(1).xlsx`, die es nicht mehr gibt. Spezifikation ins Log: Quelle je Blatt, was `carry_over_handwork` heute übernimmt und was fehlt, wie Klienten behandelt werden, die zwischen dem 24.09. und dem 09.10. dazugekommen sind oder sich geändert haben. `mandate_numbers.json` bleibt eingefroren, neue Aufträge bekommen den nächsten freien Zähler.
+- [ ] [P0] [Daten] **DM-04** Datenstand für den finalen Build zusammenführen. `[Opus]`. Hinweis: Die alte Struktur ist seit 09.10. eingefroren (`sandbox/wegpiraten_datenbank.xlsx`), die Handarbeit (Familien, Rollen P/S, Berichte, Korrekturen) liegt in `sandbox/wegpiraten_datenbank_neu.xlsx` (Stand 30.09.). Ein Neubau aus der alten Datei allein verliert die Handarbeit. `migrate.py` und `build.py` lesen noch `wegpiraten_datenbank(1).xlsx`, die es nicht mehr gibt. Spezifikation ins Log: Quelle je Blatt, was `carry_over_handwork` heute übernimmt und was fehlt, wie Klienten behandelt werden, die zwischen dem 24.09. und dem 09.10. dazugekommen sind oder sich geändert haben. `mandate_numbers.json` bleibt eingefroren, neue Aufträge bekommen den nächsten freien Zähler. Ergebnis ist die Datei, die Wegpiraten Ende Oktober bekommt; danach ist das Workbook beim Kunden die einzige Quelle, ein Neubau aus JSON-Dateien findet nicht mehr statt.
 - [ ] [P0] [Daten] **DM-05** Finalen Build ausführen und Differenz belegen. `[Sonnet]`, Spezifikation: DM-04. Hinweis: Skriptpfade umstellen, Build laufen lassen, Zählung (Kinder, Aufträge, Betreuungen, Zuordnungen, Berichte) und jede geänderte oder neue Zeile gegenüber `_neu.xlsx` ins Log. Danach Blatt «Prüfungen» auswerten: Fehler und Hinweise zählen.
-- [ ] [P0] [Daten] **DM-06** Workbook in echtem Excel prüfen. `[Stephan]`. Hinweis: LibreOffice sieht die Excel-Defekte nicht (siehe Datenmodell, «Excel-specific decisions»). `sandbox/excel_pruefung.ps1` unter Windows, Dropdowns und Prüfungen stichprobenweise.
+- [ ] [P0] [Daten] **DM-06** Workbook in echtem Excel prüfen. `[Stephan]`. Hinweis: LibreOffice sieht die Excel-Defekte nicht (siehe Datenmodell, «Excel-specific decisions»). `sandbox/excel_pruefung.ps1` unter Windows, Dropdowns und Prüfungen stichprobenweise. Danach Übergabe an Wegpiraten.
+- [ ] [P0] [Aufräumen] **DM-07** Sandbox auflösen. `[Opus]` legt fest, `[Haiku]` führt aus, `[Stephan]` verschiebt die Dateien mit Personendaten. Hinweis: Erst nach DM-06 und DM-41 (die Accordix-Meldung August liegt dort). Inventar jeder Datei in `sandbox/` mit Entscheid: löschen, ins Repo übernehmen (z.B. `verify_excel_strict` und `excel_pruefung.ps1`, falls sie für spätere Strukturänderungen am Kunden-Workbook gebraucht werden) oder ausserhalb des Repos archivieren (alles mit Personendaten). `migrate.py`, `prepare.py`, `import_reports.py`, die `migration*.json`, `reports_import.json` und `mandate_numbers.json` haben nach dem finalen Build keinen Zweck mehr. Danach: `sandbox/`-Regeln aus `.gitignore`, alle Verweise auf `sandbox/` in `docs/` prüfen (das Datenmodell nennt sie als Herkunft, dort als Geschichte kennzeichnen, im Runbook entfernen), die Klärungsdateien sind beantwortet oder ins Log übertragen. Abnahme: `git grep sandbox` zeigt nur noch begründete Erwähnungen.
 
 - [ ] [P0] [Daten] **DM-60** Altdaten bereinigen, die die Prüfungen aufdecken. `[Stephan]` mit Wegpiraten, Liste je Befund `[Sonnet]` aus dem Blatt «Prüfungen». Frist Ende Oktober 2026. Hinweis: 14 KJA-Aufträge mit «beendet» statt Geschäftsnummer, Stauffer-AHV, Rollen P ohne Eintrag, Berichtsstatus der Vergangenheit. Das ist der Zweck der Übung, kein Fehler des Builds.
 
 ### Phase 1: Schema und Stammdaten-Import
 
-- [ ] [P0] [Config] **DM-10** Entitätsmodelle in `.config/wegpiraten_config.yaml` anlegen: `person`, `mandate`, `mandate_person`, `contact_person`, `mandate_employee_relation`, `report`. `[Haiku]`. Hinweis: Feldnamen, Typen und Pflicht genau aus den Tabellen im Datenmodell, Abschnitt «Entities». Nur Spalten, die im Workbook editierbar sind; die grauen `▸`-Spalten werden nicht importiert. `client` und `client_employee_relation` bleiben bis DM-53 stehen.
+- [ ] [P0] [Config] **DM-10** Entitätsmodelle in `.config/wegpiraten_config.yaml` anlegen: `person`, `mandate`, `mandate_person`, `contact_person`, `mandate_employee_relation`, `report`. `[Haiku]`. Hinweis: Feldnamen, Typen und Pflicht genau aus den Tabellen im Datenmodell, Abschnitt «Entities». Nur Spalten, die im Workbook editierbar sind; die grauen `▸`-Spalten werden nicht importiert. `client` und `client_employee_relation` werden im selben Zug entfernt: Die Datenbank wird bei jedem Lauf neu aufgesetzt, der Feature-Branch muss das alte Schema nicht mehr lesen.
 - [ ] [P0] [Import] **DM-11** `import_masterdata.py` auf die neuen Blätter umstellen. `[Sonnet]`. Hinweis: `DEFAULT_TABLE_MAPPINGS` und `FOREIGN_KEY_MAPPINGS` (Reihenfolge: Stammdaten → `masterdata_contact_person` → `person` → `mandate` → `mandate_person` → `relation_mandate_emp` → `report`). Leere Reservezeilen (das Workbook hat 2000 Formelzeilen) überspringen. FK-Diagnostik bleibt.
 - [ ] [P0] [Schema] **DM-12** Abgeleitete Felder als SQL-View `v_mandate` spezifizieren. `[Opus]`. Hinweis: `index_person_id` (jüngstes Kind der Familie der Betreuungskinder, sonst das Kind selbst; bei gleichem Geburtsdatum dieselbe Regel wie im Workbook), `short_code` und `last_name/first_name/social_security_number` des Indexkindes, `sr_ap_gender/first_name/last_name` der Ansprechperson, Budget in Minuten. Die View muss für jeden Auftrag dasselbe Indexkind liefern wie das Workbook; Abgleich gehört zur Spezifikation.
 - [ ] [P0] [Schema] **DM-13** View `v_mandate` umsetzen und gegen das Workbook prüfen. `[Sonnet]`, Spezifikation: DM-12. Hinweis: Test vergleicht View-Spalten mit den berechneten Spalten des Workbooks für alle Aufträge.
-- [ ] [P0] [Import] **DM-14** Synthetisches Test-Workbook ohne Personendaten. `[Sonnet]`. Hinweis: kleiner Ausschnitt mit den Fällen aus dem Konzept: Geschwister mit Indexkind, Kind mit zwei Aufträgen, Folgeauftrag, Vertretung (zwei MA, eine mit P), Austritt, SA-Sentinel. Erzeugt mit `build.py` aus einer erfundenen `migration_v2`-Datei, liegt unter `tests/fixtures/`. Grundlage für alle Tests ab hier.
+- [ ] [P0] [Import] **DM-14** Synthetisches Test-Workbook ohne Personendaten. `[Sonnet]`. Hinweis: kleiner Ausschnitt mit den Fällen aus dem Konzept: Geschwister mit Indexkind, Kind mit zwei Aufträgen, Folgeauftrag, Vertretung (zwei MA, eine mit P), Austritt, SA-Sentinel. Das Test-Workbook enthält nur die Excel-Tabellen, die der Import liest (gleiche Tabellennamen und Spalten wie das finale Workbook), erzeugt von einem kleinen Skript unter `tests/fixtures/`; keine Abhängigkeit von `build.py`, das mit der Sandbox verschwindet. Grundlage für alle Tests ab hier.
 - [ ] [P0] [Import] **DM-15** SA-Sentinel im neuen Modell. `[Opus]` entscheidet, `[Sonnet]` setzt um. Hinweis: `internal_client.py` legt heute einen Klienten `SA` an. Vorschlag: ein Auftrag `SA` ohne Kind und ohne Betreuung, von Invariante 8 ausgenommen, nie fakturiert, nie gemeldet. Betrifft Import, Bogenerzeugung und Rechnungsfilter.
 - [ ] [P0] [Import] **DM-16** Fehler-Invarianten beim Import prüfen. `[Sonnet]`. Hinweis: Import bricht ab bei den Invarianten mit Schwere `error`, die Rechnung oder Bogen falsch machen (1–5, 8–13, 28, 29, 45, 48). Hinweise nur ins Log. Gleiche Nummern wie im Datenmodell, damit die Meldung auf die Regel zeigt.
 
@@ -100,7 +138,7 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 - [ ] [P0] [Rechnung] **DM-31** Rechnungsnummer aus der Auftragsnummer. `[Sonnet]`. Hinweis: entsteht von selbst aus `service_data.mandate_id` (`2026-11-A26001`). `generate_scor` mit den neuen Nummern testen. Dateiname `{invoice_id}_{von}_{bis}_{application_number}` bleibt; die KJA-FS-Upload-Konvention prüfen (`_` als Trenner).
 - [ ] [P0] [Rechnung] **DM-32** Rechnungsfilter `CLIENT=` erweitern. `[Sonnet]`. Hinweis: `invoice_filter.py` nimmt A-Nummern (ein Auftrag) und C-Nummern (alle Aufträge, deren Indexkind das Kind ist). Makefile-Hilfe nachziehen.
 - [ ] [P0] [Rechnung] **DM-33** Rechnungsübersicht (`document_utils.py`) um Auftragsnummer ergänzen. `[Haiku]`. Hinweis: Spalte «Auftrag» vor «Klient», «Klient» zeigt das Indexkind. Sonst keine Änderung am Layout.
-- [ ] [P0] [Rechnung] **DM-34** Paralleler Rechnungslauf alt gegen neu. `[Opus]` legt fest, was gleich sein muss, `[Sonnet]` schreibt den Vergleich, `[Stephan]` nimmt ab. Hinweis: ein abgeschlossener Monat (Vorschlag 2026-09) einmal mit `main` und einmal mit dem Feature-Branch. Beträge, Stunden, Positionen, Empfänger und QR-Daten je Rechnung gleich; erlaubt verschieden sind nur Rechnungsnummer, Referenz und Dateiname. Jede andere Abweichung ist ein Fehler oder eine im Log begründete fachliche Änderung.
+- [ ] [P0] [Rechnung] **DM-34** Paralleler Rechnungslauf alt gegen neu. `[Opus]` legt fest, was gleich sein muss, `[Sonnet]` schreibt den Vergleich, `[Stephan]` nimmt ab. Hinweis: ein abgeschlossener Monat (Vorschlag 2026-09) einmal mit `backup/pre-datamodel-v2` und der alten Datei, einmal mit dem Feature-Branch und dem finalen Workbook. Beträge, Stunden, Positionen, Empfänger und QR-Daten je Rechnung gleich; erlaubt verschieden sind nur Rechnungsnummer, Referenz und Dateiname. Jede andere Abweichung ist ein Fehler oder eine im Log begründete fachliche Änderung.
 
 ### Phase 4: Reporting
 
@@ -111,15 +149,14 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 
 ### Phase 5: Umstellung
 
-- [ ] [P0] [Doku] **DM-50** Betriebs-Runbook auf das neue Modell umschreiben. `[Sonnet]`. Hinweis: `docs/runbook_betriebsablauf.md` und die Kapitel «Für die Umsetzung in den Programmen» im Umstellungs-Runbook; AGENTS.md und CLAUDE.md (Projektübersicht, Datenmodell) nachziehen.
-- [ ] [P0] [Betrieb] **DM-51** Generalprobe auf einer Kopie. `[Stephan]` mit `[Sonnet]`. Hinweis: kompletter Monat auf dem Feature-Branch mit dem finalen Workbook: `import-master`, `timesheets`, `import-sheets`, `invoices`, `report`, `accordix`. Eigene Datenbank-Datei, Produktiv-DB unberührt.
-- [ ] [P0] [Betrieb] **DM-52** Stichtag festlegen und Stammdatei umschalten. `[Stephan]`. Hinweis: Ab dem Stichtag wird nur noch das neue Workbook gepflegt. Empfehlung: Es übernimmt den Namen `wegpiraten_datenbank.xlsx` im Proton-Drive, die alte Datei wird als `wegpiraten_datenbank_alt.xlsx` archiviert; dann bleibt `masterdata_source` in der Config unverändert. Stichtag nach einem Monatslauf, nicht mitten im Monat.
-- [ ] [P0] [Git] **DM-53** Merge nach `main`, Tag `datamodel-v2`. `[Stephan]`. Hinweis: erst nach DM-34, DM-41 und DM-51. Danach `client`/`client_employee_relation` aus der Config und `clients`/`relation_client_emp` aus dem Code entfernen (`[Haiku]`, eigener Commit).
+- [ ] [P0] [Doku] **DM-50** Betriebs-Runbook mit Schritt-für-Schritt-Anleitung umschreiben. `[Sonnet]`, Review `[Opus]`. Hinweis: `docs/runbook_betriebsablauf.md` bekommt den Monatslauf als nummerierte Schritte, jeder mit Befehl, erwartetem Ergebnis und was bei Abweichung zu tun ist: Workbook aus der Cloud holen (`make fetch-master`), SQLite-Datei löschen, `make import-master` und dessen Prüfmeldungen lesen, Bögen erzeugen (`make timesheets`), Bögen einsammeln und importieren, Rechnungen, Arbeitszeitprotokoll, Accordix. Dazu der einmalige Abschnitt «Erster Lauf nach der Umstellung» (Oktober 2026: Bögen mit `C…` in G8). Das Umstellungs-Runbook verliert die Sandbox-Teile und das Kapitel «Für die Umsetzung in den Programmen», die «Typischen Vorgänge» für Wegpiraten bleiben. AGENTS.md und CLAUDE.md (Projektübersicht, Datenmodell) nachziehen. Wird vor DM-51 geschrieben, damit die Generalprobe genau nach dem Runbook läuft.
+- [ ] [P0] [Betrieb] **DM-51** Generalprobe auf einer Kopie. `[Stephan]` mit `[Sonnet]`. Hinweis: kompletter Monat auf dem Feature-Branch mit dem finalen Workbook, Schritt für Schritt nach dem Runbook aus DM-50; jede Stelle, an der das Runbook nicht reicht, wird dort korrigiert. Vorschlag: September 2026 mit den archivierten Bögen, dann ist der Vergleich aus DM-34 gleich mit erledigt.
+- [ ] [P0] [Betrieb] **DM-52** Neues Workbook an Wegpiraten übergeben und Quelle umschalten. `[Stephan]`. Hinweis: Ende Oktober 2026. Wegpiraten bearbeitet die Datei lokal, Stephan holt sie aus der Cloud. Empfehlung: Sie heisst wieder `wegpiraten_datenbank.xlsx`, dann bleibt `masterdata_source` in der Config unverändert; heisst sie anders, `file_pattern` und `preferred_filename` anpassen (`[Haiku]`).
+- [ ] [P0] [Git] **DM-53** Merge nach `main`, Tag `datamodel-v2`. `[Stephan]`. Hinweis: nach DM-34 und DM-51, vor dem Oktober-Lauf; DM-41 nur dann vorher, wenn die Accordix-Meldung vor dem Lauf fällig ist.
 
 ## P1 Should
 
 - [ ] [P1] [Import] **DM-61** Workbook-Prüfungen und Python-Prüfung abgleichen. `[Sonnet]`. Hinweis: Hinweis-Invarianten (14–36) zusätzlich im Import als Warnung ausgeben, damit eine im Workbook übersehene Prüfung im Log steht.
-- [ ] [P1] [Doku] **DM-62** Sandbox-Skripte nach der Umstellung einordnen. `[Opus]`. Hinweis: `migrate.py` und `prepare.py` sind nach dem Stichtag erledigt; `build.py` bleibt, solange Strukturänderungen am Workbook über einen Neubau laufen. Entscheiden und im Umstellungs-Runbook festhalten.
 
 ## P2 Nice
 
@@ -129,17 +166,22 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 ## Abhängigkeiten
 
 ```
-DM-00 ─┬─ DM-01
-       └─ DM-02 ─┬─ DM-03 ──────────────── DM-30
-                 └─ DM-04 ─ DM-05 ─ DM-06
+DM-00, DM-01 (erledigt)
+DM-02 ─┬─ DM-03 ──────────────── DM-30
+       └─ DM-04 ─ DM-05 ─ DM-06 ─ DM-52 (Ende Oktober)
+DM-05 ─ DM-60 (Ende Oktober)
 DM-10 ─ DM-11 ─┬─ DM-12 ─ DM-13 ─┬─ DM-20 ─ DM-21
 DM-14 ─────────┘                 ├─ DM-22 ─ DM-23
 DM-15 ───────────────────────────┤
                                  ├─ DM-30 ─┬─ DM-31, DM-32, DM-33
                                  │         └─ DM-34
                                  └─ DM-40 ─ DM-41;  DM-42, DM-43
-DM-34, DM-41, DM-06 ─ DM-50 ─ DM-51 ─ DM-52 ─ DM-53
+DM-34, DM-41, DM-06 ─ DM-50 ─ DM-51 ─ DM-53 ─ Oktober-Lauf (Anfang November)
+DM-06, DM-41 ─ DM-07
 ```
 
 Was ohne Antwort von Wegpiraten beginnen kann: DM-10 bis DM-16, DM-20 bis DM-23, DM-30 bis
 DM-33 und DM-42. Was auf Antworten wartet: DM-03, DM-04 (Folgeaufträge), DM-40 (KOB).
+Reihenfolge bei knappem Kontingent: zuerst alles, was Ende Oktober braucht (DM-02, DM-04 bis
+DM-06, DM-60), dann der Pfad zum Oktober-Lauf (DM-10 bis DM-34, DM-50, DM-51); Reporting
+(Phase 4) darf nach dem ersten Rechnungslauf kommen, wenn die Accordix-Meldung nicht vorher fällig ist.
