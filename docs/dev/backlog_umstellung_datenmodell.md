@@ -192,7 +192,7 @@ DM-06, DM-41 ─ DM-07
 ```
 
 Was ohne Antwort von Wegpiraten beginnen kann: DM-10 bis DM-16, DM-20 bis DM-23, DM-30 bis
-DM-33 und DM-42. Was auf Antworten wartet: nichts mehr ausser DM-02 A3 (Ankündigung der Rechnungsnummern).
+DM-33 und DM-42. Was auf Antworten wartet: nichts; alle Regeln aus DM-02 A sind entschieden.
 Reihenfolge bei knappem Kontingent: zuerst alles, was Ende Oktober braucht (DM-02, DM-04 bis
 DM-06, DM-60), dann der Pfad zum Oktober-Lauf (DM-10 bis DM-34, DM-50, DM-51); Reporting
 (Phase 4) darf nach dem ersten Rechnungslauf kommen, wenn die Accordix-Meldung nicht vorher fällig ist.

@@ -10,10 +10,10 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** DM-02 A1/A2 entschieden (Accordix nach Kostenträger, Einführungsgespräch einmalig), DM-03 erledigt
+- **Zuletzt erledigt:** DM-02 A1 bis A3 entschieden (Accordix nach Kostenträger, Einführungsgespräch einmalig), DM-03 erledigt
 - **In Arbeit:** nichts
 - **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md` (hängt an keiner Antwort); parallel DM-10 `[Haiku]`
-- **Wartet auf Stephan:** DM-02 A3 (Ankündigung der neuen Rechnungsnummern an KJA-FS), blockiert nichts
+- **Wartet auf Stephan:** nichts
 - **Entwürfe ohne Opus-Review:** keine
 - **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
 
@@ -38,6 +38,10 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-09
+
+- **DM-02 A3 entschieden** `[Opus 5.5]` (Status: erledigt): Stephan: kein Kostenträger, auch das
+  KJA nicht, muss über den geänderten Nummernkreis der Rechnungen informiert werden. Damit ist
+  DM-02 Gruppe A vollständig entschieden.
 
 - **DM-02 A1 und A2 entschieden, DM-03 erledigt** `[Opus 5.5]` (Status: erledigt): Stephan:
   Accordix-Pflicht hängt am Kostenträger, P1000 ja, andere bisher nein; das Einführungsgespräch

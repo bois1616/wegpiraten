@@ -104,3 +104,4 @@ die Programme, nicht diesen Build; der Build hängt an keiner Antwort.
 | --- | --- | --- | --- |
 | A1 | Accordix-Meldepflicht hängt am Kostenträger: P1000 (KJA-FS) ja, alle anderen bisher nein. KOB fällt damit heraus. | 2026-10-09 | Stephan |
 | A2 | Einführungsgespräch: 15 Minuten einmalig, nicht pro Monat. | 2026-10-09 | Stephan |
+| A3 | Neue Rechnungsnummern werden niemandem angekündigt, auch dem KJA nicht. | 2026-10-09 | Stephan |
