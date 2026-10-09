@@ -11,7 +11,8 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 - **Branch:** `feature/datamodel-v2` (lokal, von `e960512`, noch nicht gepusht); Rückweg: Tag `pre-datamodel-v2` (lokal)
 - **Zuletzt erledigt:** Plan erstellt (Backlog, dieses Log)
 - **In Arbeit:** nichts
-- **Nächster Schritt:** DM-00 Freigabe durch Stephan, danach DM-02 `[Opus]` und parallel DM-10 `[Haiku]`
+- **Frist:** Ende Oktober 2026 neues Workbook bereit, Unklarheiten und Datenfehler behoben (DM-02, DM-04–06, DM-60)
+- **Nächster Schritt:** DM-02 und DM-04 `[Opus]`, parallel DM-10 `[Haiku]`; DM-00 wartet auf Freigabe
 - **Wartet auf Stephan:** DM-00 (Merge, Tag, Push), DM-01 (AGENTS.md-Ausnahme), Fachfragen aus DM-02
 - **Entwürfe ohne Opus-Review:** keine
 - **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
@@ -35,6 +36,13 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-09
+
+- **Alte Stammdatei eingefroren** `[Opus]` (Status: erledigt): Stephan hat `wegpiraten_datenbank.xlsx`
+  aus der Kundenablage verschoben; Wegpiraten bearbeitet sie nicht mehr. Quelle für den finalen
+  Build ist damit `sandbox/wegpiraten_datenbank.xlsx` (Stand 09.10.), sie ändert sich nicht mehr.
+  Nächste Stammdatenänderung Ende Oktober, bis dahin müssen Unklarheiten und Datenfehler behoben
+  sein. Backlog: Abschnitt «Termin» ergänzt, DM-60 nach P0 mit Frist, DM-04 auf die eingefrorene
+  Quelle angepasst. Offen: mit welchen Programmen der Oktober-Lauf fakturiert.
 
 - **Plan für die finale Umstellung** `[Opus]` (Status: erledigt): Backlog
   `docs/dev/backlog_umstellung_datenmodell.md` mit 36 Aufgaben in sechs Phasen plus P1/P2 und

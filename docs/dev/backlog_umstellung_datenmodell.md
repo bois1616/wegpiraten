@@ -6,6 +6,19 @@ bestätigte Modell. Fachliche Grundlage: [Konzept](../konzept_person_auftrag_lei
 Der Fortschritt steht im [Umsetzungslog](umsetzungslog_umstellung_datenmodell.md); wer übernimmt,
 liest zuerst dessen Abschnitt «Übergabe».
 
+## Termin
+
+Seit 2026-10-09 ist die alte Stammdatei eingefroren: Stephan hat `wegpiraten_datenbank.xlsx` aus der
+Kundenablage verschoben, Wegpiraten kann sie nicht mehr bearbeiten. Massgeblich ist die Kopie
+`sandbox/wegpiraten_datenbank.xlsx` (Stand 09.10.). Die nächste Stammdatenänderung von Wegpiraten
+kommt **Ende Oktober 2026**; bis dahin muss das neue Workbook stehen und die Unklarheiten und
+Datenfehler müssen behoben sein. Kritischer Pfad damit: DM-02, DM-04, DM-05, DM-06, DM-60.
+
+Offen ist, mit welchen Programmen der Oktober-Lauf Anfang November fakturiert. Die alten Programme
+können weiterlaufen, solange sie die eingefrorene alte Datei lesen und Ende Oktober keine Änderung
+an Klienten oder Zuordnungen anfällt, die den Oktober betrifft. Sonst müssen DM-11 bis DM-34 bis
+dahin fertig sein. Entscheidung `[Stephan]`, sobald DM-02 beantwortet ist.
+
 Format wie [backlog.md](../../backlog.md): `- [ ] [Priorität] [Bereich] Text. Hinweis: …`,
 ergänzt um eine ID (`DM-nn`) und die Modellzuordnung.
 
@@ -58,9 +71,11 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 - [ ] [P0] [Governance] **DM-01** Ausnahme von AGENTS.md «Betriebsstabilität» festhalten. `[Stephan]`. Hinweis: Die Umstellung ist absichtlich destruktiv (Tabelle `clients` und `relation_client_emp` entfallen) und bricht das bisherige Importformat. Beides verbietet AGENTS.md heute. Stephan genehmigt die Ausnahme für diesen Branch; der Satz kommt als Abschnitt in AGENTS.md (Text vorbereiten: `[Haiku]`).
 - [ ] [P0] [Fach] **DM-02** Offene Fachfragen nach «blockiert die Umstellung» und «kann warten» sortieren. `[Opus]`, Antworten `[Stephan]` mit Wegpiraten. Hinweis: Blockierend nach heutiger Lesart: KOB (`ST09`) ohne Accordix-Zuordnung (melden oder ausschliessen), die Folgeaufträge Duarte Torres und Loosli (Ende alt, Beginn neu), Rechnungsnummer-Wechsel C→A gegenüber KJA-FS und KESB ankündigen. Kann warten: Fragen 10–14 im Datenmodell (KESB-Nummern, Berichtsformen, Rhythmen, Abschlussbericht, Erledigt-Stand). Ergebnis als Liste im Log.
 - [ ] [P0] [Fach] **DM-03** Einführungsgespräch (ST99) im neuen Modell festlegen. `[Opus]`, Bestätigung `[Stephan]`. Hinweis: Die Regel liest heute `clients.start_date`. Im neuen Modell gibt es drei Kandidaten: Beginn des Auftrags, Eintritt der Betreuung, Beginn des ersten Auftrags der Kette. Vorschlag: Eintritt des Indexkindes (der bleibt bei Verlängerungen gleich), sonst gäbe jede Verlängerung erneut 15 Gratisminuten.
-- [ ] [P0] [Daten] **DM-04** Datenstand für den finalen Build zusammenführen. `[Opus]`. Hinweis: Die Stammdaten werden weiter in `sandbox/wegpiraten_datenbank.xlsx` gepflegt (Stand 09.10.), die Handarbeit (Familien, Rollen P/S, Berichte, Korrekturen) liegt in `sandbox/wegpiraten_datenbank_neu.xlsx` (Stand 30.09.). Ein Neubau aus der alten Datei allein verliert die Handarbeit. `migrate.py` und `build.py` lesen noch `wegpiraten_datenbank(1).xlsx`, die es nicht mehr gibt. Spezifikation ins Log: Quelle je Blatt, was `carry_over_handwork` heute übernimmt und was fehlt, wie Klienten behandelt werden, die nach dem 24.09. dazugekommen sind oder sich geändert haben. `mandate_numbers.json` bleibt eingefroren, neue Aufträge bekommen den nächsten freien Zähler.
+- [ ] [P0] [Daten] **DM-04** Datenstand für den finalen Build zusammenführen. `[Opus]`. Hinweis: Die alte Struktur ist seit 09.10. eingefroren (`sandbox/wegpiraten_datenbank.xlsx`), die Handarbeit (Familien, Rollen P/S, Berichte, Korrekturen) liegt in `sandbox/wegpiraten_datenbank_neu.xlsx` (Stand 30.09.). Ein Neubau aus der alten Datei allein verliert die Handarbeit. `migrate.py` und `build.py` lesen noch `wegpiraten_datenbank(1).xlsx`, die es nicht mehr gibt. Spezifikation ins Log: Quelle je Blatt, was `carry_over_handwork` heute übernimmt und was fehlt, wie Klienten behandelt werden, die zwischen dem 24.09. und dem 09.10. dazugekommen sind oder sich geändert haben. `mandate_numbers.json` bleibt eingefroren, neue Aufträge bekommen den nächsten freien Zähler.
 - [ ] [P0] [Daten] **DM-05** Finalen Build ausführen und Differenz belegen. `[Sonnet]`, Spezifikation: DM-04. Hinweis: Skriptpfade umstellen, Build laufen lassen, Zählung (Kinder, Aufträge, Betreuungen, Zuordnungen, Berichte) und jede geänderte oder neue Zeile gegenüber `_neu.xlsx` ins Log. Danach Blatt «Prüfungen» auswerten: Fehler und Hinweise zählen.
 - [ ] [P0] [Daten] **DM-06** Workbook in echtem Excel prüfen. `[Stephan]`. Hinweis: LibreOffice sieht die Excel-Defekte nicht (siehe Datenmodell, «Excel-specific decisions»). `sandbox/excel_pruefung.ps1` unter Windows, Dropdowns und Prüfungen stichprobenweise.
+
+- [ ] [P0] [Daten] **DM-60** Altdaten bereinigen, die die Prüfungen aufdecken. `[Stephan]` mit Wegpiraten, Liste je Befund `[Sonnet]` aus dem Blatt «Prüfungen». Frist Ende Oktober 2026. Hinweis: 14 KJA-Aufträge mit «beendet» statt Geschäftsnummer, Stauffer-AHV, Rollen P ohne Eintrag, Berichtsstatus der Vergangenheit. Das ist der Zweck der Übung, kein Fehler des Builds.
 
 ### Phase 1: Schema und Stammdaten-Import
 
@@ -103,7 +118,6 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 
 ## P1 Should
 
-- [ ] [P1] [Daten] **DM-60** Altdaten bereinigen, die die Prüfungen aufdecken. `[Stephan]` mit Wegpiraten. Hinweis: 14 KJA-Aufträge mit «beendet» statt Geschäftsnummer, Stauffer-AHV, Rollen P ohne Eintrag, Berichtsstatus der Vergangenheit. Das ist der Zweck der Übung, kein Fehler des Builds.
 - [ ] [P1] [Import] **DM-61** Workbook-Prüfungen und Python-Prüfung abgleichen. `[Sonnet]`. Hinweis: Hinweis-Invarianten (14–36) zusätzlich im Import als Warnung ausgeben, damit eine im Workbook übersehene Prüfung im Log steht.
 - [ ] [P1] [Doku] **DM-62** Sandbox-Skripte nach der Umstellung einordnen. `[Opus]`. Hinweis: `migrate.py` und `prepare.py` sind nach dem Stichtag erledigt; `build.py` bleibt, solange Strukturänderungen am Workbook über einen Neubau laufen. Entscheiden und im Umstellungs-Runbook festhalten.
 
