@@ -10,10 +10,10 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten und Datenfehler behoben; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** Plan nach Stephans Antworten nachgeführt, DM-01 erledigt (AGENTS.md)
+- **Zuletzt erledigt:** DM-02 (Fragenliste) und DM-04 (Build-Spezifikation)
 - **In Arbeit:** nichts
-- **Nächster Schritt:** DM-02 und DM-04 `[Opus]`, parallel DM-10 `[Haiku]`
-- **Wartet auf Stephan:** Fachfragen aus DM-02
+- **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md` (mit den Vorschlägen aus DM-02 lauffähig); parallel DM-10 `[Haiku]`, DM-03 `[Opus]` ist mit DM-02 A6 vorbereitet
+- **Wartet auf Stephan:** Antworten auf `docs/dev/dm02_fachfragen.md`, Gruppe A (mit Wegpiraten), Eintrag in DM-04 «Entscheide aus DM-02»
 - **Entwürfe ohne Opus-Review:** keine
 - **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
 
@@ -36,6 +36,18 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-09
+
+- **DM-02 Fachfragen sortiert, DM-04 Build spezifiziert** `[Opus 5.5]` (Status: erledigt):
+  `docs/dev/dm02_fachfragen.md` und `docs/dev/dm04_build_spezifikation.md`. Grundlage: Vergleich
+  der eingefrorenen alten Datei (09.10.) mit dem Blatt «Klienten (alt)» des Testbuilds (Stand der
+  Quelle 24.09.) und Auswertung des Blatts «Prüfungen» im Testbuild. Befunde, die über die bekannten
+  offenen Fragen hinausgehen: (1) Im Testbuild ist Nipote als eine Familie erfasst, laut Klärung
+  vom 24.09. sind es zwei (A1). (2) Die Folgeaufträge haben die Geschäftsnummer des Vorgängers
+  geerbt; bei C1024 hat Wegpiraten inzwischen die neue Nummer eingetragen, und `apply_follow_ups`
+  würde sie jetzt auch dem Vorgänger geben (DM-04 Schritt 2). (3) C1000 und C1065 zeigen seit dem
+  24.09. das Muster einer überschriebenen Verlängerung (A3). (4) Perren und Burri tragen eine
+  Familie mit nur einem Kind (B4). (5) Drei neue Klienten C1089 bis C1091, nächste freie
+  Auftragsnummer `A26047`. Prüfung: keine Codeänderung. Offen: Antworten zu Gruppe A.
 
 - **DM-00 abgeschlossen** `[Opus 5.5]` (Status: erledigt): Mit Stephans Freigabe `main` per
   Fast-Forward auf `e960512` (`fix/sa-sentinel-client`) gezogen, `main`, Tag `pre-datamodel-v2`,
