@@ -9,13 +9,15 @@ Diesen Abschnitt liest jedes Modell zuerst und überschreibt ihn am Ende jeder S
 einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Begründung dafür.
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
-- **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten und Datenfehler behoben; Anfang November Oktober-Abrechnung mit dem neuen Schema
+- **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
 - **Zuletzt erledigt:** DM-02 (Fragenliste) und DM-04 (Build-Spezifikation)
 - **In Arbeit:** nichts
-- **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md` (mit den Vorschlägen aus DM-02 lauffähig); parallel DM-10 `[Haiku]`, DM-03 `[Opus]` ist mit DM-02 A6 vorbereitet
-- **Wartet auf Stephan:** Antworten auf `docs/dev/dm02_fachfragen.md`, Gruppe A (mit Wegpiraten), Eintrag in DM-04 «Entscheide aus DM-02»
+- **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md` (hängt an keiner Antwort); parallel DM-10 `[Haiku]`, DM-03 `[Opus]` ist mit DM-02 A6 vorbereitet
+- **Wartet auf Stephan:** Antworten auf die drei Regeln in `docs/dev/dm02_fachfragen.md`, Gruppe A (blockieren nichts, Vorschläge gelten bis dahin)
 - **Entwürfe ohne Opus-Review:** keine
 - **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
+
+- **Grundsatz Daten:** Datenpflege ist nicht Aufgabe der Umstellung; Inkonsistenzen benennen und markieren, nicht korrigieren, nicht blockieren (Stephan, 2026-10-09)
 
 ## Eintragsvorlage
 
@@ -36,6 +38,16 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-09
+
+- **Grundsatz «markieren statt pflegen» eingearbeitet** `[Opus 5.5]` (Status: erledigt): Stephan:
+  Datenpflege ist nicht Aufgabe der Umstellung, Inkonsistenzen werden benannt und markiert und
+  blockieren nichts. Folgen: DM-02 neu gruppiert (A nur noch drei Regeln für die Programme, die
+  bisherigen Datenfragen Nipote, doppelte Nummern, Verlängerungsmuster sind jetzt Befunde B1 bis B3);
+  DM-04 übernimmt die Daten unverändert, keine neuen Folgeaufträge, keine Korrektur von Familien oder
+  Schreibweisen, einzige Codekorrektur bleibt die Geschäftsnummer des Vorgängers bei C1024 (ein Fehler
+  von `apply_follow_ups`, keine Datenpflege); DM-16 hält beim Import nicht mehr an, sondern schreibt
+  eine Befundliste und markiert betroffene Rechnungen nach dem Muster `PRÜFEN`; DM-60 ist jetzt die
+  Übergabe der Befundliste, nicht die Bereinigung.
 
 - **DM-02 Fachfragen sortiert, DM-04 Build spezifiziert** `[Opus 5.5]` (Status: erledigt):
   `docs/dev/dm02_fachfragen.md` und `docs/dev/dm04_build_spezifikation.md`. Grundlage: Vergleich

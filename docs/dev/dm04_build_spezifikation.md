@@ -3,6 +3,13 @@
 Stand 2026-10-09, `[Opus 5.5]`. Vorgabe für DM-05 (`[Sonnet]`). Ergebnis ist das Workbook, das
 Wegpiraten Ende Oktober bekommt; danach ist das Workbook beim Kunden die einzige Quelle.
 
+## Grundsatz: Daten werden übernommen, nicht gepflegt
+
+Stephan, 2026-10-09: Datenpflege ist nicht Aufgabe der Umstellung. Der Build übernimmt die Daten so,
+wie sie in der Quelle stehen. Inkonsistenzen werden benannt und markiert (Blatt «Prüfungen»,
+«Fehlerliste», Logeintrag), aber nicht korrigiert und nicht als Grund genommen, den Build anzuhalten.
+Ausnahme ist nur, was der Build selbst falsch machen würde (Schritt 2).
+
 ## Ausgangslage, geprüft am 2026-10-09
 
 | Datei | Stand | Inhalt |
@@ -46,53 +53,52 @@ Jeder Schritt ist für sich stabil; bricht die Sitzung ab, gilt der letzte im Lo
    den Testbuild schreiben: `WEGPIRATEN_DST=sandbox/wegpiraten_datenbank_final.xlsx`,
    `WEGPIRATEN_HAND=sandbox/wegpiraten_datenbank_neu.xlsx`. Der Testbuild bleibt als Vergleich
    unverändert liegen.
-2. **Folgeaufträge.** In `prepare.py`, `FOLLOW_UPS`:
+2. **Folgeaufträge.** In `prepare.py`, `FOLLOW_UPS`, nur die drei von Wegpiraten bestätigten
+   (C1024, C1068, C1082), keine neuen.
    - C1024: Der Vorgänger behält die Nummer aus dem Stand 02.09. (250911003), der Nachfolger bekommt
      die aus der Quelle (260918020). Dafür ein Feld `old_application_number`; heute kopiert
-     `apply_follow_ups` die Quellnummer auf beide, was seit dem 09.10. falsch ist.
-   - C1068, C1082: neue Geschäftsnummer des Nachfolgers nach DM-02 A2; ohne Antwort unverändert
-     (der Fehler bleibt sichtbar).
-   - C1000, C1065: nach DM-02 A3. Bei «Folgeauftrag» je ein Eintrag mit `old_end` (C1065: 31.08.2026)
-     bzw. `old_application_number` (C1000: 260401001) und dem alten Ende; bei «Korrektur» nichts.
-   - C1011, C1015: nach DM-02 A4; ohne Antwort nichts.
+     `apply_follow_ups` die Quellnummer auf beide. Das ist ein Fehler des Builds, keine Datenpflege.
+   - Alles Weitere (doppelte Nummern bei C1068/C1082, Verlängerungsmuster bei C1000/C1065, C1011,
+     C1015) bleibt, wie es ist, und steht als Befund in der Liste aus Schritt 7.
 3. **Nummern.** `mandate_numbers.json` nicht neu schreiben lassen, sondern nur ergänzen (das tut
    `build_mandate_numbers` bereits). Erwartet: C1089 bis C1091 und jeder neue Folgeauftrag bekommen
    die nächsten Zähler ab `A26047`, nach Beginn und alter Klientennummer. Die 91 bestehenden Nummern
    bleiben gleich; das wird im Log mit einem Vergleich vorher/nachher belegt.
-4. **Handarbeit.** `carry_over_handwork` übernimmt Familie, Rolle und Berichte. Danach:
-   - Familie nach DM-02 A1 (Nipote) und B4 (Perren, Burri leeren) setzen. Das ist eine Korrektur der
-     Handarbeit, also im Testbuild selbst vor dem Build oder als dokumentierte Ausnahme im Build,
-     nicht stillschweigend.
+4. **Handarbeit.** `carry_over_handwork` übernimmt Familie, Rolle und Berichte unverändert, auch
+   wo sie fragwürdig sind (Nipote eine Familie, Perren und Burri je eine Familie mit einem Kind):
+   die Prüfungen im Workbook markieren das bereits.
    - Neue Zuordnungen ohne Rolle: ist die Person die einzige am Auftrag, P (wie bisher); sonst leer
-     lassen und in die Liste für DM-02 B7.
+     lassen, die Prüfung «Auftrag ohne primäre Betreuungsperson» markiert es.
    - Berichte, deren Auftrag es nicht mehr gibt, melden; es darf keiner verloren gehen. Erwartet:
      153 Berichte, alle zugeordnet.
-5. **Schreibweisen.** Die 16 Codewerte mit abweichender Schreibweise (Invariante 18) dort angleichen,
-   wo der Wert der Werteliste bis auf Gross- und Kleinschreibung gleich ist. Alles andere bleibt und
-   steht als Hinweis im Workbook.
+5. **Schreibweisen** werden nicht angeglichen. Die Prüfung «Schreibweise eines Codewerts» markiert sie.
 6. **Build und Prüfung.** `verify_excel_strict` muss bestehen. Danach in LibreOffice neu berechnen
    und die gecachten Werte lesen (der Import liest `data_only=True`).
 7. **Differenz belegen.** Für jedes editierbare Feld der Blätter Kinder, Aufträge, Betreuungen,
    Ansprechpersonen und Zuordnung MA: finaler Build gegen Testbuild. Jede Abweichung muss durch die
    Liste «Was sich geändert hat» oder einen Entscheid aus DM-02 erklärt sein. Eine unerklärte
    Abweichung heisst, dass im Testbuild von Hand etwas korrigiert wurde, das der Build nicht kennt:
-   auflisten und vor der Übergabe entscheiden, nicht überschreiben.
-8. **Zählung und Prüfstand ins Log:** Kinder, Aufträge, Betreuungen, Zuordnungen, Berichte, Familien;
-   Blatt «Prüfungen» mit Anzahl je Prüfung, verglichen mit dem Stand im Testbuild (4 Fehlerarten,
-   8 Hinweisarten am 30.09.).
+   auflisten; Stephan entscheidet, ob die Korrektur in den Build gehört (dann wie Schritt 2) oder
+   als Befund bleibt.
+8. **Zählung, Prüfstand und Befundliste:** Kinder, Aufträge, Betreuungen, Zuordnungen, Berichte,
+   Familien ins Log; Blatt «Prüfungen» mit Anzahl je Prüfung, verglichen mit dem Stand im Testbuild
+   (4 Fehlerarten, 8 Hinweisarten am 30.09.). Die Befunde aus `dm02_fachfragen.md`, Gruppe B, mit dem
+   Stand nach dem Build nachführen; die Liste geht mit dem Workbook an Wegpiraten.
 
 ## Abnahme
 
 - Die 91 eingefrorenen Nummern sind unverändert, neue Nummern beginnen bei `A26047`.
 - 153 Berichte übernommen, Rollen aller Paare aus dem Testbuild übernommen, die noch existieren.
 - Jede Abweichung zum Testbuild ist erklärt (Schritt 7).
-- Fehler im Blatt «Prüfungen» sind nur solche aus DM-02 B oder unbeantwortete Fragen aus DM-02 A.
+- Jeder Fehler und Hinweis im Blatt «Prüfungen» steht in der Befundliste. Offene Befunde halten die
+  Übergabe nicht auf.
 - Danach DM-06 (Excel unter Windows) durch Stephan.
 
 ## Entscheide aus DM-02
 
-Hier trägt ein, wer die Antworten aus [dm02_fachfragen.md](dm02_fachfragen.md) erhält: Nummer, Antwort,
-Datum, von wem. Bis dahin gelten die Vorschläge dort.
+Hier trägt ein, wer Antworten zu den Regeln in [dm02_fachfragen.md](dm02_fachfragen.md), Gruppe A,
+erhält: Nummer, Antwort, Datum, von wem. Bis dahin gelten die Vorschläge dort. Die Gruppe A betrifft
+die Programme, nicht diesen Build; der Build hängt an keiner Antwort.
 
 | # | Antwort | Datum | Quelle |
 | --- | --- | --- | --- |
