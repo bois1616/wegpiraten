@@ -27,7 +27,7 @@ Drei Gruppen:
 | # | Frage | Warum wichtig | Vorschlag, gilt bis zur Antwort |
 | --- | --- | --- | --- |
 | A1 | ~~KOB an Accordix melden?~~ **Entschieden 2026-10-09 (Stephan): Meldepflichtig ist ein Auftrag über den Kostenträger, nicht über die Leistungsart. P1000 (KJA-FS) ist meldepflichtig, alle anderen bisher nicht.** | KOB läuft heute nur auf einem Auftrag eines anderen Kostenträgers und fällt damit von selbst heraus. Neu ist: auch SPF und UWB anderer Kostenträger (19 Aufträge in der alten Datei) werden nicht gemeldet. | — |
-| A2 | ~~Einführungsgespräch (ST99)~~ **Entschieden 2026-10-09 (Stephan): Die 15 Minuten gibt es einmalig, nicht pro Monat und nicht pro Auftrag.** | Umsetzung: einmal je Kind, im Monat des Eintritts seiner ersten ST99-Betreuung; Verlängerungen lösen es nicht erneut aus (DM-03). | — |
+| A2 | ~~Einführungsgespräch (ST99)~~ **Entschieden 2026-10-09, konkretisiert und korrigiert 2026-10-10 (Stephan):** 15 Minuten einmalig, vom Kunden im Timesheet mit Notiz `Ohne Berechnung` vom Rest getrennt. Die Position erscheint auf der Rechnung mit Betrag 0 CHF. | Die frühere automatische Ableitung aus ST99 und Eintrittsmonat ist zurückgenommen: ST99 ist PRIVAT. Keine automatische Position oder Einmaligkeitskontrolle; falsch gesetzter Notiztext ist akzeptiertes Risiko. | — |
 | A3 | ~~Ankündigung der neuen Rechnungsnummern~~ **Entschieden 2026-10-09 (Stephan): Kein Kostenträger, auch das KJA nicht, muss über den geänderten Nummernkreis informiert werden.** | — | — |
 
 ## B: Datenbefunde
@@ -64,6 +64,17 @@ finalen Build (DM-05, Schritt 8). «Markiert» heisst: Das Workbook zeigt den Be
   gehören zu dieser Prüfung und gehen mit der Befundliste an Wegpiraten.
 
 ## Was mit den Antworten passiert
+
+### Ergänzende Antworten vom 10.10.2026
+
+Die vier Fragen aus der [Planprüfung](plan_review_2026-10-10.md) sind beantwortet:
+unbrauchbare Rechnungen auslassen und als Warnung zur Nacharbeit melden, ohne den übrigen
+Lauf zu blockieren; heutiges Indexkind auch für alte Leistungsdaten verwenden; Accordix
+je Betreuung, nicht je Auftrag; Einführungsgespräch manuell erfassen und als Position
+mit Betrag 0 CHF zeigen. Die zunächst genannte Vorgabe, diese Position aus der Rechnung
+auszuschliessen, hat Stephan noch am selben Tag korrigiert. Keine Rekonstruktion historischer
+Rechnungsgrundlagen, keine zusätzliche dauerhafte Datenhaltung. Stammdatenkorrektur durch
+den Kunden im XLSX, danach vollständiger Neuaufbau der SQLite-DB.
 
 Antworten aus A gehen in die Programme (DM-03, DM-40, DM-31) und werden in
 [dm04_build_spezifikation.md](dm04_build_spezifikation.md), Abschnitt «Entscheide aus DM-02»,

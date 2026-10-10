@@ -43,6 +43,15 @@ Dieses System ist als Übergangslösung konzipiert. Ziel:
 
 Nicht-Ziel: langfristige Architektur, Skalierung, Funktionsausbau.
 
+Bestätigt durch Stephan am 2026-10-10: v1 erleichtert den bisherigen manuellen Ablauf,
+bis WEGROSE (`~/projects/wegpiraten_v2`) einsetzbar ist. Angemessene Eingabeprüfungen
+und Warnungen genügen; maximale Absicherung und historische Rekonstruktion sind kein Ziel.
+Die XLSX-Datenbank ist die gemeinsame Arbeitsgrundlage. Der Kunde pflegt die Stammdaten
+und füllt Timesheets aus; Stephan erzeugt daraus die Dokumente. SQLite ist ein abgeleitetes,
+wegwerfbares Arbeitsartefakt. Nach kundenseitiger Korrektur wird der Lauf vollständig neu
+aufgesetzt. Unbrauchbare Rechnungen auslassen und als Warnung mit Grund melden; der übrige
+Lauf geht weiter. Keine Stammdatenkorrekturen ausschliesslich in SQLite vornehmen.
+
 ---
 
 ## Betriebsworkflow (monatlicher Batch-Betrieb)
@@ -54,7 +63,7 @@ Nicht-Ziel: langfristige Architektur, Skalierung, Funktionsausbau.
 ### Monatlicher Ablauf
 
 0. Stammdaten bei Änderungen von Proton Drive holen (`fetch-master` bzw. `import-master --fetch`; Zugriff via proton-drive CLI unter zentralem flock)
-1. Manuelle Anpassung der Stammdaten in der DB (falls erforderlich)
+1. Kundenseitige Stammdatenänderungen übernehmen, bestehende SQLite-DB löschen und mit `make import-master` neu erstellen
 2. Import der Timesheets aus einem Verzeichnis (Holung von Proton Drive: `fetch-timesheets <relativer Remote-Pfad>`, Verzeichnis-Cache analog MONTH)
 3. Batch-Erstellung der Rechnungen (DOCX + PDF)
 4. Manueller Versand per E-Mail

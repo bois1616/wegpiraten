@@ -232,9 +232,13 @@ would be a second copy of the same edge and could contradict the first.
 
 ### mandate_person
 
-One row per child per mandate. **Each row is exactly one line of the Accordix
-report** — that equivalence is the point of the entity and the fastest way to
-explain it.
+One row per child per mandate. ~~Each row is exactly one line of the Accordix
+report~~ — **corrected 2026-10-10 (Stephan): Accordix reports each Betreuung, not
+each mandate.** A continuing Betreuung carried over to a follow-up mandate must
+not become a second reported care solely because another authorisation exists.
+Different cared-for children remain separate. The table structure stays as it is;
+the export must account for care continued across predecessor/successor rows.
+The technical grouping draft is in [the plan review](dev/plan_review_2026-10-10.md).
 
 | Field | Type | Null | Note |
 | --- | --- | --- | --- |
@@ -251,8 +255,9 @@ explain it.
 | `number_of_care_days_per_week` | integer 0–7 | yes | SPT only |
 | `remarks` | text | yes | for the Accordix report |
 
-**A row here means the child receives the service.** That is what makes the row
-an Accordix line, and it is the reason the index marker cannot live here.
+**A row here means the child receives the service.** It contributes to an
+Accordix care case (with continuation across mandates accounted for as clarified
+above), and it is the reason the index marker cannot live here.
 
 An intermediate version on 2026-09-04 stored `is_index_case` on this entity and
 derived the mandate's child from it, on the argument that the children are
@@ -273,6 +278,11 @@ The rule Wegpiraten applies is *the youngest child of the family*, and it does n
 move when a mandate expires. That makes the index child a property of the
 family, which is why it is derived from the family's children and not stored here. A
 mandate inherits it through the children it cares for.
+
+**Clarified 2026-10-10 (Stephan):** invoices always use the current index child,
+including when old service data is processed again. Historical index-child
+reconstruction is not required. The XLSX workbook is the shared source; SQLite
+is discarded and recreated for the document run after customer corrections.
 
 `start_date` is the Accordix entry (*Eintritt*) and a **manual entry**: it is
 neither the current authorisation nor the first mandate on record. It can predate

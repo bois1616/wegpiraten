@@ -9,6 +9,21 @@ Grundlage: Übergabe und Backlog vom 09.10., DM-02 und DM-04, Konzept, Datenmode
 Umstellungs-Runbook sowie die betroffenen Import-, Rechnungs-, Bogen- und Reportingmodule.
 Der finale Build und die Alt-Neu-Abgleiche wurden hier nicht ausgeführt.
 
+## Betriebsrahmen, bestätigt am 10.10.2026
+
+Wegpiraten v1 erleichtert einzelne Vorgänge bis WEGROSE (`~/projects/wegpiraten_v2`)
+einsetzbar ist. Ausgangspunkt war ein manueller Ablauf mit Copy&Paste und wiederverwendeten
+DOCX-Dokumenten. Angemessene Eingabeprüfungen und Warnungen sollen Nacharbeit ermöglichen;
+maximale Absicherung, historische Rekonstruktion und zusätzliche Datenhaltung sind kein Ziel.
+
+Die gemeinsame Arbeitsgrundlage ist die XLSX-Datenbank. Der Kunde pflegt die Stammdaten
+und füllt Timesheets aus. Stephan übernimmt die Dateien und erzeugt Rechnungen, Timesheets
+und Accordix-Meldungen. SQLite ist ein wegwerfbares Arbeitsartefakt: bestehende DB löschen,
+`make import-master`, `make import-sheets`, `make invoices`. Befunde gehen an den Kunden;
+nach dessen fachlicher Korrektur beginnt Stephan den Lauf von vorne. Es gibt keine dauerhaft
+gepflegten Daten in SQLite. Zusätzliche Prüfpakete, Hashregister oder historische Indexdaten
+sind für diesen Ablauf keine Voraussetzung.
+
 ## Urteil
 
 Die Zerlegung nach Workbook, Import, Bögen, Rechnung, Reporting und Betrieb ist sinnvoll.
@@ -16,8 +31,9 @@ Der Fallback auf den gesicherten alten Programmstand passt zum Neuaufbau der SQL
 Die technische Normalisierung und die Datenpflege sind ausdrücklich getrennt. Der Plan
 ist als Arbeitsübersicht brauchbar, als vollständige Umsetzungsvorgabe noch nicht.
 
-Vor der Umsetzung fehlen Verträge für den Umgang mit unbrauchbaren Datensätzen,
-dauerhafte Alt-ID-Zuordnung, Zeilenreihenfolge und zwei berechnete Fremdschlüssel.
+Korrektur nach Stephans Antworten am 10.10.: Der Umgang mit unbrauchbaren Rechnungsgrundlagen
+und dem heutigen Indexkind ist entschieden. Es fehlen noch technische Vorgaben für
+die Alt-ID-Zuordnung, Zeilenreihenfolge und zwei berechnete Fremdschlüssel.
 Die Abhängigkeiten lassen Zwischenstände zu, in denen Config und Programme nicht
 zusammenpassen. Einige Abnahmekriterien widersprechen bereits bestätigten Änderungen.
 
@@ -25,46 +41,39 @@ zusammenpassen. Einige Abnahmekriterien widersprechen bereits bestätigten Ände
 
 | Aufgabe | Was jetzt möglich ist | Was für die Abnahme fehlt |
 | --- | --- | --- |
-| DM-02 | Bestehende Antworten sind ausreichend für Kostenträgerfilter und Datenpflegegrundsatz. Neue technische Randfälle stehen unten. | Antworten zu Q1–Q4; keine erneute Kundenbefragung zu beantworteten Fragen. |
-| DM-03 | Einmaligkeit ist entschieden; Umsetzung braucht noch eine eindeutige Erkennung des Gesprächs und Zuordnung zur Rechnung. | ST99 ist laut Datenmodell PRIVAT, nicht das Gespräch; Q4. |
+| DM-02 | Q1–Q4 sind am 10.10. beantwortet; Datenkorrekturen bleiben beim Kunden. | Keine Antwort zu diesen vier Fragen mehr offen. |
+| DM-03 | Manuell gesplittete Timesheet-Zeile mit «Ohne Berechnung» erscheint mit Betrag 0 CHF. ST99 spielt dabei keine Rolle. | Bestehendes Verhalten in DM-30 beibehalten und prüfen. |
 | DM-04 | Spezifikation grundsätzlich verwendbar; Ergänzungen zur Abnahme unten. | DM-05 muss Verlustfreiheit tatsächlich belegen. |
 | DM-07 | Aufräumregeln und Reihenfolge lassen sich spezifizieren. | Dateiweises Inventar und bestätigtes externes Archiv vor Entfernen von Personendaten. |
-| DM-12 | View-Vertrag lässt sich spezifizieren. | SQL/Excel-Parität auf synthetischen Fällen und finalem Workbook, Q2. |
+| DM-12 | View verwendet das heutige Indexkind, auch bei alten Leistungsdaten. | SQL/Excel-Parität auf synthetischen Fällen und finalem Workbook. |
 | DM-15 | Sentinel-Vertrag lässt sich vollständig als Entwurf beschreiben. | Review und Integrationstest über alle Verbraucher. |
 | DM-22 | Resolver und dauerhafte Mappingquelle lassen sich spezifizieren. | Mapping aus DM-05, Archivbogen-Test, Review. |
 | DM-34 | Vergleichskriterien lassen sich jetzt festlegen. | Beide Programme, festgelegte Monatsquellen und ausgeführter Vergleich. |
-| DM-40 | Felder, Kostenträgerfilter und Monatsauswahl lassen sich spezifizieren. | Q3 zur Kette, Umsetzung und DM-41. |
+| DM-40 | Meldung je Betreuung, kein zusätzlicher Meldefall allein durch Folgeauftrag. | Technische Zusammenfassung der Kettenzeilen spezifizieren, Umsetzung und DM-41. |
 | DM-41 | Vergleichsmethode lässt sich beschreiben. | Neue Meldung und tatsächlicher Abgleich der August-Datei. |
 | DM-43 | Stilllegung ist der passende Vorschlag. | Entfernen der CLI-/Makefile-Aufrufe und Prüfung der Verweise. |
 | DM-50 | Anforderungen an Review und Generalprobe sind klar. | Fertige Befehle, Runbook und tatsächlich durchgeführte Generalprobe. |
 | DM-70 | Kleiner Ausgabevertrag möglich. | Bewusst nach erster Nutzung; keine Vorziehung auf den kritischen Pfad. |
 
-## Neue Fragen an Stephan
+## Antworten von Stephan, 10.10.2026
 
-Diese Fragen betreffen Auswirkungen der Programme, keine Bereinigung der Kundendaten.
-Die Antworten sind noch offen; keine der folgenden Optionen gilt durch Schweigen als genehmigt.
-
-- **Q1: Unbrauchbare Rechnungsgrundlage.** Darf ein Auftrag ohne eindeutige Leistungszuordnung,
-  Tarif oder berechenbaren Betrag vom Rechnungsausgang ausgeschlossen und ausdrücklich als
-  nicht erstellt gemeldet werden, während der übrige Lauf weitergeht? Vorschlag: ja.
-  Eine fehlende Geschäftsnummer bleibt dagegen wie entschieden eine Rechnung mit `PRÜFEN`.
-- **Q2: Historisches Indexkind.** Soll eine erneut erstellte alte Rechnung das heutige Indexkind
-  verwenden? `person.family_id` hat keine Historie; ein jüngeres, später erfasstes Kind ändert
-  heute auch die Ableitung für Vorgängeraufträge. Vorschlag für diese Übergangslösung: heutiger
-  Stammdatenstand, alte ausgestellte Rechnung und damaliges Workbook im Monatsarchiv erhalten.
-  Falls das damalige Indexkind rechnerisch reproduzierbar sein muss, braucht es eine andere
-  Datenhaltung; die heutige View allein reicht nicht.
-- **Q3: Accordix und Folgeaufträge.** Ist eine Meldezeile pro Betreuung/Auftrag auch dann gewollt,
-  wenn aufeinanderfolgende Aufträge denselben Eintritt und offene Betreuung haben? Die
-  Gleichsetzung im Datenmodell ist ausdrücklich dokumentiert, aber dann können mehrere Zeilen
-  desselben Kindes und derselben Leistungsart im Monatsfile stehen. Keine automatische
-  Zusammenfassung einführen, bevor die gewünschte Wirkung bestätigt ist.
-- **Q4: Einführungsgespräch erkennen.** Im Backlog steht ST99 für das Einführungsgespräch,
-  im Datenmodell unter «Open questions», Punkt 5, dagegen für `PRIVAT`. Der Code kennt nur
-  kostenfreie Leistungszeilen mit «ohne Berechnung» in der Notiz. Soll die Umsetzung eine
-  solche erfasste Zeile verwenden oder automatisch eine 15-Minuten-Position erzeugen?
-  Einmaligkeit ist bereits entschieden, diese Frage betrifft nur Erkennung und Erzeugung.
-  Ohne Antwort darf kein allgemeiner PRIVAT-Auftrag als Einführungsgespräch behandelt werden.
+- **Q1, entschieden:** Unbrauchbare Rechnungen auslassen, im Log als Warnung mit Auftrag und
+  Grund ausgeben, Nacharbeit kundenseitig. Der übrige Lauf geht weiter, kein Blocker.
+  Eine fehlende Geschäftsnummer bleibt wie bisher eine markierte Rechnung mit `PRÜFEN`.
+- **Q2, entschieden:** Immer das heutige Indexkind verwenden. Eine Rekonstruktion des
+  damaligen Rechnungskontexts wird nicht verlangt; keine Indexkind-Historie einführen.
+- **Q3, entschieden:** Accordix je Betreuung, nicht je Auftrag. Die frühere Gleichsetzung
+  «jede mandate_person-Zeile = eine Meldezeile» ist bei einer fortlaufenden Betreuung über
+  mehrere Folgeaufträge zurückgenommen. Mehrere betreute Kinder bleiben getrennte Meldefälle.
+  Der technische Gruppierungsvorschlag steht unter DM-40 und bleibt ein Review-Entwurf.
+- **Q4, entschieden:** Kunde splittet das Einführungsgespräch manuell in 15 Minuten mit
+  Notiz `Ohne Berechnung` und den Rest. **Korrektur Stephan, ebenfalls 10.10.:** Die markierte
+  Position erscheint auf der Rechnung mit den erfassten Minuten und Betrag **0 CHF**.
+  Die zunächst genannte Vorgabe, sie aus der Rechnung auszuschliessen, ist zurückgenommen.
+  Keine automatisch erzeugten Minuten,
+  kein ST99- oder Eintrittsmonat-Kriterium, keine maschinelle Einmaligkeitskontrolle.
+  Das Risiko eines falsch gesetzten Notiztextes wird ausdrücklich akzeptiert. Der bisherige
+  Vergleich ohne Beachtung der Gross-/Kleinschreibung kann beibehalten werden.
 
 ## DM-12: Vertrag für `v_mandate`
 
@@ -81,7 +90,7 @@ Die Antworten sind noch offen; keine der folgenden Optionen gilt durch Schweigen
 3. Für die erste Betreuung: ohne Familie das Betreuungskind selbst; mit Familie das Kind mit
    maximalem Geburtsdatum aus **allen** Kindern dieser Familie, auch ohne Betreuung im Auftrag.
    Austritt oder abgelaufene Bewilligung begrenzen diese Kandidatenmenge nicht. Das ist die
-   dokumentierte Regel; ihre historische Wirkung hängt an Q2.
+   dokumentierte Regel; auch alte Leistungsdaten verwenden das heutige Indexkind (Q2).
 4. Bei mehreren Familien, mehreren Kindern ohne Familie oder fehlendem Geburtsdatum: Excel
    kann trotzdem ein erstes Kind liefern. Zur Parität dieses Ergebnis separat vergleichen;
    der Befund muss den Auftrag erreichen, auch wenn ein Indexwert vorhanden ist. Die View darf
@@ -164,15 +173,15 @@ Lücke, unbekannte ID, A-ID ausserhalb Bewilligung, SA, vollständiger Dateirüc
 ## DM-34 und DM-41: Vergleich und Abnahme
 
 Beide Läufe bekommen getrennte DB-, Import-, `done`- und Ausgabeordner; identische Kopien
-der Leistungsbögen und expliziten MONTH-Wert. Keine Cloud-Holung oder Verschiebung der
-Monatsoriginale während des Vergleichs. Quell-Workbooks, Config, Vorlagen, Mapping und
-Git-Revisionen werden mit Hash im privaten Prüfpaket festgehalten. Keine Personendaten
-oder tatsächlichen Rechnungskontexte ins Repo committen.
+der Leistungsbögen und expliziten MONTH-Wert. Monatsoriginale nicht verschieben.
+Verwendeten Datenstand und Git-Revisionen im Log nennen; Zählungen, Summen und begründete
+Abweichungen reichen als Nachweis. Keine zusätzlichen Hashregister oder privaten Prüfpakete
+als Voraussetzung. Keine Personendaten oder tatsächlichen Rechnungskontexte ins Repo committen.
 
-DM-34 vergleicht zuerst jede Rohleistungszeile (Quelle, Zeile, Datum, Mitarbeiter,
-Minutenarten, Kilometer, Notiz), dann Rechnungen. C→A und etwaige Aufteilung auf
-Folgeaufträge müssen das Zuordnungsmanifest erklären. Vor einer Rechnungssumme zählen
-importierte/abgewiesene Zeilen und Gesamtsummen, damit verschwundene Rechnungen auffallen.
+DM-34 vergleicht importierte/abgewiesene Zeilen, Zeitsummen und Rechnungsbeträge je Auftrag.
+C→A und Aufteilung auf Folgeaufträge müssen die Zuordnung erklären. Bei Abweichungen die
+betroffenen Leistungszeilen nachprüfen. Ein vollständiges zusätzliches Zeilenmanifest
+ist keine Voraussetzung. Ausgelassene Rechnungen werden als Warnung nachvollziehbar.
 
 Gleich bleiben ohne begründete Ausnahme: Zeiten, Rundung, Positionen, Tarife, Betrag,
 Kontingentbehandlung, Empfänger, Besteller, Standort, IBAN, Währung und QR-Betrag.
@@ -182,14 +191,15 @@ gültig sein. DOCX-Inhalt semantisch vergleichen, PDF-Layout stichprobenweise; Z
 PDF-Dateihashes sind keine fachlichen Gleichheitskriterien.
 
 Zulässige Unterschiede nicht pauschal freigeben: Aufteilung einer C-Rechnung in zwei
-Folgeaufträge, abweichendes Kontingent, ST99 und neueres Indexkind werden einzeln mit
+Folgeaufträge, abweichendes Kontingent und neueres Indexkind werden einzeln mit
 Quelle/Fachregel und finanzieller Wirkung erklärt. DM-02-B-Befunde rechtfertigen nicht
 automatisch jede Abweichung. Die eingefrorene Oktober-Stammdatei bildet nicht zwingend
 den damaligen Septemberstand ab. Falls das Monatsarchiv fehlt, den Test ausdrücklich als
 Programmvergleich mit heutigem Datenstand kennzeichnen.
 
-DM-41 vergleicht August als Multimenge, nicht als Menge: doppelte Meldezeilen dürfen nicht
-verschwinden. Internes Manifest mit Auftrag, Betreuungskind, Ausgabereihe, Ausschlussgrund.
+DM-41 vergleicht August einschliesslich Zeilenanzahl und mehrfach vorkommender Werte.
+Zusammengefasste Folgeauftragszeilen sind nach Q3 eine beabsichtigte Änderung; zusätzliche
+Duplikate wären ein Fehler. Zuordnung und Ausschlussgründe im Log erläutern.
 P1000-Filter und getrennte Austrittsdaten sind erlaubte Regeländerungen; zusätzliche
 Geschwister sind nur mit tatsächlich erfasster Betreuung zulässig, im initialen Build
 ohne Familien nicht vorauszusetzen. Die manuell erstellte August-Datei ist eine Referenz,
@@ -202,11 +212,20 @@ Nur Aufträge mit meldepflichtigem Kostenträger aus einer validierten Config-Li
 Indexkind; Leistungsart über `service_types.code` und `SERVICE_TYPE_MAP`, Zuweisung vom
 Auftrag, Eintritt/Austritt und Austrittsfelder von `mandate_person`.
 
-Vorschlag Monatsauswahl: sowohl Auftrag als auch Betreuung überlappen den Meldemonat,
-inklusive Grenzen. Das ist nötig, weil bei Verlängerungen Eintritt gleich und Austritt
-offen bleiben: allein der Betreuungszeitraum würde alle alten Aufträge weiter melden.
-Bewilligungsende begrenzt die Auswahl, wird aber **nie als Austritt exportiert**.
-Q3 bleibt insbesondere für den Wechsel innerhalb eines Monats offen.
+Bestätigte Einheit: eine tatsächliche Betreuung, nicht eine Bewilligung. Eine Verlängerung
+allein erzeugt keinen weiteren Meldefall. Technischer Vorschlag ohne Schemaerweiterung:
+Betreuungszeilen desselben Kindes in einer Vorgänger-/Nachfolgerkette mit gleicher Leistungsart
+und gleichem Eintritt zu einer fortlaufenden Betreuung zusammenfassen. Unverbundene Aufträge,
+unterschiedliche Leistungsarten und unterschiedliche Eintritte nicht pauschal zusammenziehen.
+Bei widersprüchlichen Austritts- oder Zuweisungsangaben warnen, kundenseitig nacharbeiten lassen;
+keinen künstlichen Austritt aus dem Bewilligungsende ableiten. Die genaue Auswahl bei solchen
+Widersprüchen bleibt Bestandteil der DM-40-Spezifikation, keine neue Fachfrage zur Meldeeinheit.
+
+Vorschlag Monatsauswahl: Betreuung überlappt den Monat und mindestens ein meldepflichtiger
+Auftrag ihrer Kette überlappt ihn ebenfalls, Grenzen inklusiv. Daten aus dem im Monat
+massgeblichen Auftrag verwenden; den Auftragswechsel innerhalb eines Monats und den
+tatsächlichen Austritt ausdrücklich testen. Allein mehrere passende Aufträge rechtfertigen
+keine doppelten Meldezeilen. Bewilligungsende ist **nie das exportierte Austrittsdatum**.
 
 Fehlende Pflichtwerte, unbekannte Leistungsmappings und ungültige Codewerte nicht durch
 Defaults ersetzen. Bestehendes Überspringen solcher Zeilen braucht eine vollständige
@@ -216,7 +235,7 @@ Format und Spalten der Accordix-Vorlage bleiben erhalten, kein internes ID-Feld 
 
 ## DM-07, DM-43 und DM-70
 
-**DM-07:** Nach DM-06 und DM-41 sowie Sicherung des DM-34/51-Prüfpakets jede Datei
+**DM-07:** Nach DM-06 und DM-41 jede Datei
 inventarisieren. Excel-Strukturprüfer und Windows-Prüfskript bei Bedarf nach `tools/`
 übernehmen, ohne Import von `build.py` oder JSON-Migrationsdaten. Dateien mit Personendaten
 verschiebt Stephan extern; erst nach bestätigter Sicherung löschen. Alte Workbook-Versionen
@@ -246,17 +265,18 @@ Terminfortschreibung oder Kundenverteilung. Umsetzung bleibt P2.
 - **DM-11/16:** Selbst-FK von Vorgängeraufträgen braucht alle Aufträge vor FK-Prüfung;
   die Excel-Reihenfolge garantiert keinen Vorgänger zuerst. Erst sammeln, dann prüfen.
   Technische Unlesbarkeit muss fehlschlagen: der heutige Import fängt Lesefehler ab und
-  liefert teils 0 Zeilen zurück. Q1 und ein Vertrag für verwaiste Referenzen/ungültige
-  Typen fehlen. Rohbefunde aufbewahren; kein stiller Verlust durch PK/FK-Verwerfen.
+  liefert teils 0 Zeilen zurück. Nicht verwendbare Datensätze/Ergebnisse auslassen und als
+  Warnung zur kundenseitigen Nacharbeit melden (Q1); andere Datensätze weiterverarbeiten.
+  Keine stillen Verluste durch PK/FK-Verwerfen. Nach Korrektur wird die DB neu aufgebaut.
 - **DM-05:** Feldweiser Verlustvergleich muss auch Konflikte innerhalb zusammengeführter
   Kinder und Ansprechpersonen abdecken. Eine Mehrheitsanrede ist eine echte Entscheidung
   über Werte; widersprüchliche Originalwerte dürfen nicht unsichtbar verschwinden.
-  Nachweise mit Personendaten ins private Prüfpaket, im Git-Log nur IDs und Zählungen.
-- **DM-03/30:** Einmaligkeit allein spezifiziert keine Rechnung. ST99 steht im Datenmodell
-  für PRIVAT, die Zuordnung im Backlog ist daher nicht belastbar. Der heutige Code erkennt
-  «ohne Berechnung» in Notizen, keine ST99-Automatik. Erkennung, Position, Kostenfreiheit
-  und Verhalten ohne Leistungszeilen sowie bei mehreren Aufträgen im Eintrittsmonat
-  explizit festlegen; keinesfalls auf jedem Auftrag dieselben 15 Minuten hinzufügen.
+  Im Git-Log nur IDs und Zählungen; vorhandene Monatsarchive genügen für Betriebsnachweise.
+- **DM-03/30, beantwortet und korrigiert:** «Ohne Berechnung»-Zeilen als eigene Position
+  mit erfassten Minuten und Betrag 0 CHF auf der Rechnung zeigen. Rohzeiten und bestehende
+  Zeitsummen erhalten; diese Zeilen erhöhen den Rechnungsbetrag nicht. Test: 15 Minuten
+  markiert plus Rest zeigt beide Positionen, nur der Rest wird berechnet. Das entspricht
+  dem bestehenden Code; keine neue Gesprächsautomatik implementieren.
 - **DM-20:** Monatsüberlappung von Bewilligung (`start <= Monatsende`, Ende leer oder
   `end >= Monatsanfang`) spezifizieren. Der alte Code prüft nur Ende. Entscheiden und
   testen, ob vollständig beendete Betreuungen ohne beendeten Auftrag noch Bögen erzeugen.

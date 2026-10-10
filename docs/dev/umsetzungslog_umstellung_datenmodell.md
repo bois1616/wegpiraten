@@ -10,14 +10,15 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** DM-02, DM-03, DM-04 gemäss Stand 09.10.; Planprüfung 10.10. als Entwurf dokumentiert, siehe unten. Die Einmaligkeitsregel aus DM-03 bleibt bestätigt; ihre Zuordnung zu ST99 ist nicht belastbar (Datenmodell: PRIVAT).
+- **Zuletzt erledigt:** DM-02, DM-03, DM-04 gemäss Stand 09.10.; Q1–Q4 am 10.10. beantwortet und nachgeführt. Einführungsgespräch manuell im Bogen, Position «Ohne Berechnung» erscheint mit Betrag 0 CHF; keine ST99-Automatik. Technische Planentwürfe weiterhin Review offen.
 - **In Arbeit:** nichts
 - **Nächster Schritt:** Planprüfungsentwurf durch Opus/Astra prüfen; DM-05 nach DM-04 mit Verlustnachweis bleibt der nächste Build-Schritt. Vor DM-10 die berechneten Fremdschlüssel, Budgeteinheiten und einen stabilen gemeinsamen Umstellungsschritt klären.
-- **Wartet auf Stephan:** Q1–Q4 in `plan_review_2026-10-10.md`: unbrauchbare Rechnungsgrundlage, historisches Indexkind, Accordix-Kettenzeilen, Erkennung/Erzeugung des Einführungsgesprächs. Im Chat gefragt, noch nicht beantwortet.
+- **Wartet auf Stephan:** nichts zu Q1–Q4; alle am 10.10. beantwortet. Unbrauchbare Rechnungen auslassen und warnen, heutiges Indexkind, Accordix je Betreuung, Gesprächsposition mit Betrag 0 CHF.
 - **Entwürfe ohne Opus-Review:** `plan_review_2026-10-10.md` (Codex/GPT-6, genaue Modellvariante nicht ausgewiesen); keine abhängige Umsetzung dadurch freigegeben.
 - **Prüfstand:** `nox` am 10.10.: lint erfolgreich, pyright 0 Fehler/0 Warnungen; keine Codeänderung.
 
 - **Grundsatz Daten:** Datenpflege ist nicht Aufgabe der Umstellung; Inkonsistenzen benennen und markieren, nicht korrigieren, nicht blockieren (Stephan, 2026-10-09)
+- **Betriebsrahmen:** Workaround bis WEGROSE; Kunde pflegt XLSX und füllt Bögen aus, Stephan erzeugt Dokumente. Nach Befunden korrigiert der Kunde fachlich, dann DB löschen und Lauf neu aufsetzen. Keine persistierte fachliche Datenhaltung in SQLite, keine maximale Absicherung oder historische Rekonstruktion (Stephan, 2026-10-10).
 
 ## Eintragsvorlage
 
@@ -40,6 +41,19 @@ Regeln:
 ## 2026-10-10
 
 Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **Stephan's answers and workaround scope** `[Codex / GPT-6, exact variant not exposed]`
+  (Status: completed documentation update): Recorded Q1–Q4 in the review, DM-02, backlog,
+  data model and handover; added the operating scope to AGENTS.md. XLSX remains the shared
+  source, customer corrections trigger a complete disposable SQLite rebuild. Skip unusable
+  invoices with a warning and continue; use today's index child; report each Betreuung,
+  without duplicates solely from follow-up mandates. Introduction is split manually in the
+  timesheet. Stephan corrected his initial exclusion instruction: «Ohne Berechnung» remains
+  a visible invoice position with amount 0 CHF. Existing invoice code already supports this;
+  no automatic ST99/entry-month rule or persistence added. Removed extra hash-register and
+  audit-package requirements from the review. Technical Accordix grouping remains a draft,
+  not a completed DM-40 implementation. No runtime code or workbook changed.
+  Verification: `nox` lint passed, pyright 0 errors/0 warnings; `git diff --check` passed.
 
 - **Plan review and Opus task specification drafts** `[Codex / GPT-6, exact variant not exposed]`
   (Status: draft, Opus review pending): Added `docs/dev/plan_review_2026-10-10.md` and linked it
