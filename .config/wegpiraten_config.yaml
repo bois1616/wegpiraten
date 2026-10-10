@@ -366,6 +366,258 @@ entities:
         excel_column: notes
         optional: true
 
+  # Vorbereitung DM-10.1: neue Modelle, noch ohne Umschalten der Verbraucher.
+  # client/client_employee_relation entfallen erst mit dem gemeinsamen Code-Umbau.
+  # Die Auswahlspalten sind Anzeige; die beiden berechneten FKs werden importiert.
+  person:
+    fields:
+      - name: person_id
+        type: str
+        excel_column: person_id
+        primary_key: true
+      - name: short_code
+        type: str
+        excel_column: short_code
+        optional: true
+      - name: family_id
+        type: str
+        excel_column: family_id
+        optional: true
+      - name: social_security_number
+        type: str
+        excel_column: social_security_number
+        optional: true
+      - name: last_name
+        type: str
+        excel_column: last_name
+      - name: first_name
+        type: str
+        excel_column: first_name
+      - name: date_of_birth
+        type: str
+        excel_column: date_of_birth
+        optional: true
+        format: ${date_format}
+      - name: gender
+        type: str
+        excel_column: gender
+        optional: true
+      - name: uma_umf
+        type: str
+        excel_column: uma_umf
+        optional: true
+      - name: spoken_language
+        type: str
+        excel_column: spoken_language
+        optional: true
+      - name: canton_of_residence
+        type: str
+        excel_column: canton_of_residence
+        optional: true
+      - name: residence_legal_guardian
+        type: str
+        excel_column: residence_legal_guardian
+        optional: true
+      - name: notes
+        type: str
+        excel_column: notes
+        optional: true
+
+  mandate:
+    fields:
+      - name: mandate_id
+        type: str
+        excel_column: mandate_id
+        primary_key: true
+      - name: service_type_id
+        type: str
+        excel_column: service_type_id
+      - name: service_requester_id
+        type: str
+        excel_column: service_requester_id
+      - name: contact_person_id
+        type: str
+        excel_column: contact_person_id
+        optional: true
+      - name: payer_id
+        type: str
+        excel_column: payer_id
+      - name: tenant_id
+        type: str
+        excel_column: tenant_id
+      - name: application_number
+        type: str
+        excel_column: application_number
+      - name: start_date
+        type: str
+        excel_column: start_date
+        format: ${date_format}
+      - name: end_date
+        type: str
+        excel_column: end_date
+        optional: true
+        format: ${date_format}
+      - name: allowed_travel_time
+        type: int
+        excel_column: allowed_travel_time
+        optional: true
+        multiply_by: 60
+      - name: allowed_direct_effort
+        type: int
+        excel_column: allowed_direct_effort
+        optional: true
+        multiply_by: 60
+      - name: allowed_indirect_effort
+        type: int
+        excel_column: allowed_indirect_effort
+        optional: true
+        multiply_by: 60
+      - name: allocation
+        type: str
+        excel_column: allocation
+        optional: true
+      - name: notes
+        type: str
+        excel_column: notes
+        optional: true
+      - name: report_cadence
+        type: str
+        excel_column: report_cadence
+        optional: true
+      - name: report_interval_months
+        type: int
+        excel_column: report_interval_months
+        optional: true
+      - name: predecessor_mandate_id
+        type: str
+        excel_column: predecessor_mandate_id
+        optional: true
+
+  mandate_person:
+    fields:
+      - name: mandate_id
+        type: str
+        excel_column: mandate_id
+        primary_key: true
+      - name: person_id
+        type: str
+        excel_column: person_id
+        primary_key: true
+      - name: start_date
+        type: str
+        excel_column: start_date
+        format: ${date_format}
+      - name: end_date
+        type: str
+        excel_column: end_date
+        optional: true
+        format: ${date_format}
+      - name: is_leaving_reason_planned
+        type: str
+        excel_column: is_leaving_reason_planned
+        optional: true
+      - name: leaving_reason
+        type: str
+        excel_column: leaving_reason
+        optional: true
+      - name: custom_leaving_reason
+        type: str
+        excel_column: custom_leaving_reason
+        optional: true
+      - name: after_leave_situation
+        type: str
+        excel_column: after_leave_situation
+        optional: true
+      - name: custom_after_leave_situation
+        type: str
+        excel_column: custom_after_leave_situation
+        optional: true
+      - name: is_consultative_adolescent_psychiatric_care
+        type: str
+        excel_column: is_consultative_adolescent_psychiatric_care
+        optional: true
+      - name: number_of_care_days_per_week
+        type: int
+        excel_column: number_of_care_days_per_week
+        optional: true
+      - name: remarks
+        type: str
+        excel_column: remarks
+        optional: true
+
+  contact_person:
+    fields:
+      - name: contact_person_id
+        type: str
+        excel_column: contact_person_id
+        primary_key: true
+      - name: service_requester_id
+        type: str
+        excel_column: service_requester_id
+      - name: gender
+        type: str
+        excel_column: gender
+        optional: true
+      - name: first_name
+        type: str
+        excel_column: first_name
+        optional: true
+      - name: last_name
+        type: str
+        excel_column: last_name
+        optional: true
+      - name: notes
+        type: str
+        excel_column: notes
+        optional: true
+
+  mandate_employee_relation:
+    fields:
+      - name: mandate_id
+        type: str
+        excel_column: mandate_id
+        primary_key: true
+      - name: employee_id
+        type: str
+        excel_column: employee_id
+        primary_key: true
+      - name: role
+        type: str
+        excel_column: role
+        optional: true
+
+  report:
+    fields:
+      - name: report_id
+        type: str
+        excel_column: report_id
+        primary_key: true
+      - name: mandate_id
+        type: str
+        excel_column: mandate_id
+      - name: report_form
+        type: str
+        excel_column: report_form
+        optional: true
+      - name: due_date
+        type: str
+        excel_column: due_date
+        optional: true
+        format: ${date_format}
+      - name: status
+        type: str
+        excel_column: status
+        optional: true
+      - name: completed_date
+        type: str
+        excel_column: completed_date
+        optional: true
+        format: ${date_format}
+      - name: notes
+        type: str
+        excel_column: notes
+        optional: true
+
   invoice_data:
     fields:
       - name: invoice_number

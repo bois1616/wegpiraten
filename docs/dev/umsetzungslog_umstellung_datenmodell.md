@@ -10,12 +10,12 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** DM-05 finaler Build und DM-63; Ergebnis in `dm05_build_ergebnis.md`. 87 Kinder, 94 Aufträge/Betreuungen, 101 Zuordnungen, 153 Berichte. Finale XLSX und Befundliste liegen lokal in sandbox. Technische Planentwürfe weiterhin Review offen.
+- **Zuletzt erledigt:** DM-05/63 finaler Build, DM-14 synthetische Fixture, DM-21 Bogenbeschriftung, DM-10.1 additive Config-Vorbereitung. Finale XLSX und Befundliste lokal in sandbox, Build-Nachweis in `dm05_build_ergebnis.md`.
 - **In Arbeit:** nichts
-- **Nächster Schritt:** DM-06 Windows-Excel-Prüfung durch Stephan; unabhängig DM-14 synthetische Importfixture. Vor DM-10 die berechneten Fremdschlüssel, Budgeteinheiten und einen stabilen gemeinsamen Umstellungsschritt klären; technische Spezifikationsentwürfe durch Opus/Astra prüfen.
+- **Nächster Schritt:** DM-06 Windows-Excel-Prüfung durch Stephan. Technische Entwürfe DM-12/15/22 durch Opus/Astra prüfen, dann gemeinsamer Umbau des Imports und aller Verbraucher. Die sechs neuen Config-Modelle und die Fixture sind bereit; DM-10.2 entfernt die alten Modelle erst mit diesem Umbau. Aktuelle CLI-Verbraucher lesen weiterhin das alte Schema.
 - **Wartet auf Stephan:** DM-06 (echtes Windows-Excel), danach DM-60/52 Übergabe. Q1–Q4 beantwortet.
 - **Entwürfe ohne Opus-Review:** `plan_review_2026-10-10.md` (Codex/GPT-6, genaue Modellvariante nicht ausgewiesen); keine abhängige Umsetzung dadurch freigegeben.
-- **Prüfstand:** 10.10.: nox lint/typecheck erfolgreich; 27 Tests bestanden direkt in bestehender Testumgebung. nox-Test-Installation scheitert an gesperrtem Netzwerk, nicht an Tests. Finaler Feldvergleich 0 Abweichungen, 0 Formelfehler, Excel-Strukturprüfung auch nach Neuberechnung bestanden.
+- **Prüfstand:** 10.10.: nox lint/typecheck erfolgreich; 31 Tests bestanden direkt in bestehender Testumgebung. nox-Test-Installation scheitert an gesperrtem Netzwerk, nicht an Tests. Finaler Feldvergleich 0 Abweichungen, 0 Formelfehler, Excel-Strukturprüfung auch nach Neuberechnung bestanden.
 
 - **Grundsatz Daten:** Datenpflege ist nicht Aufgabe der Umstellung; Inkonsistenzen benennen und markieren, nicht korrigieren, nicht blockieren (Stephan, 2026-10-09)
 - **Betriebsrahmen:** Workaround bis WEGROSE; Kunde pflegt XLSX und füllt Bögen aus, Stephan erzeugt Dokumente. Nach Befunden korrigiert der Kunde fachlich, dann DB löschen und Lauf neu aufsetzen. Keine persistierte fachliche Datenhaltung in SQLite, keine maximale Absicherung oder historische Rekonstruktion (Stephan, 2026-10-10).
@@ -41,6 +41,21 @@ Regeln:
 ## 2026-10-10
 
 Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **DM-14 fixture, DM-21 label and DM-10.1 preparation** `[Codex / GPT-6, exact variant not exposed]`
+  (Status: completed stable subtasks): Added `tests/fixtures/create_masterdata.py` and its
+  README: eleven synthetic import tables, no customer data or sandbox dependency, family,
+  parallel/follow-up mandates, substitution, exit and TS=false cases. Calculated foreign
+  keys are supplied as fixture values; SA remains importer-generated, its integration test
+  awaits DM-15. Added six config entities without removing old client models or switching
+  runtime consumers. Verified all new fields against fixture tables and actual map_row:
+  0.5 hours becomes 30 minutes once. DM-10.2 and DM-10 overall remain open until the common
+  consumer switch. Changed E8 in the timesheet template to «Auftrag-Nr.:» by modifying the
+  single XML label; all other ZIP parts remained byte-identical. G8 and layout unchanged.
+  Validation: `nox` lint/typecheck passed, 31/31 tests passed in the existing test environment;
+  additional ruff checks for new fixture/tests passed. No live database or customer source
+  file changed. Next: spec review and common import/consumer migration, Windows Excel DM-06.
+
 
 - **DM-05 final workbook and DM-63 check** `[Codex / GPT-6, exact variant not exposed]`
   (Status: completed): Updated sandbox migration/build scripts according to approved DM-04:
