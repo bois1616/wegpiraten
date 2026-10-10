@@ -45,8 +45,8 @@ finalen Build (DM-05, Schritt 8). «Markiert» heisst: Das Workbook zeigt den Be
 | B5 | C1091 (neu seit 24.09.) ohne Geschäftsnummer | ja | Rechnung mit «PRÜFEN» im Dateinamen, wie heute schon |
 | B6 | Stauffer: C1079 und C1083 mit derselben AHV-Nummer; C1079 ohne Geburtsdatum | ja | Accordix-Pflichtfeld fehlt bei C1079 |
 | B7 | *(entfällt: die Familien bei Perren und Burri waren Demo)* | — | — |
-| B8 | 13 Austritte ohne Grund, 7 betreute Kinder ohne Accordix-Pflichtfeld, 16 Codewerte in abweichender Schreibweise | ja | Accordix kann die Zeilen ablehnen |
-| B9 | 9 Aufträge mit abgelaufener Bewilligung und offener Betreuung, 23 Zuordnungen auf ausgelaufene Aufträge | ja | auf ausgelaufene Aufträge entsteht kein Bogen (DM-20); das wird gemeldet |
+| B8 | Stand finaler Build 10.10.: 16 Austritte ohne Grund, 7 betreute Kinder ohne Accordix-Pflichtfeld, 19 Zeilen mit Codewerten in abweichender Schreibweise | ja | Accordix kann die Zeilen ablehnen |
+| B9 | Stand finaler Build 10.10.: 13 Aufträge mit abgelaufener Bewilligung und offener Betreuung, 30 Zuordnungen auf ausgelaufene Aufträge | ja | auf ausgelaufene Aufträge entsteht kein Bogen (DM-20); das wird gemeldet |
 | B10 | Rollen P/S: im Testbuild nur ein best guess (Stephan, 2026-10-09). Der finale Build setzt P nur bei Aufträgen mit genau einer Person; bei allen anderen fehlt die Rolle | ja, «ohne primäre Betreuungsperson» | Berichte dieser Aufträge ohne zuständige Person |
 
 ## C: entschieden oder zurückgestellt (Stephan, 2026-10-09)

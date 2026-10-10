@@ -10,12 +10,12 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** DM-02, DM-03, DM-04 gemäss Stand 09.10.; Q1–Q4 am 10.10. beantwortet und nachgeführt. Einführungsgespräch manuell im Bogen, Position «Ohne Berechnung» erscheint mit Betrag 0 CHF; keine ST99-Automatik. Technische Planentwürfe weiterhin Review offen.
+- **Zuletzt erledigt:** DM-05 finaler Build und DM-63; Ergebnis in `dm05_build_ergebnis.md`. 87 Kinder, 94 Aufträge/Betreuungen, 101 Zuordnungen, 153 Berichte. Finale XLSX und Befundliste liegen lokal in sandbox. Technische Planentwürfe weiterhin Review offen.
 - **In Arbeit:** nichts
-- **Nächster Schritt:** Planprüfungsentwurf durch Opus/Astra prüfen; DM-05 nach DM-04 mit Verlustnachweis bleibt der nächste Build-Schritt. Vor DM-10 die berechneten Fremdschlüssel, Budgeteinheiten und einen stabilen gemeinsamen Umstellungsschritt klären.
-- **Wartet auf Stephan:** nichts zu Q1–Q4; alle am 10.10. beantwortet. Unbrauchbare Rechnungen auslassen und warnen, heutiges Indexkind, Accordix je Betreuung, Gesprächsposition mit Betrag 0 CHF.
+- **Nächster Schritt:** DM-06 Windows-Excel-Prüfung durch Stephan; unabhängig DM-14 synthetische Importfixture. Vor DM-10 die berechneten Fremdschlüssel, Budgeteinheiten und einen stabilen gemeinsamen Umstellungsschritt klären; technische Spezifikationsentwürfe durch Opus/Astra prüfen.
+- **Wartet auf Stephan:** DM-06 (echtes Windows-Excel), danach DM-60/52 Übergabe. Q1–Q4 beantwortet.
 - **Entwürfe ohne Opus-Review:** `plan_review_2026-10-10.md` (Codex/GPT-6, genaue Modellvariante nicht ausgewiesen); keine abhängige Umsetzung dadurch freigegeben.
-- **Prüfstand:** `nox` am 10.10.: lint erfolgreich, pyright 0 Fehler/0 Warnungen; keine Codeänderung.
+- **Prüfstand:** 10.10.: nox lint/typecheck erfolgreich; 27 Tests bestanden direkt in bestehender Testumgebung. nox-Test-Installation scheitert an gesperrtem Netzwerk, nicht an Tests. Finaler Feldvergleich 0 Abweichungen, 0 Formelfehler, Excel-Strukturprüfung auch nach Neuberechnung bestanden.
 
 - **Grundsatz Daten:** Datenpflege ist nicht Aufgabe der Umstellung; Inkonsistenzen benennen und markieren, nicht korrigieren, nicht blockieren (Stephan, 2026-10-09)
 - **Betriebsrahmen:** Workaround bis WEGROSE; Kunde pflegt XLSX und füllt Bögen aus, Stephan erzeugt Dokumente. Nach Befunden korrigiert der Kunde fachlich, dann DB löschen und Lauf neu aufsetzen. Keine persistierte fachliche Datenhaltung in SQLite, keine maximale Absicherung oder historische Rekonstruktion (Stephan, 2026-10-10).
@@ -41,6 +41,25 @@ Regeln:
 ## 2026-10-10
 
 Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **DM-05 final workbook and DM-63 check** `[Codex / GPT-6, exact variant not exposed]`
+  (Status: completed): Updated sandbox migration/build scripts according to approved DM-04:
+  frozen original source, separate final destination, no demo families/roles, 153 reports
+  and six mandate rows marked `ZU PRÜFEN:`. Corrected predecessor application number for
+  C1024; retained current successor number. No historical contact rulings applied to original
+  data. Added row and catalogue checks for imported details and closing reports on predecessors
+  (two findings), plus invariants 49/50. Preserved 91 issued numbers; C1089=A26047,
+  C1091=A26048, C1090=A26049. Final counts: 87 persons, 94 mandates/cares, 101 links,
+  49 contacts, 153 reports, zero families. Four known person merges unchanged.
+  Verification: field-level source comparison, all report fields, MA pairs and roles passed;
+  zero unexplained differences, zero formula errors after LibreOffice recalculation;
+  strict Excel validation passed before/after recalculation. Original/testbuild unchanged by
+  hash comparison. Added reusable `sandbox/verify_final.py` and three synthetic regression
+  tests; full existing suite 27/27 passed. `nox` lint/typecheck passed; `nox -s test` could
+  not install build dependencies due to sandbox network restrictions, direct existing test
+  environment passed. Output and customer findings remain local, not in Git.
+  Next: Windows Excel acceptance DM-06, then customer handover; code migration not yet started.
+
 
 - **Stephan's answers and workaround scope** `[Codex / GPT-6, exact variant not exposed]`
   (Status: completed documentation update): Recorded Q1–Q4 in the review, DM-02, backlog,

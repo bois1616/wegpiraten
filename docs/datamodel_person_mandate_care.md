@@ -424,6 +424,8 @@ version where the entity did not change.
 | 42 | `application_number` is set | error |
 | 43 | payer `P1000`: `application_number` is nine digits `yymmddnnn` with `nnn` > 0 | error |
 | 44 | payer `P1000`: digits 1–6 of `application_number` form a real calendar date (`260631002` is not) | error |
+| 49 | an `Abschlussbericht` belongs only to the last mandate in a chain, not to one with a successor | warning |
+| 50 | a mandate or report whose notes start with `ZU PRÜFEN:` carries an imported detail awaiting customer verification | warning |
 
 Invariants 42–44 were added 2026-09-25 and are numbered after 41 in the reporting
 section's sequence; they are listed here because they belong to `mandate`.

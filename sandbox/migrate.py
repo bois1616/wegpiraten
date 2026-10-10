@@ -1,6 +1,6 @@
 """Migriert die Klientenliste in das Modell Kind / Auftrag / Betreuung.
 
-Liest sandbox/wegpiraten_datenbank(1).xlsx (Stand 24.09.2026, aktualisierte Originaldatei)
+Liest sandbox/wegpiraten_datenbank.xlsx (Stand 24.09.2026, aktualisierte Originaldatei)
 und schreibt das Ergebnis als JSON neben das Skript, damit der Aufbau der Arbeitsmappe
 die Zuordnung nicht noch einmal herleiten muss.
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 import openpyxl
 
 SANDBOX = Path(__file__).parent
-SRC = SANDBOX / "wegpiraten_datenbank(1).xlsx"
+SRC = SANDBOX / "wegpiraten_datenbank.xlsx"
 OUT = SANDBOX / "migration_neu.json"
 
 # Spalten der Tabelle masterdata_client, Kopfzeile 2, Daten ab Zeile 3.

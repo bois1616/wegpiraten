@@ -32,13 +32,16 @@ from openpyxl.worksheet.protection import SheetProtection
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 SANDBOX = Path(__file__).parent
-SRC = SANDBOX / "wegpiraten_datenbank(1).xlsx"
+SRC = SANDBOX / "wegpiraten_datenbank.xlsx"
 DST = Path(os.environ.get("WEGPIRATEN_DST", SANDBOX / "wegpiraten_datenbank_neu.xlsx"))
 DATA = SANDBOX / "migration_v2_neu.json"
 REPORTS_SEED = SANDBOX / "reports_import.json"
 # Handarbeit (Rollen in Zuordnung MA, Berichte) stammt aus der bisherigen Sandbox-Datei.
 # Die Familie ist seit 25.09.2026 ein Freitextfeld am Kind und wird mit übernommen.
 HAND = Path(os.environ.get("WEGPIRATEN_HAND", DST))
+CARRY_FAMILIES = os.environ.get("WEGPIRATEN_CARRY_FAMILIES", "1") == "1"
+CARRY_ROLES = os.environ.get("WEGPIRATEN_CARRY_ROLES", "1") == "1"
+MARK_REPORTS = os.environ.get("WEGPIRATEN_MARK_REPORTS", "0") == "1"
 # Blattschutz aus (24.09.2026): Sortieren scheitert, sobald ein Blatt gesperrte Formelzellen
 # enthält – »Geschützte Zellen können nicht geändert werden«. Die grauen Spalten bleiben
 # als Markierung, gesperrt sind sie nicht mehr.
@@ -1298,6 +1301,7 @@ AUFTRAEGE += issue_columns(
          "Leistungsart gibt es im Blatt Leistungstypen nicht"),
     ],
     hinweise=[
+        (f'LEFT({_c("A", "notes")},10)="ZU PRÜFEN:"', "Übernommene Angabe zu prüfen"),
         (f'{_c("A", "family_check")}="mehrere Familien"',
          "Der Auftrag betreut Kinder aus mehreren Familien"),
         (f'{_c("A", "contact_person_id")}=""', "Auftrag ohne Ansprechperson"),
@@ -1383,6 +1387,9 @@ BERICHTE += issue_columns(
          "Auftrag gibt es nicht"),
     ],
     hinweise=[
+        (f'LEFT({_c("R", "notes")},10)="ZU PRÜFEN:"', "Übernommene Angabe zu prüfen"),
+        (f'AND({_c("R", "report_form")}="Abschlussbericht",COUNTIF({_r("A", "predecessor_mandate_id")},{_c("R", "mandate_id")})>0)',
+         "Abschlussbericht auf einem Auftrag mit Nachfolger"),
         (f'{_c("R", "status_check")}="überfällig"',
          "Fällig-Datum liegt in der Vergangenheit, Status noch offen"),
         (f'{_c("R", "status_check")}="Datum fehlt"',
@@ -1572,6 +1579,18 @@ def build_wertelisten(wb):
 # ------------------------------------------------------------------- Prüfungen
 
 CHECKS = [
+    ("Hinweis", "Übernommene Angabe zu prüfen (Aufträge)",
+     "Übernommene Folgeaufträge prüfen, danach den Vorsatz ZU PRÜFEN: in der Bemerkung entfernen.",
+     '=COUNTIF(Aufträge!${A.notes}$3:${A.notes}${MAX},"ZU PRÜFEN:*")'),
+    ("Hinweis", "Übernommene Angabe zu prüfen (Berichte)",
+     "Übernommene Berichtstermine prüfen, danach den Vorsatz ZU PRÜFEN: in der Bemerkung entfernen.",
+     '=COUNTIF(Berichte!${R.notes}$3:${R.notes}${MAX},"ZU PRÜFEN:*")'),
+    ("Hinweis", "Abschlussbericht auf einem Auftrag mit Nachfolger",
+     "Ein Abschlussbericht gehört nur auf den letzten Auftrag einer Kette.",
+     '=SUMPRODUCT((Berichte!${R.report_form}$3:${R.report_form}${MAX}="Abschlussbericht")'
+     '*(Berichte!${R.mandate_id}$3:${R.mandate_id}${MAX}<>"")'
+     '*(COUNTIF(Aufträge!${A.predecessor_mandate_id}$3:${A.predecessor_mandate_id}${MAX},'
+     'Berichte!${R.mandate_id}$3:${R.mandate_id}${MAX})>0))'),
     ("Fehler", "Kind-Nr doppelt vergeben",
      "Jede Kind-Nr darf nur einmal vorkommen.",
      '=SUMPRODUCT((Kinder!${K.person_id}$3:${K.person_id}${MAX}<>"")'
@@ -2822,7 +2841,7 @@ def carry_over_handwork(persons, relations):
         if fid:
             zuordnung[pid] = fid
     for p in persons:
-        if p["person_id"] in zuordnung:
+        if CARRY_FAMILIES and p["person_id"] in zuordnung:
             p["family_id"] = zuordnung[p["person_id"]]
 
     rollen = {}
@@ -2839,7 +2858,7 @@ def carry_over_handwork(persons, relations):
                 rollen[(mid, wert(zs, row, sp, "employee_id"))] = role
         for r in relations:
             key = (r["mandate_id"], r.get("employee_id"))
-            if key in rollen:
+            if CARRY_ROLES and key in rollen:
                 r["role"] = rollen[key]
 
     berichte = []
@@ -2862,6 +2881,11 @@ def carry_over_handwork(persons, relations):
                 "notes": wert(rs, row, sp, "notes"),
             })
 
+    if MARK_REPORTS:
+        for report in berichte:
+            marker = "ZU PRÜFEN: aus der Klientenübersicht übernommen (Umstellung 10/2026)."
+            report["notes"] = f"{marker} {report.get('notes') or ''}".strip()
+
     if zuordnung or rollen or berichte:
         print(f"übernommen aus der vorhandenen Datei: {len(zuordnung)} Familienangaben, "
               f"{len(rollen)} Rollen, {len(berichte)} Berichte")
@@ -2881,7 +2905,7 @@ def main():
     for r in data["relations"]:
         if not r.get("role"):
             r["role"] = "P" if single[r["mandate_id"]] == 1 else None
-    if not data["reports"] and REPORTS_SEED.exists():
+    if not MARK_REPORTS and not data["reports"] and REPORTS_SEED.exists():
         data["reports"] = json.loads(REPORTS_SEED.read_text(encoding="utf-8"))
         print(f"Berichte aus {REPORTS_SEED.name} angelegt: {len(data['reports'])}")
 

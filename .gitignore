@@ -36,6 +36,7 @@ sandbox/*
 !sandbox/migrate.py
 !sandbox/import_reports.py
 !sandbox/excel_pruefung.ps1
+!sandbox/verify_final.py
 !sandbox/mandate_numbers.json
 .~lock.*#
 *.bak

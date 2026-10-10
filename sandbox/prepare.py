@@ -152,7 +152,7 @@ def build_mandate_numbers(mandates):
 # Nachfolger gleich. C1011/C1015 (neue Antragsnummer, Ende unverändert) fehlen absichtlich:
 # Wann der alte Auftrag endete, steht in keiner Datei. C1036 ist eine Nummernkorrektur.
 FOLLOW_UPS = {
-    "C1024": {"old_end": "2026-09-30"},
+    "C1024": {"old_end": "2026-09-30", "old_application_number": "250911003"},
     "C1068": {"old_end": "2026-08-31", "old_requester": "SR006"},
     "C1082": {"old_end": "2026-09-30"},
 }
@@ -179,6 +179,8 @@ def apply_follow_ups(data):
             "bestätigt (25.09.2026); Kontingent und Antragsnummer vom Vorgänger übernommen.")
             if x)
 
+        if "old_application_number" in spec:
+            old["application_number"] = spec["old_application_number"]
         old["end_date"] = spec["old_end"]
         if "old_requester" in spec:
             old["service_requester_id"] = spec["old_requester"]
@@ -195,6 +197,9 @@ def apply_follow_ups(data):
                 care[field] = None
         for r in [r for r in relations if r["mandate_id"] == cid]:
             relations.append({**r, "mandate_id": new_id})
+        marker = "ZU PRÜFEN: Folgeauftrag nachgetragen, Vorgängerwerte aus dem Stand 02.09.2026 (Umstellung 10/2026)."
+        for mandate in (old, new):
+            mandate["notes"] = f"{marker} {mandate.get('notes') or ''}".strip()
         mandates.append(new)
     data["stats"]["mandates"] = len(mandates)
     data["stats"]["cares"] = len(cares)
@@ -254,7 +259,8 @@ def main():
         r["old_client_id"] = r["mandate_id"].rstrip("+")
         r["mandate_id"] = mandate_map[r["mandate_id"]]
 
-    apply_contact_rulings(contacts, mandates)
+    # Originalwerte beibehalten; Widersprüche sind bereits in den Bemerkungen benannt.
+    # Keine historischen Anrede-/Namenskorrekturen in den finalen Build übernehmen.
 
     data["contacts"] = contacts
     data["families"] = families
