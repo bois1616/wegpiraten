@@ -36,7 +36,11 @@ under ignored `archiv/umstellung_datenmodell_2026-10-10/sandbox/`, with a hash m
 The three one-off migration tests are archived alongside their scripts; active synthetic
 pipeline tests remain. Customer handover files: `output/uebergabe_datenmodell_2026-10-10/`.
 The workbook is byte-identical to the final build, named `wegpiraten_datenbank.xlsx` for
-normal operation. Windows Excel DM-06 and actual delivery DM-60/52 remain open.
+normal operation. **Updated after Stephan’s feedback on 2026-10-10:** DM-60 test
+handover is complete. Stephan has also tested the result himself without findings
+so far. Customer feedback and final acceptance/delivery DM-52 remain open; the
+exact scope of his tests does not confirm formal Windows Excel DM-06 or full
+operator rehearsal DM-51.
 Historical `sandbox/` references below document former paths, not active dependencies.
 
 DM-70 completed on 2026-10-10 at Stephan's explicit request, superseding the earlier
@@ -163,7 +167,7 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 - [ ] [P0] [Daten] **DM-06** Workbook in echtem Excel prüfen. `[Stephan]`. Hinweis: LibreOffice sieht die Excel-Defekte nicht (siehe Datenmodell, «Excel-specific decisions»). `tools/excel_pruefung.ps1` unter Windows, Dropdowns und Prüfungen stichprobenweise. Danach Übergabe an Wegpiraten.
 - [x] [P0] [Aufräumen] **DM-07** Sandbox auflösen. `[Opus]` legt fest, `[Haiku]` führt aus, `[Stephan]` verschiebt die Dateien mit Personendaten. Hinweis: Erst nach DM-06 und DM-41 (die Accordix-Meldung August liegt dort). Inventar jeder Datei in `sandbox/` mit Entscheid: löschen, ins Repo übernehmen (z.B. `verify_excel_strict` und `excel_pruefung.ps1`, falls sie für spätere Strukturänderungen am Kunden-Workbook gebraucht werden) oder ausserhalb des Repos archivieren (alles mit Personendaten). `migrate.py`, `prepare.py`, `import_reports.py`, die `migration*.json`, `reports_import.json` und `mandate_numbers.json` haben nach dem finalen Build keinen Zweck mehr. Danach: `sandbox/`-Regeln aus `.gitignore`, alle Verweise auf `sandbox/` in `docs/` prüfen (das Datenmodell nennt sie als Herkunft, dort als Geschichte kennzeichnen, im Runbook entfernen), die Klärungsdateien sind beantwortet oder ins Log übertragen. Abnahme: `git grep sandbox` zeigt nur noch begründete Erwähnungen.
 
-- [ ] [P0] [Daten] **DM-60** Befundliste mit dem Workbook an Wegpiraten übergeben. `[Stephan]`, Liste `[Sonnet]` (DM-05, Schritt 8). Hinweis: [dm02_fachfragen.md](dm02_fachfragen.md), Gruppe B, im Stand nach dem finalen Build. Die Bereinigung ist Sache von Wegpiraten und keine Voraussetzung für einen weiteren Schritt.
+- [x] [P0] [Daten] **DM-60** Befundliste mit dem Workbook an Wegpiraten übergeben. `[Stephan]`, Liste `[Sonnet]` (DM-05, Schritt 8). Hinweis: [dm02_fachfragen.md](dm02_fachfragen.md), Gruppe B, im Stand nach dem finalen Build. Die Bereinigung ist Sache von Wegpiraten und keine Voraussetzung für einen weiteren Schritt.
 
 ### Phase 1: Schema und Stammdaten-Import
 

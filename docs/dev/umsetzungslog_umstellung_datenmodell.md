@@ -14,10 +14,10 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
-- **Latest change:** DM-70 monthly report task lists implemented, with one XLSX per employee and non-blocking assignment warnings. DM-07 lossless sandbox archive completed. Handover workbook and findings: `output/uebergabe_datenmodell_2026-10-10/`; workbook is byte-identical to final build. Windows checker retained and corrected at `tools/excel_pruefung.ps1`. Excel acceptance and delivery remain open.
-- **In progress:** none; stable common switch ready for review. The live database was not replaced; the CLI now requires a database rebuilt with the new workbook.
+- **Latest change:** DM-70 monthly report task lists implemented, with one XLSX per employee and non-blocking assignment warnings. DM-07 lossless sandbox archive completed. Handover workbook and findings: `output/uebergabe_datenmodell_2026-10-10/`; workbook is byte-identical to final build. Windows checker retained and corrected at `tools/excel_pruefung.ps1`. Stephan reports test handover completed and his own testing without findings so far; customer feedback and final acceptance remain open.
+- **In progress:** customer testing after Stephan’s test handover on 2026-10-10; no issues reported so far. The live database was not replaced; the CLI now requires a database rebuilt with the new workbook.
 - **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Sandbox has been archived losslessly at Stephan’s explicit request; August reference remains under `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
-- **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer handover DM-60/52 and merge DM-53. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
+- **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
 - **DM-70 validation:** 38 active tests passed; nox lint/typecheck passed with 0 errors and 0 warnings. Includes month/status selection, P versus S assignment, non-blocking missing/ambiguous references, empty employee files, literal free text, reruns and CLI invocation.
 - **Validation:** 38 tests passed before retirement of three one-off migration tests; 35 active tests passed after cleanup in `.nox/test`; `nox` lint/typecheck including reports passed (0 errors/warnings). Nox test dependency installation previously failed on network access; direct tests passed. All 94 workbook-derived mandate headers match the view; all 53 SCOR checks valid; PDF layout sampled. Windows-specific validation remains open.
@@ -44,6 +44,17 @@ Regeln:
 ## 2026-10-10
 
 Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **Customer test handover and operator feedback** `[Codex / GPT-6]`
+  (Status: test handover completed; final acceptance pending):
+  Stephan reports that he handed everything over for testing and also tested it
+  himself; everything looks good so far. DM-60 is complete as a test handover.
+  Customer test results and final acceptance remain pending. The report does not
+  specify Windows Excel checks or a full runbook rehearsal; DM-06/51 are not
+  closed on that basis. No new defects, code changes or test executions in this
+  documentation update. Prior automated validation remains 38 passing tests and
+  nox lint/typecheck with 0 errors and 0 warnings.
+
 
 - **DM-70 monthly report appointments** `[Codex / GPT-6]` (Status: completed):
   Stephan explicitly requested implementation now, overriding the earlier deferral.
