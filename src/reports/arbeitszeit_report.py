@@ -5,6 +5,7 @@ Zeiten werden pro Mitarbeiter, Klient und Datum aufgelistet und pro Mitarbeiter 
 
 import sqlite3
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 from loguru import logger
@@ -20,8 +21,8 @@ _SQL = """
 SELECT
     e.last_name || ' ' || e.first_name        AS mitarbeiter,
     sd.employee_id,
-    c.last_name || ' ' || c.first_name        AS klient,
-    sd.client_id,
+    CASE WHEN sd.mandate_id='SA' THEN 'Sonstige Aufwendungen' ELSE c.last_name || ' ' || c.first_name END AS klient,
+    sd.mandate_id,
     sd.service_date,
     COALESCE(sd.travel_time, 0)               AS fahrtzeit,
     COALESCE(sd.direct_time, 0)               AS direkt,
@@ -31,7 +32,7 @@ SELECT
         + COALESCE(sd.indirect_time, 0)       AS total
 FROM service_data sd
 LEFT JOIN employees e  ON sd.employee_id = e.emp_id
-LEFT JOIN clients   c  ON sd.client_id   = c.client_id
+LEFT JOIN v_mandate c ON sd.mandate_id = c.mandate_id
 WHERE sd.reporting_month = ?
 ORDER BY e.last_name, e.first_name, sd.service_date, c.last_name
 """
@@ -40,7 +41,7 @@ _HEADER = [
     "Mitarbeiter",
     "MA-ID",
     "Klient",
-    "Klienten-ID",
+    "Auftrag",
     "Datum",
     "Fahrtzeit",
     "Direktkontakt",
@@ -69,7 +70,7 @@ def create_arbeitszeit_report(config: Config, reporting_month: str) -> Path:
 
     db_path = config.get_db_path()
     with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql_query(_SQL, conn, params=(month_str,))
+        df = pd.read_sql_query(_SQL, conn, params=[month_str])
 
     if df.empty:
         logger.warning("Keine Leistungsdaten für {} in service_data.", month_str)
@@ -89,13 +90,13 @@ def _write_excel(df: pd.DataFrame, out_file: Path, month_str: str) -> None:
     # Summenzeilen pro Mitarbeiter
     summary_rows = []
     for emp in employees:
-        emp_df = df[df["Mitarbeiter"] == emp]
+        emp_df = cast(pd.DataFrame, df[df["Mitarbeiter"] == emp])
         summary_rows.append(
             {
                 "Mitarbeiter": emp,
                 "MA-ID": emp_df["MA-ID"].iloc[0],
                 "Klient": "",
-                "Klienten-ID": "",
+                "Auftrag": "",
                 "Datum": None,
                 "Fahrtzeit": emp_df["Fahrtzeit"].sum(),
                 "Direktkontakt": emp_df["Direktkontakt"].sum(),
@@ -219,8 +220,9 @@ def _build_pivot(df: pd.DataFrame) -> pd.DataFrame:
                 "Sum Indirekt": ("Indir. Bearbeitung", "sum"),
             }
         )
-        .sort_values(["Mitarbeiter", "Datum"])
+
     )
+    pivot = cast(pd.DataFrame, pivot).sort_values(["Mitarbeiter", "Datum"])
     pivot["Gesamt Min"] = pivot["Sum Fahrzeit"] + pivot["Sum Direkt"] + pivot["Sum Indirekt"]
     # Platzhalter; die eigentliche h:mm-Formel wird beim Schreiben als Excel-Formel eingetragen
     pivot[_PIVOT_HMM_COL] = None

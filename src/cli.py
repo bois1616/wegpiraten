@@ -11,7 +11,6 @@ Befehle:
     fetch-master    Stammdaten-Datei von Proton Drive holen
     fetch-timesheets Zeiterfassungsbögen von Proton Drive holen
     import-sheets   Ausgefüllte Zeiterfassungsbögen importieren
-    extend-master   Stammdaten-Datei um Accordix-Felder erweitern
     accordix        KFSG-Leistungsmeldung (ambulant) für Accordix erstellen
 """
 
@@ -219,7 +218,7 @@ def import_masterdata(
     """
     Importiert Stammdaten aus Excel in die SQLite-Datenbank.
 
-    Importiert Mitarbeiter, Klienten, Zahlungsdienstleister und
+    Importiert Mitarbeiter, Kinder, Aufträge, Betreuungen, Zahlungsdienstleister und
     Leistungsbesteller aus der Excel-Datei im Import-Ordner
     (structure.imports_path, standardmässig ``import``).
     Die verarbeitete Datei wird anschliessend nach ``done`` verschoben.
@@ -429,58 +428,6 @@ def arbeitszeit_report(
         raise typer.Exit(1)
 
 
-@app.command("extend-master")
-def extend_masterdata(
-    source: Optional[Path] = typer.Option(
-        None,
-        "--source",
-        "-s",
-        help="Pfad zur Stammdaten-Datei (optional, Standard: Datei im Import-Ordner aus Config)",
-    ),
-    config_path: Optional[Path] = typer.Option(
-        None,
-        "--config",
-        "-c",
-        help="Pfad zur Konfigurationsdatei",
-    ),
-) -> None:
-    """
-    Erweitert die Stammdaten-Datei um die Accordix-Felder (idempotent).
-
-    Fügt der Excel-Tabelle masterdata_client die Spalten date_of_birth,
-    gender, uma_umf, spoken_language, canton_of_residence,
-    residence_legal_guardian und allocation hinzu, legt ein Blatt
-    «Wertelisten» mit den Accordix-Wertelisten an und verknüpft die
-    Code-Spalten per Dropdown mit diesen Listen.
-
-    Die erweiterte Datei muss anschliessend wieder nach Proton Drive
-    hochgeladen werden, damit die Struktur dauerhaft erhalten bleibt.
-    """
-    console.print("[bold blue]Erweitere Stammdaten-Datei um Accordix-Felder...[/bold blue]")
-
-    try:
-        config = get_config(config_path)
-
-        from utils.extend_masterdata_accordix import extend_masterdata_file
-
-        if source:
-            excel_path = source
-        else:
-            imports_path = Path(config.structure.prj_root) / (config.structure.imports_path or "import")
-            excel_path = imports_path / (config.database.db_name or "wegpiraten_datenbank.xlsx")
-
-        path = extend_masterdata_file(excel_path)
-        console.print(f"[bold green]Stammdaten-Datei erweitert: {path}[/bold green]")
-        console.print(
-            "[yellow]Hinweis: Datei nach der Pflege wieder nach Proton Drive "
-            "hochladen, danach 'import-master' ausführen.[/yellow]"
-        )
-    except Exception as e:
-        logger.exception(f"Fehler beim Erweitern der Stammdaten-Datei: {e}")
-        console.print(f"[red]Fehler: {e}[/red]")
-        raise typer.Exit(1)
-
-
 @app.command("accordix")
 def accordix_report(
     month: str = typer.Argument(
@@ -498,10 +445,10 @@ def accordix_report(
     Erstellt die KFSG-Leistungsmeldung (ambulant) für Accordix als Excel-Datei.
 
     Nutzt die offizielle KJA-Vorlage und befüllt alle im Meldemonat aktiven,
-    einer Accordix-Leistungsart zuordenbaren Klient:innen mit den in den
+    einer Accordix-Leistungsart zuordenbaren Betreuungen meldepflichtiger Kostenträger mit den in den
     Stammdaten gepflegten Accordix-Feldern. Zeilen mit fehlenden oder
     ungültigen Pflichtfeldern werden mit Begründung übersprungen; die
-    Austrittsfelder werden im Meldefile manuell nachgetragen.
+    Austrittsfelder werden aus den Betreuungen übernommen.
     """
     console.print(f"[bold blue]Erstelle Accordix-Meldung für {month}...[/bold blue]")
 

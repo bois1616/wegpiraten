@@ -152,7 +152,9 @@ class DocumentUtils:
                 {
                     "Rechnungsdatum": data.get("invoice_date"),
                     "Zahlungsträger": getattr(payer, "name", "n.a") if payer else "n.a",
-                    "Klienten-ID": getattr(client, "key", "") if client else "",
+                    "Auftrag": data.get("mandate_id", ""),
+                    "Prüfen": bool(data.get("needs_review")),
+                    "Klienten-ID": data.get("index_person_id", ""),
                     "Klient": (
                         ", ".join(p for p in [getattr(client, "last_name", ""), getattr(client, "first_name", "")] if p)
                         if client

@@ -14,6 +14,7 @@ from pydantic_models.config.entity_model_config import EntityModelConfig, FieldC
 from pydantic_models.config.formatting_config import FormattingConfig
 from pydantic_models.config.logging_config import LoggingConfig
 from pydantic_models.config.masterdata_source_config import MasterdataSourceConfig
+from pydantic_models.config.reporting_config import ReportingConfig
 from pydantic_models.config.service_provider_config import ServiceProviderConfig
 
 # Importiere die statischen Pydantic-Modelle direkt, wenn src im PYTHONPATH liegt
@@ -78,6 +79,7 @@ class Config:
         self.service_provider = self._parse_section(self.raw_config, "service_provider", ServiceProviderConfig)
         self.templates = self._parse_section(self.raw_config, "templates", TemplatesConfig)
         self.masterdata_source = self._parse_section(self.raw_config, "masterdata_source", MasterdataSourceConfig)
+        self.reporting = self._parse_section(self.raw_config, "reporting", ReportingConfig)
         self.models = self._parse_entities(self.raw_config.get("entities", {}))
 
         self._validate_structure_and_paths()
@@ -208,8 +210,7 @@ class Config:
 
         db_path = data_dir / sqlite_name
         if not db_path.exists():
-            logger.error(f"SQLite-Datenbank nicht gefunden: {db_path}")
-            raise FileNotFoundError(f"SQLite-Datenbank nicht gefunden: {db_path}")
+            logger.debug("SQLite-Arbeitsdatenbank fehlt noch; import-master erstellt sie: {}", db_path)
 
         template_rel = getattr(self.structure, "template_path", None) or "templates"
         template_dir = (prj_root / template_rel).resolve()
@@ -342,7 +343,7 @@ class Config:
         basierend auf den Entity-Definitionen in der Config.
         """
         payer_fields = self.models.get("payer", EntityModelConfig(fields=[])).fields
-        client_fields = self.models.get("client", EntityModelConfig(fields=[])).fields
+        client_fields = self.models.get("mandate", EntityModelConfig(fields=[])).fields
         invoice_fields = self.models.get("invoice_data", EntityModelConfig(fields=[])).fields
         return ExpectedColumnsConfig(
             payer=payer_fields,

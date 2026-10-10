@@ -12,7 +12,7 @@ Claude-spezifische Anweisungen stehen in [CLAUDE.md](CLAUDE.md).
 
 Kernfunktionen:
 
-- Import von Stammdaten (Mitarbeiter, Klienten, Zahlungsdienstleister) aus Excel in SQLite
+- Import von Stammdaten (Mitarbeiter, Kinder, Aufträge, Betreuungen, Zahlungsdienstleister) aus Excel in SQLite
 - Import von ausgefüllten Zeiterfassungsbögen (Leistungsdaten)
 - Erstellung von Rechnungen für einen Leistungsmonat (DOCX + PDF)
 - Erstellung von leeren Zeiterfassungsbögen für den Folgemonat
@@ -180,7 +180,7 @@ config.service_provider.name
 config.service_provider.iban
 config.masterdata_source.remote_dir
 config.models["employee"].fields
-config.models["client"].fields
+config.models["mandate"].fields
 config.get_expected_columns()
 ```
 

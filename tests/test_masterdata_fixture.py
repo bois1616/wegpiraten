@@ -49,7 +49,7 @@ def test_fixture_uses_valid_accordix_codes() -> None:
         assert validate_coded_value("leaving_reason", row.get("leaving_reason")) is None
 
 
-def test_new_config_models_map_fixture_without_switching_old_import(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_new_config_models_map_fixture(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     """Die vorbereiteten Modelle lesen alle Felder und wandeln Stunden einmal in Minuten."""
     from data_imports.import_masterdata import DEFAULT_TABLE_MAPPINGS, map_row, read_excel_table
     from shared_modules.config import Config
@@ -75,5 +75,6 @@ def test_new_config_models_map_fixture_without_switching_old_import(tmp_path: Pa
         if entity == "mandate":
             assert mapped["allowed_travel_time"] == 30
             assert mapped["allowed_direct_effort"] == 600
-    assert "client" in config.models
-    assert DEFAULT_TABLE_MAPPINGS["masterdata_client"]["target"] == "clients"
+    assert "client" not in config.models
+    assert "masterdata_client" not in DEFAULT_TABLE_MAPPINGS
+    assert DEFAULT_TABLE_MAPPINGS["mandate"]["target"] == "mandate"

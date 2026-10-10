@@ -14,3 +14,5 @@ class DatabaseConfig(BaseModel):
 
     sqlite_db_name: Optional[str] = "Wegpiraten Datenbank.sqlite3"
     db_name: Optional[str] = "Wegpiraten Datenbank.xlsx"
+
+    legacy_mandate_mapping: str = "resources/legacy_mandate_mapping.json"

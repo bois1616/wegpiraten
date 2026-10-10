@@ -29,6 +29,7 @@ SRC_DIRS = [
     "src/invoices",
     "src/time_sheets",
     "src/data_imports",
+    "src/reports",
 ]
 
 TYPECHECK_DEPS = [

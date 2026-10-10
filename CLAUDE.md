@@ -124,3 +124,15 @@ db_path = config.get_db_path()           # richtig
 template_path = config.get_template_path("vorlage.xlsx")  # richtig
 db_path = Path("/home/user/data/db.sqlite3")  # NEIN — niemals hardcoded
 ```
+
+
+## Datenmodell-Umstellung: Stand 2026-10-10
+
+Die CLI liest jetzt das neue Workbook. `clients` und `relation_client_emp` entfallen;
+`service_data` speichert `mandate_id`. Vor dem Monatslauf SQLite sichern, löschen und
+mit dem neuen Workbook neu aufbauen. Details und Prüfergebnisse stehen in
+`docs/dev/umsetzungslog_umstellung_datenmodell.md` (Übergabe),
+`docs/dev/dm12_dm15_dm22_implementierung.md` und `docs/dev/dm34_september_2026.md`.
+Der alte Code und die alte Stammdatei gehören beim Rückweg zusammen. `extend-master`
+ist entfernt. Die aktuelle Bogen-Config verwendet F5/F8; ältere Angaben G5/G8 sind
+für diese Vorlage überholt. Keine automatisch erzeugte Einführungsgespräch-Position.

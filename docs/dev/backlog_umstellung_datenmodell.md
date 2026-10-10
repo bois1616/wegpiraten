@@ -17,6 +17,19 @@ Rekonstruktion oder maximale Absicherung als zusätzlicher Umfang. Ausgelassene 
 als Warnung zur Nacharbeit melden, übrigen Lauf fortsetzen. «Ohne Berechnung» erscheint
 auf der Rechnung mit Betrag 0 CHF (Korrektur der zunächst genannten Ausschlussregel).
 
+## Update 2026-10-10: implementation and September verification
+
+New journal updates continue in English from this point; existing German task descriptions
+remain in their original language.
+
+Stephan instructed implementation and selected September 2026 as the comparison month.
+The new import/schema/timesheet/invoice path is now implemented as one coherent change;
+see [implementation contracts](dm12_dm15_dm22_implementierung.md) and
+[September evidence](dm34_september_2026.md). No independent Opus/Astra review is claimed.
+DM-34's financial comparison is complete; Stephan's operational acceptance remains open.
+DM-16 has the P0 diagnostics and markings, with remaining warning coverage under DM-61.
+DM-50's runbook is updated; DM-51 still requires the operator's runbook-based rehearsal.
+
 ## Termin und Rahmen
 
 Seit 2026-10-09 ist die alte Stammdatei eingefroren: Stephan hat `wegpiraten_datenbank.xlsx` aus der
@@ -30,7 +43,7 @@ Zwei Fristen:
    sein; beheben muss sie Wegpiraten, nicht die Umstellung. Kritischer Pfad: DM-05, DM-06, DM-60.
 2. **Anfang November 2026: Oktober-Abrechnung mit dem neuen Schema** (entschieden 2026-10-09). Bis
    dahin müssen Phase 1 bis 3 und DM-50 fertig sein, die Bogenerzeugung für November ebenfalls.
-   Die Oktober-Bögen sind noch aus dem alten Modell erzeugt und tragen `C…` in G8; deshalb ist
+   Die Oktober-Bögen sind noch aus dem alten Modell erzeugt und tragen `C…` in F8; deshalb ist
    DM-22/DM-23 für diesen Lauf Pflicht, nicht nur für Archivbögen.
 
 Was das Vorgehen einfacher macht (Stephan, 2026-10-09):
@@ -40,7 +53,7 @@ Was das Vorgehen einfacher macht (Stephan, 2026-10-09):
   `make import-master`). Das Schema entsteht bei jedem Import neu; es gibt keine Bestandsdaten, die
   umgebaut werden müssten, und keine Rückwärtskompatibilität mit `clients` im Feature-Branch.
 - **Erfassungsbögen und Rechnungsvorlage bleiben, wie sie sind.** Sichtbar ändern sich nur der
-  Inhalt von G8 (Auftrags- statt Klientennummer) und die Rechnungsnummer.
+  Inhalt von F8 (Auftrags- statt Klientennummer) und die Rechnungsnummer.
 - **Die Sandbox wird aufgelöst** (DM-07). Nach der Umstellung bleibt dort nichts, was später für
   Verwirrung sorgen kann.
 
@@ -139,12 +152,12 @@ Sandbox-Skripte), alle gepusht, nicht gemergt. Er ist der eigentliche Produktivs
 
 ### Phase 1: Schema und Stammdaten-Import
 
-- [ ] [P0] [Config] **DM-10** Entitätsmodelle in `.config/wegpiraten_config.yaml` anlegen: `person`, `mandate`, `mandate_person`, `contact_person`, `mandate_employee_relation`, `report`. `[Haiku]`. Hinweis: Feldnamen, Typen und Pflicht genau aus den Tabellen im Datenmodell, Abschnitt «Entities». Nur Spalten, die im Workbook editierbar sind; die grauen `▸`-Spalten werden nicht importiert. `client` und `client_employee_relation` werden im selben Zug entfernt: Die Datenbank wird bei jedem Lauf neu aufgesetzt, der Feature-Branch muss das alte Schema nicht mehr lesen.
-- [ ] [P0] [Import] **DM-11** `import_masterdata.py` auf die neuen Blätter umstellen. `[Sonnet]`. Hinweis: `DEFAULT_TABLE_MAPPINGS` und `FOREIGN_KEY_MAPPINGS` (Reihenfolge: Stammdaten → `masterdata_contact_person` → `person` → `mandate` → `mandate_person` → `relation_mandate_emp` → `report`). Leere Reservezeilen (das Workbook hat 2000 Formelzeilen) überspringen. FK-Diagnostik bleibt.
-- [ ] [P0] [Schema] **DM-12** Abgeleitete Felder als SQL-View `v_mandate` spezifizieren. `[Opus]`. Hinweis: `index_person_id` (jüngstes Kind der Familie der Betreuungskinder, sonst das Kind selbst; bei gleichem Geburtsdatum dieselbe Regel wie im Workbook), `short_code` und `last_name/first_name/social_security_number` des Indexkindes, `sr_ap_gender/first_name/last_name` der Ansprechperson, Budget in Minuten. Die View muss für jeden Auftrag dasselbe Indexkind liefern wie das Workbook; Abgleich gehört zur Spezifikation. Stephan, 2026-10-10: immer heutiges Indexkind, auch bei alten Leistungsdaten; keine Historie rekonstruieren.
-- [ ] [P0] [Schema] **DM-13** View `v_mandate` umsetzen und gegen das Workbook prüfen. `[Sonnet]`, Spezifikation: DM-12. Hinweis: Test vergleicht View-Spalten mit den berechneten Spalten des Workbooks für alle Aufträge.
+- [x] [P0] [Config] **DM-10** Entitätsmodelle in `.config/wegpiraten_config.yaml` anlegen: `person`, `mandate`, `mandate_person`, `contact_person`, `mandate_employee_relation`, `report`. `[Haiku]`. Hinweis: Feldnamen, Typen und Pflicht genau aus den Tabellen im Datenmodell, Abschnitt «Entities». Editierbare Fachfelder plus die beiden berechneten FK-Schlüssel `predecessor_mandate_id` und `report.mandate_id`; Anzeige-/Prüfspalten werden nicht importiert (Korrektur 10.10.). `client` und `client_employee_relation` werden im selben Zug entfernt: Die Datenbank wird bei jedem Lauf neu aufgesetzt, der Feature-Branch muss das alte Schema nicht mehr lesen.
+- [x] [P0] [Import] **DM-11** `import_masterdata.py` auf die neuen Blätter umstellen. `[Sonnet]`. Hinweis: `DEFAULT_TABLE_MAPPINGS` und `FOREIGN_KEY_MAPPINGS` (Reihenfolge: Stammdaten → `masterdata_contact_person` → `person` → `mandate` → `mandate_person` → `relation_mandate_emp` → `report`). Leere Reservezeilen (das Workbook hat 2000 Formelzeilen) überspringen. FK-Diagnostik bleibt.
+- [x] [P0] [Schema] **DM-12** Abgeleitete Felder als SQL-View `v_mandate` spezifizieren. `[Opus]`. Hinweis: `index_person_id` (jüngstes Kind der Familie der Betreuungskinder, sonst das Kind selbst; bei gleichem Geburtsdatum dieselbe Regel wie im Workbook), `short_code` und `last_name/first_name/social_security_number` des Indexkindes, `sr_ap_gender/first_name/last_name` der Ansprechperson, Budget in Minuten. Die View muss für jeden Auftrag dasselbe Indexkind liefern wie das Workbook; Abgleich gehört zur Spezifikation. Stephan, 2026-10-10: immer heutiges Indexkind, auch bei alten Leistungsdaten; keine Historie rekonstruieren.
+- [x] [P0] [Schema] **DM-13** View `v_mandate` umsetzen und gegen das Workbook prüfen. `[Sonnet]`, Spezifikation: DM-12. Hinweis: Test vergleicht View-Spalten mit den berechneten Spalten des Workbooks für alle Aufträge.
 - [x] [P0] [Import] **DM-14** Synthetisches Test-Workbook ohne Personendaten. `[Sonnet]`. Hinweis: kleiner Ausschnitt mit den Fällen aus dem Konzept: Geschwister mit Indexkind, Kind mit zwei Aufträgen, Folgeauftrag, Vertretung (zwei MA, eine mit P), Austritt, SA-Sentinel. Das Test-Workbook enthält nur die Excel-Tabellen, die der Import liest (gleiche Tabellennamen und Spalten wie das finale Workbook), erzeugt von einem kleinen Skript unter `tests/fixtures/`; keine Abhängigkeit von `build.py`, das mit der Sandbox verschwindet. Grundlage für alle Tests ab hier. Erledigt 2026-10-10: `tests/fixtures/create_masterdata.py`, elf Tabellen ohne Sandbox-Abhängigkeit, Testfälle und Tabellen-/Mappingprüfungen. SA wird vom Import erzeugt; neuer Schema-Import folgt in DM-11/15.
-- [ ] [P0] [Import] **DM-15** SA-Sentinel im neuen Modell. `[Opus]` entscheidet, `[Sonnet]` setzt um. Hinweis: `internal_client.py` legt heute einen Klienten `SA` an. Vorschlag: ein Auftrag `SA` ohne Kind und ohne Betreuung, von Invariante 8 ausgenommen, nie fakturiert, nie gemeldet. Betrifft Import, Bogenerzeugung und Rechnungsfilter.
+- [x] [P0] [Import] **DM-15** SA-Sentinel im neuen Modell. `[Opus]` entscheidet, `[Sonnet]` setzt um. Hinweis: `internal_client.py` legt heute einen Klienten `SA` an. Vorschlag: ein Auftrag `SA` ohne Kind und ohne Betreuung, von Invariante 8 ausgenommen, nie fakturiert, nie gemeldet. Betrifft Import, Bogenerzeugung und Rechnungsfilter.
 - [ ] [P0] [Import] **DM-16** Invarianten beim Import prüfen, markieren statt anhalten. `[Sonnet]`. Hinweis: Der Import schreibt eine Befundliste (Invariante nach Nummer des Datenmodells, Blatt, Schlüssel, Text) ins Log und als Datei neben die Ausgabe, und er läuft weiter. Anhalten darf er nur, wenn das Workbook technisch nicht lesbar ist (Blatt oder Spalte fehlt). Doppelte Schlüssel: erste Zeile importieren, weitere als Befund nennen. Die nachgelagerten Programme markieren betroffene Ergebnisse nach dem bestehenden Muster `PRÜFEN` (fehlende Geschäftsnummer im Rechnungsdateinamen), etwa Rechnungen eines Auftrags ohne bestimmbares Indexkind oder mit doppelter KJA-Nummer, und listen sie in der Rechnungsübersicht.
 
 Ergänzung zu DM-16 (Stephan, 2026-10-10): Fehlen verwendbare Rechnungsgrundlagen, wird
@@ -155,38 +168,48 @@ Workbook fachlich, Stephan baut die SQLite-DB danach vollständig neu auf.
 
 DM-10 ist in stabile Schritte geteilt: **DM-10.1 erledigt 10.10.2026**, sechs neue Modelle
 additiv vorbereitet, inklusive der beiden berechneten FKs und Budgetumrechnung. Alte
-Modelle bleiben vorübergehend für die noch unveränderten Verbraucher erhalten. **DM-10.2
-offen:** Entfernung der alten Modelle gemeinsam mit der Umstellung aller Verbraucher;
-DM-10 insgesamt bleibt offen. Fixture-Mapping und Config-Validierung geprüft.
+Modelle blieben im Vorbereitungsschritt vorübergehend erhalten. **DM-10.2
+erledigt 10.10.:** Entfernung der alten Modelle gemeinsam mit der Umstellung aller Verbraucher;
+DM-10 abgeschlossen. Fixture-Mapping und Config-Validierung geprüft.
 
 ### Phase 2: Zeiterfassung
 
-- [ ] [P0] [Zeiterfassung] **DM-20** Bogenerzeugung auf Aufträge umstellen. `[Sonnet]`. Hinweis: `time_sheets/modules/client_data.py` liest `relation_mandate_emp` + `v_mandate` statt `relation_client_emp` + `clients`. Ein Bogen je Zeile der Zuordnung, wie bisher. Zelle G8 trägt die Auftragsnummer, C8 das Kurzzeichen des Indexkindes, Budget aus dem Auftrag. Dateiname `{employee_id}_{mandate_id} ({short_code})_{YYYY-MM}.xlsx`. Aufträge mit abgelaufener Bewilligung erzeugen keinen Bogen mehr (Invariante 31 als Warnung ins Log).
-- [x] [P0] [Zeiterfassung] **DM-21** Beschriftung im Bogen-Template prüfen. `[Haiku]`. Hinweis: Steht im Kopf «Klient-Nr» neben G8, wird es «Auftrag-Nr». Nur Text, keine Zellverschiebung (`header_cells.py` bleibt gültig). Erledigt 2026-10-10: E8 von «Klient-Nr.:» auf «Auftrag-Nr.:» geändert, alle übrigen XLSX-ZIP-Bestandteile unverändert.
-- [ ] [P0] [Import] **DM-22** Zuordnung alter Nummern beim Bogen-Import spezifizieren. `[Opus]`. Hinweis: Archivierte und noch ausstehende Bögen tragen `C…` in G8. Die Zuordnung C→A ist nicht immer eindeutig: bei nachgetragenen Folgeaufträgen (Yahia, Nipote, Gorlov, Richards) entscheidet das Leistungsdatum, welcher Auftrag gilt. Quelle ist `mandate_numbers.json` plus die Bewilligungszeiträume. Unauflösbar = fataler Fehler mit Datei und Zeile, kein stilles Raten.
-- [ ] [P0] [Import] **DM-23** `batch_import_timesheets.py` auf `mandate_id` umstellen. `[Sonnet]`, Spezifikation: DM-22. Hinweis: `service_data.client_id` wird `service_data.mandate_id` (FK auf `mandate`), Budgetspalten bleiben. Bögen mit `C…` laufen über die Zuordnung aus DM-22. Tests mit je einem Bogen alter und neuer Form.
+- [x] [P0] [Zeiterfassung] **DM-20** Bogenerzeugung auf Aufträge umstellen. `[Sonnet]`. Hinweis: `time_sheets/modules/client_data.py` liest `relation_mandate_emp` + `v_mandate` statt `relation_client_emp` + `clients`. Ein Bogen je Zeile der Zuordnung, wie bisher. Zelle F8 trägt (Korrektur 10.10., Config und September-Bögen geprüft) die Auftragsnummer, C8 das Kurzzeichen des Indexkindes, Budget aus dem Auftrag. Dateiname `{employee_id}_{mandate_id} ({short_code})_{YYYY-MM}.xlsx`. Aufträge mit abgelaufener Bewilligung erzeugen keinen Bogen mehr (Invariante 31 als Warnung ins Log).
+- [x] [P0] [Zeiterfassung] **DM-21** Beschriftung im Bogen-Template prüfen. `[Haiku]`. Hinweis: Steht im Kopf «Klient-Nr» neben F8, wird es «Auftrag-Nr». Nur Text, keine Zellverschiebung (`header_cells.py` bleibt gültig). Erledigt 2026-10-10: E8 von «Klient-Nr.:» auf «Auftrag-Nr.:» geändert, alle übrigen XLSX-ZIP-Bestandteile unverändert.
+- [x] [P0] [Import] **DM-22** Zuordnung alter Nummern beim Bogen-Import spezifizieren. `[Opus]`. Hinweis: Archivierte und noch ausstehende Bögen tragen `C…` in F8. Die Zuordnung C→A ist nicht immer eindeutig: bei nachgetragenen Folgeaufträgen (Yahia, Nipote, Gorlov, Richards) entscheidet das Leistungsdatum, welcher Auftrag gilt. Laufende Quelle ist `resources/legacy_mandate_mapping.json` plus die aktuellen Bewilligungszeiträume; keine Sandbox-Abhängigkeit (10.10.). Unauflösbar = fataler Fehler mit Datei und Zeile, kein stilles Raten.
+- [x] [P0] [Import] **DM-23** `batch_import_timesheets.py` auf `mandate_id` umstellen. `[Sonnet]`, Spezifikation: DM-22. Hinweis: `service_data.client_id` wird `service_data.mandate_id` (FK auf `mandate`), Budgetspalten bleiben. Bögen mit `C…` laufen über die Zuordnung aus DM-22. Tests mit je einem Bogen alter und neuer Form.
 
 ### Phase 3: Rechnung
 
-- [ ] [P0] [Rechnung] **DM-30** `invoice_processor.py` auf Aufträge umstellen. `[Sonnet]`. Hinweis: `JOIN clients` → `JOIN v_mandate`. Gruppierung bleibt je Auftrag (siehe Datenmodell, «What the invoice number names»), Kostenträger, Besteller, Ansprechperson und Standort vom Auftrag, Name und AHV-Nummer vom Indexkind. Kontextfelder (`client_name`, `client.social_security_number`, `sr_ap_*`) behalten ihre Namen, damit `rechnungsvorlage.docx` unverändert bleibt. Einführungsgespräch nach DM-03.
-- [ ] [P0] [Rechnung] **DM-31** Rechnungsnummer aus der Auftragsnummer. `[Sonnet]`. Hinweis: entsteht von selbst aus `service_data.mandate_id` (`2026-11-A26001`). `generate_scor` mit den neuen Nummern testen. Dateiname `{invoice_id}_{von}_{bis}_{application_number}` bleibt; die KJA-FS-Upload-Konvention prüfen (`_` als Trenner).
-- [ ] [P0] [Rechnung] **DM-32** Rechnungsfilter `CLIENT=` erweitern. `[Sonnet]`. Hinweis: `invoice_filter.py` nimmt A-Nummern (ein Auftrag) und C-Nummern (alle Aufträge, deren Indexkind das Kind ist). Makefile-Hilfe nachziehen.
-- [ ] [P0] [Rechnung] **DM-33** Rechnungsübersicht (`document_utils.py`) um Auftragsnummer ergänzen. `[Haiku]`. Hinweis: Spalte «Auftrag» vor «Klient», «Klient» zeigt das Indexkind. Sonst keine Änderung am Layout.
-- [ ] [P0] [Rechnung] **DM-34** Paralleler Rechnungslauf alt gegen neu. `[Opus]` legt fest, was gleich sein muss, `[Sonnet]` schreibt den Vergleich, `[Stephan]` nimmt ab. Hinweis: ein abgeschlossener Monat (Vorschlag 2026-09) einmal mit `backup/pre-datamodel-v2` und der alten Datei, einmal mit dem Feature-Branch und dem finalen Workbook. Beträge, Stunden, Positionen, Empfänger und QR-Daten je Rechnung gleich; erlaubt verschieden sind nur Rechnungsnummer, Referenz und Dateiname. Jede andere Abweichung ist ein Fehler, eine im Log begründete fachliche Änderung oder die Wirkung eines Datenbefunds aus DM-02 B.
+- [x] [P0] [Rechnung] **DM-30** `invoice_processor.py` auf Aufträge umstellen. `[Sonnet]`. Hinweis: `JOIN clients` → `JOIN v_mandate`. Gruppierung bleibt je Auftrag (siehe Datenmodell, «What the invoice number names»), Kostenträger, Besteller, Ansprechperson und Standort vom Auftrag, Name und AHV-Nummer vom Indexkind. Kontextfelder (`client_name`, `client.social_security_number`, `sr_ap_*`) behalten ihre Namen, damit `rechnungsvorlage.docx` unverändert bleibt. Einführungsgespräch nach DM-03.
+- [x] [P0] [Rechnung] **DM-31** Rechnungsnummer aus der Auftragsnummer. `[Sonnet]`. Hinweis: entsteht von selbst aus `service_data.mandate_id` (`2026-11-A26001`). `generate_scor` mit den neuen Nummern testen. Dateiname `{invoice_id}_{von}_{bis}_{application_number}` bleibt; die KJA-FS-Upload-Konvention prüfen (`_` als Trenner).
+- [x] [P0] [Rechnung] **DM-32** Rechnungsfilter `CLIENT=` erweitern. `[Sonnet]`. Hinweis: `invoice_filter.py` nimmt A-Nummern (ein Auftrag) und C-Nummern (alle Aufträge, deren Indexkind das Kind ist). Makefile-Hilfe nachgezogen (10.10.).
+- [x] [P0] [Rechnung] **DM-33** Rechnungsübersicht (`document_utils.py`) um Auftragsnummer ergänzen. `[Haiku]`. Hinweis: Spalte «Auftrag» vor «Klient», «Klient» zeigt das Indexkind. Sonst keine Änderung am Layout.
+- [ ] [P0] [Rechnung] **DM-34** Paralleler Rechnungslauf alt gegen neu. `[Opus]` legt fest, was gleich sein muss, `[Sonnet]` schreibt den Vergleich, `[Stephan]` nimmt ab. Hinweis: ein abgeschlossener Monat (Vorschlag 2026-09) einmal mit `backup/pre-datamodel-v2` und der alten Datei, einmal mit dem Feature-Branch und dem finalen Workbook. Beträge, Stunden, Positionen, Empfänger und QR-Daten ausser der Referenz je Rechnung gleich; erlaubt verschieden sind nur Rechnungsnummer, Referenz und Dateiname. Jede andere Abweichung ist ein Fehler, eine im Log begründete fachliche Änderung oder die Wirkung eines Datenbefunds aus DM-02 B.
+
+DM-34: financial comparison completed on 2026-10-10: 53 archived invoice amounts match,
+167 identical imported rows, CHF 60,385.93 sum of rounded individual invoices. Contact
+salutations and C1068 quota differences are explained in the evidence document; operator
+acceptance remains open, so the checkbox is deliberately not closed.
 
 ### Phase 4: Reporting
 
-- [ ] [P0] [Report] **DM-40** Accordix-Meldung aus den Betreuungen. `[Opus]` spezifiziert, `[Sonnet]` setzt um. Hinweis: Stephan, 2026-10-10: Meldung je Betreuung, nicht je Auftrag. Die bisherige Gleichsetzung jeder `mandate_person`-Zeile mit einer Meldezeile ist korrigiert: fortlaufende Betreuung über Folgeaufträge zusammenfassen, verschiedene Betreuungskinder getrennt melden. Eintritt und Austritt von der Betreuung, Leistungsart und Kostenträger vom Auftrag. Technischer Kettenvorschlag in der Planprüfung, Review offen. Die Sonderregel für Austritt = Bewilligungsende entfällt. **Gemeldet werden nur Betreuungen über den Kostenträger P1000 (KJA-FS)** (Stephan, 2026-10-09); Kostenträgerfilter vor `SERVICE_TYPE_MAP`. Die Liste meldepflichtiger Kostenträger gehört in die Config. Invariante 36 gilt nur für meldepflichtige Kostenträger.
+- [x] [P0] [Report] **DM-40** Accordix-Meldung aus den Betreuungen. `[Opus]` spezifiziert, `[Sonnet]` setzt um. Hinweis: Stephan, 2026-10-10: Meldung je Betreuung, nicht je Auftrag. Die bisherige Gleichsetzung jeder `mandate_person`-Zeile mit einer Meldezeile ist korrigiert: fortlaufende Betreuung über Folgeaufträge zusammenfassen, verschiedene Betreuungskinder getrennt melden. Eintritt und Austritt von der Betreuung, Leistungsart und Kostenträger vom Auftrag. Kettenregel implementiert und mit Wechsel/Austritt getestet; unabhängiges Review nicht behauptet. Die Sonderregel für Austritt = Bewilligungsende entfällt. **Gemeldet werden nur Betreuungen über den Kostenträger P1000 (KJA-FS)** (Stephan, 2026-10-09); Kostenträgerfilter vor `SERVICE_TYPE_MAP`. Die Liste meldepflichtiger Kostenträger gehört in die Config. Invariante 36 gilt nur für meldepflichtige Kostenträger.
 - [ ] [P0] [Report] **DM-41** Abgleich Accordix August 2026. `[Opus]`. Hinweis: neue Meldung gegen `sandbox/Import-Accordix_ambulant_August_2026.xlsx`. Jede Abweichung erklären: zusätzliche Geschwister, getrennte Austritte und wegfallende Zeilen anderer Kostenträger als P1000 sind gewollt, alles andere nicht.
-- [ ] [P0] [Report] **DM-42** Arbeitszeitprotokoll auf Aufträge umstellen. `[Haiku]`. Hinweis: `reports/arbeitszeit_report.py`, ein JOIN (`clients` → `v_mandate`); im Detailblatt Auftragsnummer und Indexkind zeigen.
-- [ ] [P0] [Report] **DM-43** `utils/extend_masterdata_accordix.py` stilllegen oder anpassen. `[Opus]` entscheidet, `[Haiku]` führt aus. Hinweis: Das Skript ergänzt die alte Klientenliste um Accordix-Spalten. Diese Felder sind jetzt Teil von Kinder und Betreuungen; das Skript ist vermutlich überflüssig.
+- [x] [P0] [Report] **DM-42** Arbeitszeitprotokoll auf Aufträge umstellen. `[Haiku]`. Hinweis: `reports/arbeitszeit_report.py`, ein JOIN (`clients` → `v_mandate`); im Detailblatt Auftragsnummer und Indexkind zeigen.
+- [x] [P0] [Report] **DM-43** `utils/extend_masterdata_accordix.py` stilllegen oder anpassen. `[Opus]` entscheidet, `[Haiku]` führt aus. Hinweis: Das Skript ergänzt die alte Klientenliste um Accordix-Spalten. Diese Felder sind jetzt Teil von Kinder und Betreuungen; das Skript ist vermutlich überflüssig.
 
 ### Phase 5: Umstellung
 
-- [ ] [P0] [Doku] **DM-50** Betriebs-Runbook mit Schritt-für-Schritt-Anleitung umschreiben. `[Sonnet]`, Review `[Opus]`. Hinweis: `docs/runbook_betriebsablauf.md` bekommt den Monatslauf als nummerierte Schritte, jeder mit Befehl, erwartetem Ergebnis und was bei Abweichung zu tun ist: Workbook aus der Cloud holen (`make fetch-master`), SQLite-Datei löschen, `make import-master` und dessen Prüfmeldungen lesen, Bögen erzeugen (`make timesheets`), Bögen einsammeln und importieren, Rechnungen, Arbeitszeitprotokoll, Accordix. Dazu der einmalige Abschnitt «Erster Lauf nach der Umstellung» (Oktober 2026: Bögen mit `C…` in G8). Das Umstellungs-Runbook verliert die Sandbox-Teile und das Kapitel «Für die Umsetzung in den Programmen», die «Typischen Vorgänge» für Wegpiraten bleiben. AGENTS.md und CLAUDE.md (Projektübersicht, Datenmodell) nachziehen. Wird vor DM-51 geschrieben, damit die Generalprobe genau nach dem Runbook läuft.
+- [ ] [P0] [Doku] **DM-50** Betriebs-Runbook mit Schritt-für-Schritt-Anleitung umschreiben. `[Sonnet]`, Review `[Opus]`. Hinweis: `docs/runbook_betriebsablauf.md` bekommt den Monatslauf als nummerierte Schritte, jeder mit Befehl, erwartetem Ergebnis und was bei Abweichung zu tun ist: Workbook aus der Cloud holen (`make fetch-master`), SQLite-Datei löschen, `make import-master` und dessen Prüfmeldungen lesen, Bögen erzeugen (`make timesheets`), Bögen einsammeln und importieren, Rechnungen, Arbeitszeitprotokoll, Accordix. Dazu der einmalige Abschnitt «Erster Lauf nach der Umstellung» (Oktober 2026: Bögen mit `C…` in F8). Das Umstellungs-Runbook verliert die Sandbox-Teile und das Kapitel «Für die Umsetzung in den Programmen», die «Typischen Vorgänge» für Wegpiraten bleiben. AGENTS.md und CLAUDE.md (Projektübersicht, Datenmodell) nachziehen. Wird vor DM-51 geschrieben, damit die Generalprobe genau nach dem Runbook läuft.
 - [ ] [P0] [Betrieb] **DM-51** Generalprobe auf einer Kopie. `[Stephan]` mit `[Sonnet]`. Hinweis: kompletter Monat auf dem Feature-Branch mit dem finalen Workbook, Schritt für Schritt nach dem Runbook aus DM-50; jede Stelle, an der das Runbook nicht reicht, wird dort korrigiert. Vorschlag: September 2026 mit den archivierten Bögen, dann ist der Vergleich aus DM-34 gleich mit erledigt.
 - [ ] [P0] [Betrieb] **DM-52** Neues Workbook an Wegpiraten übergeben und Quelle umschalten. `[Stephan]`. Hinweis: Ende Oktober 2026. Wegpiraten bearbeitet die Datei lokal, Stephan holt sie aus der Cloud. Empfehlung: Sie heisst wieder `wegpiraten_datenbank.xlsx`, dann bleibt `masterdata_source` in der Config unverändert; heisst sie anders, `file_pattern` und `preferred_filename` anpassen (`[Haiku]`).
 - [ ] [P0] [Git] **DM-53** Merge nach `main`, Tag `datamodel-v2`. `[Stephan]`. Hinweis: nach DM-34 und DM-51, vor dem Oktober-Lauf; DM-41 nur dann vorher, wenn die Accordix-Meldung vor dem Lauf fällig ist.
+
+DM-16.1 implemented: P0 key/FK/mandate/number diagnostics, `PRÜFEN` filename and summary
+markers, warning-only omission of unusable invoices. Full warning parity follows in DM-61;
+DM-16 remains open for final review of coverage. DM-50 runbook rewritten; its review and the
+operator rehearsal remain open. No claim of a production or cloud rehearsal.
 
 ## P1 Should
 
@@ -221,3 +244,8 @@ DM-33 und DM-42. Was auf Antworten wartet: nichts; alle Regeln aus DM-02 A sind 
 Reihenfolge bei knappem Kontingent: zuerst alles, was Ende Oktober braucht (DM-02, DM-04 bis
 DM-06, DM-60), dann der Pfad zum Oktober-Lauf (DM-10 bis DM-34, DM-50, DM-51); Reporting
 (Phase 4) darf nach dem ersten Rechnungslauf kommen, wenn die Accordix-Meldung nicht vorher fällig ist.
+
+- [ ] [P1] [Invoice] September comparison found the existing distinction between summing
+  unrounded computed totals (CHF 60,385.92) and summing the rounded invoice amounts
+  (CHF 60,385.93). Decide whether the summary should sum the latter; do not change individual
+  invoice calculations as a side effect of this migration.

@@ -2,7 +2,7 @@
 # Verwendung: make <ziel> [MONTH=...] [CLIENT=...]
 #
 #   make invoices      MONTH=02.2026                    Rechnungen + Arbeitszeitprotokoll (Format MM.YYYY)
-#   make invoices      MONTH=02.2026 CLIENT=C1017,C1038 Rechnungen für bestimmte Klienten
+#   make invoices      MONTH=02.2026 CLIENT=A26001,C1017 Auftrag A… oder Indexkind C…
 #   make timesheets    MONTH=2026-02                    Zeiterfassungsbögen erstellen (Format YYYY-MM)
 #   make import-master                                  Stammdaten importieren
 #   make import-master FETCH=1                          Stammdaten vorher von Proton Drive holen
@@ -12,7 +12,6 @@
 #   make import-sheets MONTH=2026-02                    Zeiterfassungsbögen importieren
 #   make report        MONTH=2026-02                    Arbeitszeitprotokoll erstellen
 #   make accordix      MONTH=2026-02                    Accordix-Leistungsmeldung (ambulant) erstellen
-#   make extend-master                                  Stammdaten-Datei um Accordix-Felder erweitern
 #   make validate                                       Konfiguration prüfen
 #
 # MONTH wird beim ersten Aufruf in .month gespeichert und für Folgeaufrufe
@@ -24,14 +23,14 @@
 
 CLI := .venv/bin/wegpiraten
 
-.PHONY: help invoices timesheets import-master fetch-master fetch-timesheets import-sheets report accordix extend-master validate _require-month _save-month _require-tsdir _save-tsdir
+.PHONY: help invoices timesheets import-master fetch-master fetch-timesheets import-sheets report accordix validate _require-month _save-month _require-tsdir _save-tsdir
 
 help:
 	@echo ""
 	@echo "Wegpiraten – verfügbare Ziele"
 	@echo ""
 	@echo "  make invoices      MONTH=02.2026                    Rechnungen + Arbeitszeitprotokoll  (Format MM.YYYY)"
-	@echo "  make invoices      MONTH=02.2026 CLIENT=C1017,C1038 Rechnungen für bestimmte Klienten"
+	@echo "  make invoices      MONTH=02.2026 CLIENT=A26001,C1017 Auftrag A… oder Indexkind C…"
 	@echo "  make timesheets    MONTH=2026-02                    Zeiterfassungsbögen erstellen  (Format YYYY-MM)"
 	@echo "  make import-master                                  Stammdaten importieren"
 	@echo "  make import-master FETCH=1                          Stammdaten vorher von Proton Drive holen"
@@ -41,7 +40,6 @@ help:
 	@echo "  make import-sheets MONTH=2026-02                    Zeiterfassungsbögen importieren"
 	@echo "  make report        MONTH=2026-02                    Arbeitszeitprotokoll erstellen"
 	@echo "  make accordix      MONTH=2026-02                    Accordix-Leistungsmeldung (ambulant) erstellen"
-	@echo "  make extend-master                                  Stammdaten-Datei um Accordix-Felder erweitern"
 	@echo "  make validate                                       Konfiguration prüfen"
 	@echo ""
 	@echo "  MONTH wird zwischen Aufrufen in .month gespeichert (kein erneutes Angeben nötig)."
@@ -72,8 +70,6 @@ report: _require-month _save-month
 accordix: _require-month _save-month
 	$(CLI) accordix $(MONTH)
 
-extend-master:
-	$(CLI) extend-master
 
 validate:
 	$(CLI) validate

@@ -10,7 +10,6 @@ from openpyxl import load_workbook
 from openpyxl.workbook.workbook import Workbook
 
 from pydantic_models.config.config_data import TimeSheetHeaderCells, TimeSheetRowMapping
-from pydantic_models.config.entity_model_config import EntityModelConfig
 from pydantic_models.data.header_data_model import HeaderDataModel
 from shared_modules.config import Config
 from shared_modules.utils import derive_table_range, ensure_dir
@@ -69,60 +68,19 @@ class TimeSheetFactory:
         )
 
     def _validate_header_model(self) -> None:
-        """
-        Prüft einmalig, ob HeaderDataModel mit den Entity-Definitionen 'client'
-        und 'client_employee_relation' kompatibel ist. employee_id stammt aus
-        der Relation, nicht mehr aus den (nur noch zur Ansicht dienenden)
-        Spalten clients.employee_id/employee_2.
-        """
-        entity_cfg: EntityModelConfig | None = self.config.models.get("client")
-        if entity_cfg is None:
-            logger.error("Entity 'client' fehlt in der Config.")
-            raise ValueError("Entity 'client' fehlt in der Config.")
-
-        relation_cfg: EntityModelConfig | None = self.config.models.get("client_employee_relation")
-        if relation_cfg is None:
-            logger.error("Entity 'client_employee_relation' fehlt in der Config.")
-            raise ValueError("Entity 'client_employee_relation' fehlt in der Config.")
-
-        entity_fields = {field.name for field in entity_cfg.fields}
-        relation_fields = {field.name for field in relation_cfg.fields}
-        required_client_fields = {
-            "client_id",
-            "service_type",
-            "short_code",
-            "allowed_travel_time",
-            "allowed_direct_effort",
-            "allowed_indirect_effort",
+        """Prüft die Quellmodelle; Indexkind und Kurzzeichen kommen aus der View."""
+        required = {
+            "mandate": {"mandate_id", "service_type_id", "allowed_travel_time", "allowed_direct_effort", "allowed_indirect_effort"},
+            "person": {"person_id", "short_code", "first_name", "last_name"},
+            "mandate_employee_relation": {"mandate_id", "employee_id"},
         }
-
-        if not required_client_fields.issubset(entity_fields):
-            missing = required_client_fields - entity_fields
-            logger.error(f"Pflichtfelder fehlen in Entity 'client': {missing}")
-            raise ValueError(f"Pflichtfelder fehlen in Entity 'client': {missing}")
-
-        if "employee_id" not in relation_fields:
-            logger.error("Pflichtfeld 'employee_id' fehlt in Entity 'client_employee_relation'.")
-            raise ValueError("Pflichtfeld 'employee_id' fehlt in Entity 'client_employee_relation'.")
-
-        model_fields = set(HeaderDataModel.model_fields)
-
-        allowed_computed_fields = {"allowed_hours_per_month"}
-        extra_in_model = (
-            model_fields
-            - entity_fields
-            - relation_fields
-            - allowed_computed_fields
-            - {
-                "client_first_name",
-                "client_last_name",
-                "employee_first_name",
-                "employee_last_name",
-            }
-        )
-        if extra_in_model:
-            logger.error(f"HeaderDataModel enthält unbekannte Felder: {extra_in_model}")
-            raise ValueError(f"HeaderDataModel enthält unbekannte Felder: {extra_in_model}")
+        for entity, names in required.items():
+            model = self.config.models.get(entity)
+            if model is None:
+                raise ValueError(f"Entity '{entity}' fehlt in der Config.")
+            missing = names - {f.name for f in model.fields}
+            if missing:
+                raise ValueError(f"Pflichtfelder fehlen in Entity '{entity}': {missing}")
 
     # --------------------------------------------------------------------- #
     # Datenbeschaffung

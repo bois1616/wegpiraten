@@ -47,6 +47,7 @@ from openpyxl.styles import Protection
 from openpyxl.worksheet.worksheet import Worksheet
 from pydantic import BaseModel, ValidationError
 
+from data_imports.legacy_mandates import LegacyMandateResolver
 from pydantic_models.data.invoice_row_model import InvoiceRowModel
 from pydantic_models.data.row_mapping import RowMapping
 from pydantic_models.data.timesheet_import_profile import TimeSheetImportProfile
@@ -70,7 +71,7 @@ class ImportedRowExport(BaseModel):
     reporting_month: str
     source_file: str
     tenant_id: Optional[str] = None
-    client_id: str
+    mandate_id: str
     employee_id: str
     service_date: date
     service_type: str
@@ -103,7 +104,7 @@ class TimeSheetsImporter:
     """
 
     _INSERT_FIELDS: tuple[str, ...] = (
-        "client_id",
+        "mandate_id",
         "tenant_id",
         "employee_id",
         "service_date",
@@ -186,9 +187,12 @@ class TimeSheetsImporter:
         )
 
         self._error_entries: List[ImportErrorEntry] = []
-        self._valid_client_ids: set[str] = set()
+        self._valid_mandate_ids: set[str] = set()
         self._valid_employee_ids: set[str] = set()
 
+        self.legacy_resolver = LegacyMandateResolver(
+            self.db_path, Path(config.structure.prj_root) / config.database.legacy_mandate_mapping
+        )
         self._ensure_service_data_table()
         self._refresh_fk_cache()
 
@@ -253,19 +257,19 @@ class TimeSheetsImporter:
         return values
 
     def _refresh_fk_cache(self) -> None:
-        self._valid_client_ids = self._fetch_reference_values("clients", "client_id")
+        self._valid_mandate_ids = self._fetch_reference_values("mandate", "mandate_id")
         self._valid_employee_ids = self._fetch_reference_values("employees", "emp_id")
 
     def _validate_header_foreign_keys(self, header: Dict[str, object], source_file: str) -> bool:
-        client_id = str(header.get("client_id") or "").strip()
-        if not client_id:
-            self._record_error(source_file, "Header", "client_id fehlt im Header.")
+        mandate_id = str(header.get("mandate_id") or "").strip()
+        if not mandate_id:
+            self._record_error(source_file, "Header", "mandate_id fehlt im Header.")
             return False
-        if client_id not in self._valid_client_ids:
+        if not str(header.get("source_mandate_id") or "").startswith("C") and mandate_id not in self._valid_mandate_ids:
             self._record_error(
                 source_file,
                 "FK-Fehler",
-                f"client_id '{client_id}' existiert nicht in den Stammdaten (clients.client_id).",
+                f"mandate_id '{mandate_id}' existiert nicht in den Stammdaten (mandate.mandate_id).",
             )
             return False
 
@@ -279,7 +283,7 @@ class TimeSheetsImporter:
             return False
 
         service_type = str(header.get("service_type") or "").strip()
-        if not service_type:
+        if not service_type and not str(header.get("source_mandate_id") or "").startswith("C"):
             self._record_error(
                 source_file,
                 "FK-Fehler",
@@ -346,7 +350,7 @@ class TimeSheetsImporter:
         sql = """
         CREATE TABLE IF NOT EXISTS service_data (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            client_id TEXT NOT NULL,
+            mandate_id TEXT NOT NULL,
             tenant_id TEXT,
             employee_id TEXT,
             service_date TEXT NOT NULL,
@@ -358,7 +362,7 @@ class TimeSheetsImporter:
             notes TEXT,
             source_file TEXT,
             reporting_month TEXT,
-            FOREIGN KEY (client_id) REFERENCES clients(client_id),
+            FOREIGN KEY (mandate_id) REFERENCES mandate(mandate_id),
             FOREIGN KEY (employee_id) REFERENCES employees(emp_id)
         )
         """
@@ -370,7 +374,7 @@ class TimeSheetsImporter:
         """
         client_date_index_sql = """
         CREATE INDEX IF NOT EXISTS idx_service_data_client_date
-        ON service_data (client_id, service_date)
+        ON service_data (mandate_id, service_date)
         """
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA foreign_keys = ON")
@@ -425,57 +429,57 @@ class TimeSheetsImporter:
                 return column
         return None
 
-    def _resolve_service_type(self, client_id: Optional[str]) -> Optional[str]:
-        if not client_id:
+    def _resolve_service_type(self, mandate_id: Optional[str]) -> Optional[str]:
+        if not mandate_id:
             return None
         sql = """
         SELECT st.code
-        FROM clients c
+        FROM v_mandate c
         LEFT JOIN service_types st ON c.service_type = st.service_type_id
-        WHERE c.client_id = ?
+        WHERE c.mandate_id = ?
         """
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(sql, (client_id,)).fetchone()
+            row = conn.execute(sql, (mandate_id,)).fetchone()
         if row and row[0]:
             return str(row[0]).strip()
         return None
 
-    def _resolve_hourly_rate(self, client_id: Optional[str]) -> Optional[float]:
-        if not client_id:
+    def _resolve_hourly_rate(self, mandate_id: Optional[str]) -> Optional[float]:
+        if not mandate_id:
             return None
         sql = """
         SELECT st.hourly_rate
-        FROM clients c
+        FROM v_mandate c
         LEFT JOIN service_types st ON c.service_type = st.service_type_id
-        WHERE c.client_id = ?
+        WHERE c.mandate_id = ?
         """
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(sql, (client_id,)).fetchone()
+            row = conn.execute(sql, (mandate_id,)).fetchone()
         if row and row[0] is not None:
             return to_float(row[0])
         return None
 
-    def _resolve_employee_id(self, client_id: Optional[str]) -> Optional[str]:
-        """Ermittelt die employee_id über relation_client_emp, sofern für den
+    def _resolve_employee_id(self, mandate_id: Optional[str]) -> Optional[str]:
+        """Ermittelt die employee_id über relation_mandate_emp, sofern für den
         Klienten genau ein aktives Klient-MA-Paar hinterlegt ist. Bei mehreren
         (oder keinem) Paaren bleibt die employee_id offen (F5 im Sheet muss
         dann selbst ausgefüllt sein)."""
-        if not client_id:
+        if not mandate_id:
             return None
-        sql = "SELECT employee_id FROM relation_client_emp WHERE client_id = ? AND COALESCE(is_active, 1) = 1"
+        sql = "SELECT employee_id FROM relation_mandate_emp WHERE mandate_id = ? AND COALESCE(is_active, 1) = 1"
         with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(sql, (client_id,)).fetchall()
+            rows = conn.execute(sql, (mandate_id,)).fetchall()
         if len(rows) == 1 and rows[0][0]:
             return str(rows[0][0]).strip()
         return None
 
-    def _resolve_budget(self, client_id: Optional[str]) -> tuple[Optional[int], Optional[int], Optional[int]]:
-        """Liest allowed_travel_time, allowed_direct_effort, allowed_indirect_effort aus clients."""
-        if not client_id:
+    def _resolve_budget(self, mandate_id: Optional[str]) -> tuple[Optional[int], Optional[int], Optional[int]]:
+        """Liest allowed_travel_time, allowed_direct_effort, allowed_indirect_effort aus mandate."""
+        if not mandate_id:
             return None, None, None
-        sql = "SELECT allowed_travel_time, allowed_direct_effort, allowed_indirect_effort FROM clients WHERE client_id = ?"
+        sql = "SELECT allowed_travel_time, allowed_direct_effort, allowed_indirect_effort FROM v_mandate WHERE mandate_id = ?"
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(sql, (client_id,)).fetchone()
+            row = conn.execute(sql, (mandate_id,)).fetchone()
         if row:
             travel = int(row[0]) if row[0] is not None else None
             direct = int(row[1]) if row[1] is not None else None
@@ -483,23 +487,23 @@ class TimeSheetsImporter:
             return travel, direct, indirect
         return None, None, None
 
-    def _resolve_tenant_id(self, client_id: Optional[str]) -> Optional[str]:
-        if not client_id:
+    def _resolve_tenant_id(self, mandate_id: Optional[str]) -> Optional[str]:
+        if not mandate_id:
             return None
-        sql = "SELECT tenant_id FROM clients WHERE client_id = ?"
+        sql = "SELECT tenant_id FROM v_mandate WHERE mandate_id = ?"
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(sql, (client_id,)).fetchone()
+            row = conn.execute(sql, (mandate_id,)).fetchone()
         if row and row[0]:
             return str(row[0]).strip()
         return None
 
-    def _resolve_client_employees(self, client_id: Optional[str]) -> set[str]:
-        """Liest die aktiven Klient-MA-Paare des Clients aus relation_client_emp."""
-        if not client_id:
+    def _resolve_client_employees(self, mandate_id: Optional[str]) -> set[str]:
+        """Liest die aktiven Klient-MA-Paare des Clients aus relation_mandate_emp."""
+        if not mandate_id:
             return set()
-        sql = "SELECT employee_id FROM relation_client_emp WHERE client_id = ? AND COALESCE(is_active, 1) = 1"
+        sql = "SELECT employee_id FROM relation_mandate_emp WHERE mandate_id = ? AND COALESCE(is_active, 1) = 1"
         with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(sql, (client_id,)).fetchall()
+            rows = conn.execute(sql, (mandate_id,)).fetchall()
         return {str(row[0]).strip() for row in rows if row[0] and str(row[0]).strip()}
 
     def _determine_row_mapping(self, ws: Worksheet) -> Optional[tuple[RowMapping, bool]]:
@@ -595,17 +599,24 @@ class TimeSheetsImporter:
     def _read_header(self, ws: Worksheet) -> Dict[str, object]:
         cells = self.profile.header_cells
         employee_id = ws[cells.emp_id].value  # type: ignore[union-attr]
-        client_id = ws[cells.client_id].value  # type: ignore[union-attr]
+        mandate_id = ws[cells.client_id].value  # type: ignore[union-attr]
         allowed_hours = ws[cells.allowed_hours_per_month].value  # type: ignore[union-attr]
 
-        client_id_str = str(client_id).strip() if client_id is not None else ""
-        if not client_id_str:
-            client_id_str = ""
+        mandate_id_str = str(mandate_id).strip() if mandate_id is not None else ""
+        if not mandate_id_str:
+            mandate_id_str = ""
 
-        service_type = self._resolve_service_type(client_id_str or None)
-        resolved_employee_id = self._resolve_employee_id(client_id_str or None)
-        resolved_tenant_id = self._resolve_tenant_id(client_id_str or None)
-        resolved_hourly_rate = self._resolve_hourly_rate(client_id_str or None)
+        source_id = mandate_id_str
+        try:
+            candidates = self.legacy_resolver.candidate_ids(source_id)
+            if len(candidates) == 1:
+                mandate_id_str = candidates[0]
+        except (ValueError, OSError):
+            pass
+        service_type = self._resolve_service_type(mandate_id_str or None)
+        resolved_employee_id = self._resolve_employee_id(mandate_id_str or None)
+        resolved_tenant_id = self._resolve_tenant_id(mandate_id_str or None)
+        resolved_hourly_rate = self._resolve_hourly_rate(mandate_id_str or None)
         if not employee_id:
             employee_id = resolved_employee_id
         employee_id_str = str(employee_id).strip() if employee_id is not None else ""
@@ -627,9 +638,9 @@ class TimeSheetsImporter:
 
         # Fallback auf DB, falls das Sheet keine Budgets enthält
         if sheet_travel is None and sheet_direct is None and sheet_indirect is None:
-            db_travel, db_direct, db_indirect = self._resolve_budget(client_id_str or None)
+            db_travel, db_direct, db_indirect = self._resolve_budget(mandate_id_str or None)
             if db_travel is not None or db_direct is not None or db_indirect is not None:
-                logger.debug("Budget für Klient {} aus DB übernommen (Timesheet ohne Budgetzeile).", client_id_str)
+                logger.debug("Budget für Klient {} aus DB übernommen (Timesheet ohne Budgetzeile).", mandate_id_str)
             sheet_travel, sheet_direct, sheet_indirect = db_travel, db_direct, db_indirect
 
         return {
@@ -639,7 +650,8 @@ class TimeSheetsImporter:
             "allowed_hours_per_month": allowed_hours,
             "service_type": service_type,
             "short_code": ws[cells.short_code].value,  # type: ignore[union-attr]
-            "client_id": client_id_str or None,
+            "mandate_id": mandate_id_str or None,
+            "source_mandate_id": source_id,
             "tenant_id": resolved_tenant_id,
             "hourly_rate": resolved_hourly_rate,
             "allowed_travel_time": sheet_travel,
@@ -715,13 +727,47 @@ class TimeSheetsImporter:
                     row_number=row_idx,
                 )
 
-            employee_id = header.get("employee_id")
+            try:
+                resolved_id, outside = self.legacy_resolver.resolve(
+                    str(header.get("source_mandate_id") or header.get("mandate_id") or ""), service_date
+                )
+            except (ValueError, OSError) as exc:
+                self._record_error(source_file, "Auftragszuordnung", str(exc), row_number=row_idx)
+                has_fatal_date_error = True
+                continue
+            if outside and resolved_id != INTERNAL_CLIENT_ID:
+                self._record_warning(
+                    source_file,
+                    "Bewilligung",
+                    f"Leistungsdatum ausserhalb Bewilligung: {resolved_id} {service_date}",
+                    row_number=row_idx,
+                )
+            row_header = dict(header)
+            row_header.update(
+                mandate_id=resolved_id,
+                service_type=self._resolve_service_type(resolved_id),
+                tenant_id=self._resolve_tenant_id(resolved_id),
+                hourly_rate=self._resolve_hourly_rate(resolved_id),
+            )
+            db_budget = self._resolve_budget(resolved_id)
+            for field, value in zip(
+                ("allowed_travel_time", "allowed_direct_effort", "allowed_indirect_effort"), db_budget
+            ):
+                if row_header.get(field) != value and row_header.get(field) is not None:
+                    self._record_warning(
+                        source_file,
+                        "Budget",
+                        f"Bogenbudget weicht von Auftrag {resolved_id} ab ({field}); Auftragsbudget wird verwendet",
+                        row_number=row_idx,
+                    )
+                row_header[field] = value
+            employee_id = row_header.get("employee_id") or self._resolve_employee_id(resolved_id)
             employee_id_str = str(employee_id).strip() if employee_id is not None else ""
             payload = {
-                "client_id": str(header.get("client_id") or "").strip(),
+                "mandate_id": str(row_header.get("mandate_id") or "").strip(),
                 "employee_id": employee_id_str or "UNBEKANNT",
                 "service_date": service_date,
-                "service_type": str(header.get("service_type") or "").strip(),
+                "service_type": str(row_header.get("service_type") or "").strip(),
                 "travel_time": travel,
                 "direct_time": direct,
                 "indirect_time": indirect,
@@ -732,8 +778,8 @@ class TimeSheetsImporter:
                 validated = InvoiceRowModel.model_validate(payload)
                 rows.append(
                     {
-                        "client_id": validated.client_id,
-                        "tenant_id": str(header.get("tenant_id") or "").strip() or None,
+                        "mandate_id": validated.mandate_id,
+                        "tenant_id": str(row_header.get("tenant_id") or "").strip() or None,
                         "employee_id": employee_id_str or None,
                         "service_date": validated.service_date,
                         "service_type": validated.service_type,
@@ -742,13 +788,13 @@ class TimeSheetsImporter:
                         "direct_time": validated.direct_time,
                         "indirect_time": validated.indirect_time,
                         "billable_hours": validated.billable_hours,
-                        "hourly_rate": header.get("hourly_rate"),
+                        "hourly_rate": row_header.get("hourly_rate"),
                         "notes": str(v_notes).strip() if v_notes is not None else None,
                         "source_file": source_file,
                         "reporting_month": reporting_month,
-                        "allowed_travel_time": header.get("allowed_travel_time"),
-                        "allowed_direct_effort": header.get("allowed_direct_effort"),
-                        "allowed_indirect_effort": header.get("allowed_indirect_effort"),
+                        "allowed_travel_time": row_header.get("allowed_travel_time"),
+                        "allowed_direct_effort": row_header.get("allowed_direct_effort"),
+                        "allowed_indirect_effort": row_header.get("allowed_indirect_effort"),
                         "_source_row": row_idx,
                     }
                 )
@@ -866,6 +912,8 @@ class TimeSheetsImporter:
                         f"Datenbank-Constraint verletzt: {exc}",
                         row_number=record.get("_source_row"),
                     )
+                    conn.rollback()
+                    return 0, []
                 except sqlite3.DatabaseError as exc:
                     self._record_error(
                         source_file,
@@ -873,6 +921,8 @@ class TimeSheetsImporter:
                         f"Zeile konnte nicht gespeichert werden: {exc}",
                         row_number=record.get("_source_row"),
                     )
+                    conn.rollback()
+                    return 0, []
             conn.commit()
         return count, imported_rows
 
@@ -919,7 +969,7 @@ class TimeSheetsImporter:
         "source_file",
         "service_date",
         "tenant_id",
-        "client_id",
+        "mandate_id",
         "employee_id",
         "service_type",
         "hourly_rate",
@@ -979,7 +1029,7 @@ class TimeSheetsImporter:
         Aggregiert die Detaildaten je Klient für eine Rechnungsvorschau.
         Gibt einen DataFrame mit einer Zeile pro Klient zurück.
         """
-        group_cols = ["client_id"]
+        group_cols = ["mandate_id"]
         for optional in ("tenant_id", "service_type"):
             if optional in df.columns:
                 group_cols.append(optional)
@@ -1076,22 +1126,22 @@ class TimeSheetsImporter:
             logger.warning("employee_id fehlt im Header – Import erfolgt ohne employee_id ({})", file_path.name)
         # Sonstige Aufwendungen sind nicht klientenbezogen; für den Sentinel-Klienten
         # existiert bewusst kein Klient-MA-Paar, das geprüft werden könnte.
-        elif header.get("client_id") != INTERNAL_CLIENT_ID:
+        elif header.get("mandate_id") != INTERNAL_CLIENT_ID:
             sheet_employee_id = str(header.get("employee_id"))
-            client_employees = self._resolve_client_employees(header.get("client_id"))  # type: ignore[arg-type]
+            client_employees = self._resolve_client_employees(header.get("mandate_id"))  # type: ignore[arg-type]
             if sheet_employee_id not in client_employees:
                 self._record_warning(
                     file_path.name,
                     "MA-Zuordnung",
-                    f"employee_id '{sheet_employee_id}' ist beim Klient '{header.get('client_id')}' "
-                    f"nicht als Klient-MA-Paar in relation_client_emp hinterlegt "
+                    f"employee_id '{sheet_employee_id}' ist beim Klient '{header.get('mandate_id')}' "
+                    f"nicht als Klient-MA-Paar in relation_mandate_emp hinterlegt "
                     f"(hinterlegt: {sorted(client_employees)}). Import erfolgt trotzdem (z.B. Vertretung "
                     "oder manuell erzeugtes Timesheet ohne bestehendes Paar).",
                 )
 
         logger.info(
-            "Header: client_id={}, employee_id={}, service_type={}, month={}",
-            header.get("client_id"),
+            "Header: mandate_id={}, employee_id={}, service_type={}, month={}",
+            header.get("mandate_id"),
             header.get("employee_id"),
             header.get("service_type"),
             reporting_month,

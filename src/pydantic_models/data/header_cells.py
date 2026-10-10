@@ -7,17 +7,17 @@ class HeaderCells(BaseModel):
     """
     Zelladressen im Excel-Template für die Kopfwerte.
     Diese Adressen müssen mit ReportingFactory.create_reporting_sheet übereinstimmen.
-    Relevant sind hier nur die Felder G5 (emp_id) und G8 (client_id) als Schlüssel.
+    Relevant sind hier nur die Felder F5 (emp_id) und F8 (client_id) als Schlüssel.
     Alle anderen Felder sind informativ oder optional.
     """
 
     employee_name: str = "C5"  # rein informativ
-    emp_id: str = "G5"  # Schlüssel
+    emp_id: str = "F5"  # Schlüssel
     reporting_month: str = "C6"  # Datum (Excel-Date), i. d. R. pro Datei gleich
     allowed_hours_per_month: str = "C7"  # informativ
-    service_type: str = "G7"  # Schlüssel/Festwert
+    service_type: str = "F7"  # Schlüssel/Festwert
     short_code: str = "C8"  # informativ
-    client_id: str = "G8"  # Schlüssel
+    client_id: str = "F8"  # Schlüssel
     budget_travel_time: Optional[str] = None
     budget_direct_effort: Optional[str] = None
     budget_indirect_effort: Optional[str] = None

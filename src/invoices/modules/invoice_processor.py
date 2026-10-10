@@ -96,7 +96,7 @@ class InvoiceProcessor:
 
         with sqlite3.connect(db_path) as conn:
             service_data_columns = {row[1] for row in conn.execute("PRAGMA table_info(service_data)").fetchall()}
-            client_columns = {row[1] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
+            client_columns = {row[1] for row in conn.execute("PRAGMA table_info(v_mandate)").fetchall()}
             has_service_data_tenant = "tenant_id" in service_data_columns
             has_client_tenant = "tenant_id" in client_columns
 
@@ -141,7 +141,9 @@ class InvoiceProcessor:
 
             sql = f"""
         SELECT
-            sd.client_id,
+            sd.mandate_id AS client_id,
+            c.index_person_id,
+            c.needs_review,
             sd.service_date,
             sd.travel_time,
             sd.direct_time,
@@ -174,7 +176,7 @@ class InvoiceProcessor:
             COALESCE(st_id.hourly_rate, st_code.hourly_rate) AS hourly_rate,
             COALESCE(st_id.rundung, st_code.rundung) AS rundung
         FROM service_data sd
-        JOIN clients c ON sd.client_id = c.client_id
+        LEFT JOIN v_mandate c ON sd.mandate_id = c.mandate_id
         LEFT JOIN payer p ON c.payer_id = p.payer_id
         {tenant_join_sql}
         LEFT JOIN service_requester sr ON c.service_requester_id = sr.service_requester_id
@@ -188,6 +190,7 @@ class InvoiceProcessor:
             )
         LEFT JOIN service_types st_id ON c.service_type = st_id.service_type_id
         WHERE sd.service_date BETWEEN ? AND ?
+          AND sd.mandate_id <> 'SA'
           AND COALESCE(c.service_type, '') <> ?
         """
             params: List[Scalar] = [start_date, end_date, INTERNAL_SERVICE_TYPE_ID]
@@ -196,8 +199,8 @@ class InvoiceProcessor:
                 sql += " AND c.payer_id = ?"
                 params.append(self.filter.payer)
             if self.filter.client:
-                sql += " AND sd.client_id = ?"
-                params.append(self.filter.client)
+                sql += " AND (sd.mandate_id = ? OR c.index_person_id = ?)"
+                params.extend([self.filter.client, self.filter.client])
             if self.filter.service_requester:
                 sql += " AND (c.service_requester_id = ? OR sr.name = ?)"
                 params.extend([self.filter.service_requester, self.filter.service_requester])
@@ -207,10 +210,11 @@ class InvoiceProcessor:
                 params.extend(self.filter.payer_list)
             if self.filter.client_list:
                 placeholders = ", ".join(["?"] * len(self.filter.client_list))
-                sql += f" AND sd.client_id IN ({placeholders})"
+                sql += f" AND (sd.mandate_id IN ({placeholders}) OR c.index_person_id IN ({placeholders}))"
+                params.extend(self.filter.client_list)
                 params.extend(self.filter.client_list)
 
-            sql += " ORDER BY c.payer_id, sd.client_id, sd.service_date"
+            sql += " ORDER BY c.payer_id, sd.mandate_id, sd.service_date"
             df = pd.read_sql_query(sql, conn, params=params)
 
         if "service_date" in df.columns:
@@ -304,6 +308,22 @@ class InvoiceProcessor:
                     logger.error("Fehlende client_id in service_data – überspringe Datensätze.")
                     continue
                 client_row = client_details.iloc[0]
+                if not client_row.get("index_person_id") or pd.isna(client_row.get("index_person_id")):
+                    logger.warning(
+                        "Auftrag {} ohne Indexkind: Rechnung ausgelassen, Stammdaten nacharbeiten.", client_id
+                    )
+                    continue
+                normal_mask = ~client_details["notes"].apply(lambda v: "ohne berechnung" in str(v or "").lower())
+                if client_details.loc[normal_mask, "hourly_rate"].apply(lambda v: pd.isna(v) or not math.isfinite(float(v)) or float(v) < 0).any():
+                    logger.warning(
+                        "Auftrag {} ohne verwendbaren Tarif: Rechnung ausgelassen, Stammdaten nacharbeiten.", client_id
+                    )
+                    continue
+                if not client_row.get("payer_name") or pd.isna(client_row.get("payer_name")):
+                    logger.warning(
+                        "Auftrag {} ohne Kostenträger: Rechnung ausgelassen, Stammdaten nacharbeiten.", client_id
+                    )
+                    continue
 
                 # PrivatePerson wird mit typisierten Feldern aus der DataFrame-Zeile erstellt
                 client_obj = PrivatePerson(
@@ -492,6 +512,9 @@ class InvoiceProcessor:
                         "tenant_zip": safe_str(client_row.get("tenant_zip")),
                         "tenant_city": safe_str(client_row.get("tenant_city")),
                         "tenant_iban": safe_str(client_row.get("tenant_iban")),
+                        "needs_review": bool(client_row.get("needs_review")),
+                        "mandate_id": str(client_id),
+                        "index_person_id": safe_str(client_row.get("index_person_id")),
                         "client_name": client_name or safe_str(client_obj.name),
                         "service_type_description": service_type_description,
                         "client": client_obj,
@@ -522,6 +545,9 @@ class InvoiceProcessor:
                             "und muss vor dem KJA-FS-Batch-Upload manuell geprüft werden.",
                             client_id,
                         )
+                    elif client_row.get("needs_review"):
+                        application_number = f"PRÜFEN-{application_number}"
+                        logger.warning("Auftrag {} mit Datenbefunden: Rechnungsdatei als PRÜFEN markiert", client_id)
                     period_von = period.start.strftime("%Y%m%d")
                     period_bis = period.end.strftime("%Y%m%d")
                     file_stem = f"{invoice_id}_{period_von}_{period_bis}_{application_number}"

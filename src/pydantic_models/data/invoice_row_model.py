@@ -14,7 +14,7 @@ class InvoiceRowModel(BaseModel):
     Definition `invoice_data` in der Config übereinstimmen.
     """
 
-    client_id: str
+    mandate_id: str
     employee_id: str
     service_date: date
     service_type: str

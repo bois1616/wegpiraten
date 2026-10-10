@@ -66,6 +66,17 @@ English. The mapping is fixed:
 `mandate_person` keeps the name the concept document uses. `care` is the
 shorthand in prose; do not introduce it as an identifier.
 
+## Implementation note 2026-10-10
+
+The CLI now imports this model, stores `service_data.mandate_id` and derives invoice/timesheet
+fields through `v_mandate`. The legacy C-to-A lookup is versioned under `resources/`, independent
+of the migration sandbox. **Correction of the cell address:** the current configured template
+and the September 2026 timesheets store employee ID in F5 and mandate ID in F8. Earlier G5/G8
+references below describe the previous assumption; the configuration is authoritative and
+no cells were moved. Implementation contracts and test evidence are in
+[the schema implementation](dev/dm12_dm15_dm22_implementierung.md) and
+[the September comparison](dev/dm34_september_2026.md).
+
 ## Identifiers
 
 `C…` is a child, `A…` a mandate, `AP…` a contact person.

@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import tempfile
@@ -65,11 +66,11 @@ def zip_invoices(pdf_files: List[Path], zip_path: Path) -> None:
             zipf.write(file, arcname=file.name)
 
 
-def safe_str(val) -> str:
+def safe_str(val: Any) -> str:
     """
     Gibt immer einen String zurück, auch wenn val None oder numerisch ist.
     """
-    return "" if val is None else str(val)
+    return "" if val is None or (isinstance(val, float) and math.isnan(val)) else str(val)
 
 
 @contextmanager

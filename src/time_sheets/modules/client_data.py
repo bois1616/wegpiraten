@@ -1,7 +1,7 @@
 """
 Gemeinsame DB-Abfrage aktiver Klient-Mitarbeiter-Paare für die Zeiterfassungs-Module.
 
-Die Query (Paare aus relation_client_emp, end_date-Filter, is_active-Prüfung
+Die Query (Paare aus relation_mandate_emp, end_date-Filter, is_active-Prüfung
 für Klient/Mitarbeiter/Paar sowie employees.ts als genereller Timesheet-Schalter)
 wird sowohl von TimeSheetFactory als auch von TimeSheetBatchProcessor genutzt und
 ist deshalb hier zentral hinterlegt.
@@ -47,16 +47,20 @@ SELECT
     st.code AS service_type,
     e.first_name AS employee_first_name,
     e.last_name AS employee_last_name
-FROM relation_client_emp r
-JOIN clients c ON r.client_id = c.client_id
+FROM relation_mandate_emp r
+JOIN v_mandate c ON r.mandate_id = c.mandate_id
 JOIN employees e ON r.employee_id = e.emp_id
 LEFT JOIN service_types st ON c.service_type = st.service_type_id
 WHERE COALESCE(r.is_active, 1) = 1
   AND (c.end_date IS NULL OR c.end_date >= ?)
+  AND date(c.start_date) <= date(?, 'start of month', '+1 month', '-1 day')
   AND COALESCE(c.is_active, 1) = 1
   AND COALESCE(e.is_active, 1) = 1
   AND c.service_type != '{INTERNAL_SERVICE_TYPE_ID}'
   AND COALESCE(e.ts, 1) = 1
+  AND c.index_person_id IS NOT NULL
+  AND COALESCE(c.short_code, '') <> ''
+  AND st.code IS NOT NULL
 """
 # COALESCE(e.ts, 1): TS=FALSCH sperrt jede Timesheet-Erstellung für den MA
 # (klientenbezogen wie "Sonstige Aufwendungen"); ein leeres TS-Feld gilt
@@ -73,16 +77,19 @@ FROM employees e
 WHERE COALESCE(e.ts, 0) = 1
 """
 
-# Alle Paare aus relation_client_emp (aktiv wie inaktiv), inkl. der Felder,
+# Alle Paare aus relation_mandate_emp (aktiv wie inaktiv), inkl. der Felder,
 # die zur Diagnose der _ACTIVE_CLIENTS_SQL-Filterbedingungen nötig sind.
 _ALL_PAIRS_DIAGNOSTIC_SQL = """
 SELECT
-    r.client_id,
+    r.mandate_id AS client_id,
     r.employee_id,
     COALESCE(r.is_active, 1) AS pair_active,
     c.client_id AS client_found,
     COALESCE(c.is_active, 1) AS client_active,
     c.end_date,
+    c.start_date,
+    c.index_person_id,
+    c.short_code,
     c.service_type,
     c.first_name AS client_first_name,
     c.last_name AS client_last_name,
@@ -91,16 +98,16 @@ SELECT
     COALESCE(e.ts, 1) AS employee_ts,
     e.first_name AS employee_first_name,
     e.last_name AS employee_last_name
-FROM relation_client_emp r
-LEFT JOIN clients c ON r.client_id = c.client_id
+FROM relation_mandate_emp r
+LEFT JOIN v_mandate c ON r.mandate_id = c.mandate_id
 LEFT JOIN employees e ON r.employee_id = e.emp_id
-ORDER BY r.client_id, r.employee_id
+ORDER BY r.mandate_id, r.employee_id
 """
 
 
 class ClientEmployeePairStatus(BaseModel):
     """
-    Diagnose-Eintrag für ein Klient-Mitarbeiter-Paar aus relation_client_emp:
+    Diagnose-Eintrag für ein Klient-Mitarbeiter-Paar aus relation_mandate_emp:
     ob dafür im Erfassungsmonat ein Timesheet erzeugt wird, und falls nicht,
     aus welchem Grund (bzw. welchen Gründen).
     """
@@ -115,7 +122,7 @@ class ClientEmployeePairStatus(BaseModel):
 
 def build_pair_diagnostics(db_path: Path, reporting_month: str) -> List[ClientEmployeePairStatus]:
     """
-    Liefert für JEDES Paar aus relation_client_emp (aktiv wie inaktiv) einen
+    Liefert für JEDES Paar aus relation_mandate_emp (aktiv wie inaktiv) einen
     Diagnose-Eintrag. Spiegelt exakt die Filterbedingungen von
     _ACTIVE_CLIENTS_SQL, damit sich Abweichungen zwischen "Anzahl Paare" und
     "Anzahl erzeugter Timesheets" eindeutig klären lassen.
@@ -131,13 +138,19 @@ def build_pair_diagnostics(db_path: Path, reporting_month: str) -> List[ClientEm
         reasons: List[str] = []
 
         if row["pair_active"] != 1:
-            reasons.append("Paar in relation_client_emp inaktiv")
+            reasons.append("Paar in relation_mandate_emp inaktiv")
 
         if pd.isna(row["client_found"]):
             reasons.append("client_id nicht in Stammdaten (clients) gefunden")
         else:
             if row["client_active"] != 1:
                 reasons.append("Klient inaktiv")
+            if pd.isna(row["index_person_id"]):
+                reasons.append("Indexkind nicht bestimmbar")
+            if pd.isna(row["short_code"]) or not row["short_code"]:
+                reasons.append("Kurzzeichen fehlt")
+            if pd.notna(row["start_date"]) and str(row["start_date"])[:7] > reporting_month:
+                reasons.append("Auftrag beginnt nach dem Erfassungsmonat")
             end_date = row["end_date"]
             if pd.notna(end_date) and str(end_date) < month_start:
                 reasons.append(f"Klient-Enddatum ({end_date}) liegt vor dem Erfassungsmonat")
@@ -175,18 +188,18 @@ def build_pair_diagnostics(db_path: Path, reporting_month: str) -> List[ClientEm
 def load_active_client_headers(db_path: Path, reporting_month: str) -> List[HeaderDataModel]:
     """
     Lädt für jedes im Erfassungsmonat aktive Klient-Mitarbeiter-Paar aus
-    relation_client_emp einen Header-Datensatz und validiert ihn gegen
+    relation_mandate_emp einen Header-Datensatz und validiert ihn gegen
     HeaderDataModel. Interne Klienten (service_type ST999 / Sonstige
     Aufwendungen) werden ausgeschlossen; diese werden separat über
     employees.ts gesteuert. Mitarbeiter mit employees.ts=FALSCH erhalten
     grundsätzlich keine Timesheets (weder klientenbezogen noch Sonstige
-    Aufwendungen), auch wenn gültige Paare in relation_client_emp bestehen.
+    Aufwendungen), auch wenn gültige Paare in relation_mandate_emp bestehen.
     """
     month_start = f"{reporting_month}-01"
 
     logger.info(f"Lade aktive Klient-Mitarbeiter-Paare für Monat {reporting_month}.")
     with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql_query(_ACTIVE_CLIENTS_SQL, conn, params=[month_start])
+        df = pd.read_sql_query(_ACTIVE_CLIENTS_SQL, conn, params=[month_start, month_start])
     logger.info(f"{len(df)} Klient-Mitarbeiter-Paare geladen.")
 
     headers: List[HeaderDataModel] = []
@@ -195,7 +208,7 @@ def load_active_client_headers(db_path: Path, reporting_month: str) -> List[Head
             row_dict = {str(key): value for key, value in row.to_dict().items()}
             headers.append(HeaderDataModel.model_validate(row_dict))
         except ValidationError as exc:
-            logger.error(f"Ungültige Reporting-Daten in Zeile {idx}: {exc}")
+            logger.warning(f"Ungültige Reporting-Daten in Zeile {idx}: {exc}")
 
     return headers
 

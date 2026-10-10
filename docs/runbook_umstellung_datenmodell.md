@@ -1,13 +1,13 @@
 # Runbook: Umstellung auf Kinder, Aufträge und Betreuungen
 
-Stand 25.09.2026. Was sich geändert hat, was einmalig zu tun ist und was künftig bei welchem
-Ereignis gepflegt wird. Den Hintergrund erklärt das [Konzept](konzept_person_auftrag_leistung.md),
-die Felder und Regeln stehen im [Datenmodell](datamodel_person_mandate_care.md). Der
-monatliche Abrechnungslauf bleibt wie im [Betriebs-Runbook](runbook_betriebsablauf.md), bis die
-Programme auf das neue Modell umgestellt sind.
+Stand 10.10.2026. Dieses Runbook beschreibt die kundenseitige Datenpflege. Den Hintergrund
+erklärt das [Konzept](konzept_person_auftrag_leistung.md), die Felder und Regeln stehen im
+[Datenmodell](datamodel_person_mandate_care.md). Für den CLI-Monatslauf gilt das
+[Betriebs-Runbook](runbook_betriebsablauf.md).
 
-Arbeitsdatei ist vorerst `sandbox/wegpiraten_datenbank_neu.xlsx`. Sie ist ein Testbuild aus
-der Klientenliste vom 24.09.2026, keine Produktivdatei.
+Nach der Windows-Excel-Prüfung und Übergabe wird das finale Workbook die gemeinsame
+Arbeitsgrundlage. Der Kunde pflegt dieses Workbook; die SQLite-Datenbank wird daraus und
+aus den ausgefüllten Bögen neu aufgebaut. Befunde werden fachlich im Workbook korrigiert.
 
 ## Was sich geändert hat
 
@@ -39,12 +39,14 @@ Die Reihenfolge ist absichtlich so gewählt: Fehler zuerst, dann Fachfragen, dan
    dafür braucht jedes Kind der Familie ein Geburtsdatum (sonst ein Fehler). Ohne Familie gilt das
    Kind selbst als Indexkind. Eine Familie mit nur einem Kind meldet sich als Hinweis, meist ein Tippfehler.
 5. **Folgeaufträge nachtragen**, wo die Klientenliste eine Verlängerung überschrieben hat.
-   Erledigt für Yahia, Nipote (Yarrah Orion) und Gorlov. Offen für Duarte Torres und Loosli:
-   Wegpiraten nennt das Ende des alten und den Beginn des neuen Auftrags.
+   Bereits überführte Folgeaufträge sind zur Prüfung markiert. Wo Zeiträume fehlen,
+   nennt Wegpiraten das Ende des alten und den Beginn des neuen Auftrags.
 6. **Berichte durchsehen.** Die Liste ist aus der Klientenübersicht befüllt. Bei roten Zellen
-   ohne Datum gilt der 15. des Monats. Was von den Mitarbeiterblättern abweicht, steht in
-   `sandbox/klaerung_berichte_2026-09-25.md`. Für vergangene Berichte fehlt der Status.
-7. **Die offenen Fachfragen beantworten** (siehe Konzept, Abschnitt «Was offen ist»).
+   ohne Datum gilt der 15. des Monats. Abweichungen und aus dem Testbuild übernommene
+   Angaben sind in der Befundliste zur fachlichen Prüfung genannt. Für vergangene Berichte
+   fehlt der Status.
+7. **Die Befundliste zum finalen Workbook prüfen.** Technische Grundsatzfragen wurden
+   am 10.10.2026 beantwortet; Datenkorrekturen bleiben Aufgabe von Wegpiraten.
 
 ## Bei einem Ereignis zu pflegen
 
@@ -153,22 +155,3 @@ Zeile in «Zuordnung MA» mit Rolle S ergänzen, nach dem Einsatz wieder entfern
 - **Geschäftsnummer beim KJA immer yymmddnnn.** Bei anderen Kostenträgern Freitext, nie leer.
 - **Bei jeder Auftragserfassung fragen,** ob im selben Haushalt weitere Kinder betreut werden.
   Ein nicht erfasstes Geschwisterkind findet keine Prüfung.
-
-## Für die Umsetzung in den Programmen
-
-Erst nach der Annahme des Modells durch Stephan, vorher bleiben `src/` und die Datenbank unberührt.
-
-1. Import: `import-master` liest die neuen Blätter (Kinder, Aufträge, Betreuungen,
-   Ansprechpersonen, Zuordnung MA, Berichte) statt der Klientenliste. Die Zuordnung der
-   Blätter zu den Tabellen steht in `DEFAULT_TABLE_MAPPINGS`.
-2. Rechnung und Zeiterfassung: die Verbindung `JOIN clients` in `invoice_processor.py` und
-   `client_data.py` wird zur Verbindung auf `mandate`. Die Buchungsdaten bleiben.
-3. Nummern: `service_data.client_id` von `C…` auf die neue Auftragsnummer umstellen. Archivierte
-   Erfassungsbögen tragen die alte Nummer in Zelle G8, dort muss der Import beide Formen kennen.
-   Auch bestehende Rechnungsnummern ändern sich, weil die Rechnungsnummer aus der
-   Auftragsnummer entsteht.
-4. Danach die monatliche Aufgabenliste je Mitarbeitende aus der Berichtsliste. Sie soll am
-   Monatsanfang zusammen mit den Erfassungsbögen entstehen. Ob im selben Lauf oder als eigenes
-   Programm daneben, ist noch zu entscheiden.
-5. Bereinigung der Altdaten nach der Migration der echten Daten. Was die Prüfungen dabei
-   aufdecken, gehört zum Zweck der Übung.

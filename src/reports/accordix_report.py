@@ -57,45 +57,65 @@ _COL_ALLOCATION = "M"  # Allocation
 _COL_START_DATE = "Q"  # StartDate
 _COL_END_DATE = "S"  # EndDate
 
-# Neue Stammdatenfelder, die beim letzten Import ergänzt wurden
-_ACCORDIX_DB_COLUMNS = (
-    "date_of_birth",
-    "gender",
-    "uma_umf",
-    "spoken_language",
-    "canton_of_residence",
-    "residence_legal_guardian",
-    "allocation",
-)
-
 _SQL_BASE = """
-SELECT
-    c.client_id,
-    c.last_name,
-    c.first_name,
-    c.social_security_number,
-    c.start_date,
-    c.end_date,
-    st.code AS service_code
-    {extra_cols}
-FROM clients c
-LEFT JOIN service_types st ON c.service_type = st.service_type_id
-WHERE date(c.start_date) <= date(:period_end)
-  AND (c.end_date IS NULL OR date(c.end_date) >= date(:period_start))
-  AND COALESCE(c.service_type, '') <> :internal_service_type
-ORDER BY c.last_name, c.first_name
+SELECT b.mandate_id AS client_id, b.person_id,
+    p.last_name, p.first_name, p.social_security_number, p.date_of_birth,
+    p.gender, p.uma_umf, p.spoken_language, p.canton_of_residence,
+    p.residence_legal_guardian, m.allocation, b.start_date, b.end_date,
+    b.is_leaving_reason_planned, b.leaving_reason, b.custom_leaving_reason,
+    b.after_leave_situation, b.custom_after_leave_situation,
+    b.is_consultative_adolescent_psychiatric_care, b.number_of_care_days_per_week,
+    b.remarks, st.code AS service_code, m.predecessor_mandate_id,
+    m.start_date AS mandate_start, m.payer_id
+FROM mandate_person b
+LEFT JOIN person p ON b.person_id=p.person_id
+LEFT JOIN mandate m ON b.mandate_id=m.mandate_id
+LEFT JOIN service_types st ON m.service_type_id=st.service_type_id
+WHERE date(m.start_date)<=date(:period_end)
+  AND (m.end_date IS NULL OR date(m.end_date)>=date(:period_start))
+  AND (b.end_date IS NULL OR date(b.end_date)>=date(:period_start))
+ORDER BY p.last_name,p.first_name,m.start_date,b.source_row
 """
+
+
+def _collapse_continuing_cares(
+    conn: sqlite3.Connection, rows: list[dict[str, Any]], payers: list[str]
+) -> list[dict[str, Any]]:
+    """Ein Folgeauftrag erzeugt für dieselbe fortlaufende Betreuung keine zweite Zeile."""
+    all_cares = conn.execute("""SELECT b.mandate_id,b.person_id,date(b.start_date),
+        m.predecessor_mandate_id,st.code FROM mandate_person b
+        JOIN mandate m ON b.mandate_id=m.mandate_id
+        LEFT JOIN service_types st ON m.service_type_id=st.service_type_id""").fetchall()
+    by_key = {(r[0], r[1]): r for r in all_cares}
+    chosen: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for row in rows:
+        if row["payer_id"] not in payers:
+            continue
+        current = by_key.get((row["client_id"], row["person_id"]))
+        root = row["client_id"]
+        seen: set[str] = set()
+        while current and current[3] and root not in seen:
+            seen.add(root)
+            previous = by_key.get((current[3], row["person_id"]))
+            if not previous or previous[2] != current[2] or previous[4] != current[4]:
+                break
+            root = previous[0]
+            current = previous
+        if current and current[3] and root in seen:
+            logger.warning(
+                "Betreuung {}: zyklische Auftragskette, Meldezeile zur Nacharbeit ausgelassen", row["person_id"]
+            )
+            continue
+        key = (root, row["person_id"], row["service_code"], str(row["start_date"])[:10])
+        if key in chosen:
+            logger.info("Fortlaufende Betreuung {}: Folgeaufträge zu einer Accordix-Zeile zusammengefasst", key)
+        chosen[key] = row
+    return list(chosen.values())
 
 
 def _format_date(value: date) -> str:
     """Formatiert ein Datum gemäss Vorlage als TT.MM.JJJJ (Text)."""
     return value.strftime("%d.%m.%Y")
-
-
-def _existing_accordix_columns(conn: sqlite3.Connection) -> list[str]:
-    """Liefert die Accordix-Spalten, die in der Tabelle clients bereits existieren."""
-    existing = {row[1] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
-    return [col for col in _ACCORDIX_DB_COLUMNS if col in existing]
 
 
 def _set_if_present(sheet, column: str, excel_row: int, value: Optional[Any]) -> None:
@@ -132,17 +152,8 @@ def create_accordix_report(config: Config, reporting_month: str) -> Path:
 
     db_path = config.get_db_path()
     with sqlite3.connect(db_path) as conn:
-        accordix_cols = _existing_accordix_columns(conn)
-        missing_cols = [col for col in _ACCORDIX_DB_COLUMNS if col not in accordix_cols]
-        if missing_cols:
-            logger.warning(
-                "Spalten fehlen in der Tabelle clients: {}. "
-                "Bitte zuerst 'import-master' mit der erweiterten Stammdaten-Datei ausführen.",
-                ", ".join(missing_cols),
-            )
-        extra_cols = "".join(f",\n    c.{col}" for col in accordix_cols)
         cursor = conn.execute(
-            _SQL_BASE.format(extra_cols=extra_cols),
+            _SQL_BASE,
             {
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
@@ -151,10 +162,11 @@ def create_accordix_report(config: Config, reporting_month: str) -> Path:
         )
         column_names = [desc[0] for desc in cursor.description]
         rows = [dict(zip(column_names, row)) for row in cursor.fetchall()]
+        rows = _collapse_continuing_cares(conn, rows, config.reporting.accordix_payer_ids)
 
     if not rows:
         logger.warning("Keine aktiven Klient:innen für {} gefunden.", month_str)
-        raise ValueError(f"Keine aktiven Klient:innen für {month_str} gefunden.")
+        logger.warning("Leere Accordix-Meldung: keine passenden Betreuungen für {}", month_str)
 
     # load_workbook verwirft die x14-Datenvalidierungs-Erweiterung der Vorlage
     # (Dropdown-Komfort); das strikt einzuhaltende Importformat (Zellinhalte)
@@ -172,8 +184,7 @@ def create_accordix_report(config: Config, reporting_month: str) -> Path:
         if service_name is None:
             skipped += 1
             logger.warning(
-                "Klient {} ({}) übersprungen: Leistungsart {!r} ist keiner "
-                "Accordix-Leistungsart zugeordnet.",
+                "Klient {} ({}) übersprungen: Leistungsart {!r} ist keiner Accordix-Leistungsart zugeordnet.",
                 client_id,
                 label,
                 row["service_code"],
@@ -235,24 +246,27 @@ def create_accordix_report(config: Config, reporting_month: str) -> Path:
         sheet[f"{_COL_SERVICE_TYPE}{excel_row}"] = service_name
         _set_if_present(sheet, _COL_ALLOCATION, excel_row, row.get("allocation"))
         sheet[f"{_COL_START_DATE}{excel_row}"] = _format_date(start_date)
-        # Austrittsdatum nur setzen, wenn die Leistung im oder vor dem
-        # Meldemonat endet; andernfalls läuft die Leistung weiter (leer).
         if end_date is not None and end_date <= period_end:
             sheet[f"{_COL_END_DATE}{excel_row}"] = _format_date(end_date)
-            logger.warning(
-                "Klient {} ({}): Austrittsdatum {} gesetzt — die Austrittsfelder "
-                "(war geplant, Austrittsgrund, Situation nach Austritt) müssen "
-                "im Meldefile manuell ergänzt werden.",
-                client_id,
-                label,
-                _format_date(end_date),
-            )
+            for column, field in (
+                ("T", "is_leaving_reason_planned"),
+                ("U", "leaving_reason"),
+                ("V", "custom_leaving_reason"),
+                ("W", "after_leave_situation"),
+                ("X", "custom_after_leave_situation"),
+            ):
+                _set_if_present(sheet, column, excel_row, row.get(field))
+        for column, field in (
+            ("N", "is_consultative_adolescent_psychiatric_care"),
+            ("O", "number_of_care_days_per_week"),
+            ("Z", "remarks"),
+        ):
+            _set_if_present(sheet, column, excel_row, row.get(field))
         written += 1
 
     if written == 0:
-        raise ValueError(
-            f"Keine meldepflichtigen Leistungen für {month_str} gefunden "
-            f"({skipped} Klient:innen übersprungen)."
+        logger.warning(
+            "Keine gültige Accordix-Zeile für {}, {} Betreuungen zur Nacharbeit ausgelassen", month_str, skipped
         )
 
     output_path = ensure_dir(config.get_output_path())

@@ -8,17 +8,18 @@ Begleitet das [Backlog](backlog_umstellung_datenmodell.md). Muster wie
 Diesen Abschnitt liest jedes Modell zuerst und überschreibt ihn am Ende jeder Sitzung. Er ist der
 einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Begründung dafür.
 
-- **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
-- **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** DM-05/63 finaler Build, DM-14 synthetische Fixture, DM-21 Bogenbeschriftung, DM-10.1 additive Config-Vorbereitung. Finale XLSX und Befundliste lokal in sandbox, Build-Nachweis in `dm05_build_ergebnis.md`.
-- **In Arbeit:** nichts
-- **Nächster Schritt:** DM-06 Windows-Excel-Prüfung durch Stephan. Technische Entwürfe DM-12/15/22 durch Opus/Astra prüfen, dann gemeinsamer Umbau des Imports und aller Verbraucher. Die sechs neuen Config-Modelle und die Fixture sind bereit; DM-10.2 entfernt die alten Modelle erst mit diesem Umbau. Aktuelle CLI-Verbraucher lesen weiterhin das alte Schema.
-- **Wartet auf Stephan:** DM-06 (echtes Windows-Excel), danach DM-60/52 Übergabe. Q1–Q4 beantwortet.
-- **Entwürfe ohne Opus-Review:** `plan_review_2026-10-10.md` (Codex/GPT-6, genaue Modellvariante nicht ausgewiesen); keine abhängige Umsetzung dadurch freigegeben.
-- **Prüfstand:** 10.10.: nox lint/typecheck erfolgreich; 31 Tests bestanden direkt in bestehender Testumgebung. nox-Test-Installation scheitert an gesperrtem Netzwerk, nicht an Tests. Finaler Feldvergleich 0 Abweichungen, 0 Formelfehler, Excel-Strukturprüfung auch nach Neuberechnung bestanden.
+The handover continues in English from 2026-10-10; historical entries below keep their language.
 
-- **Grundsatz Daten:** Datenpflege ist nicht Aufgabe der Umstellung; Inkonsistenzen benennen und markieren, nicht korrigieren, nicht blockieren (Stephan, 2026-10-09)
-- **Betriebsrahmen:** Workaround bis WEGROSE; Kunde pflegt XLSX und füllt Bögen aus, Stephan erzeugt Dokumente. Nach Befunden korrigiert der Kunde fachlich, dann DB löschen und Lauf neu aufsetzen. Keine persistierte fachliche Datenhaltung in SQLite, keine maximale Absicherung oder historische Rekonstruktion (Stephan, 2026-10-10).
+- **Branch:** `feature/datamodel-v2`; fallback branch/tag `backup/pre-datamodel-v2` / `pre-datamodel-v2` at `e960512`. No push or merge in this session.
+- **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
+- **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
+- **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
+- **In progress:** none; stable common switch ready for review. The live database was not replaced; the CLI now requires a database rebuilt with the new workbook.
+- **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Do not remove sandbox until DM-06 and DM-41 are complete.
+- **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer handover DM-60/52 and merge DM-53. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
+- **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
+- **Validation:** 38 tests passed in `.nox/test`; `nox` lint/typecheck including reports passed (0 errors/warnings). Nox test dependency installation previously failed on network access; direct tests passed. All 94 workbook-derived mandate headers match the view; all 53 SCOR checks valid; PDF layout sampled. Windows-specific validation remains open.
+- **Operating scope:** temporary aid until WEGROSE. Customer-maintained XLSX is authoritative; SQLite disposable. Correct findings in XLSX and rebuild. Skip unusable invoices with logged reasons; keep reviewable invoices marked `PRÜFEN`. Current Indexkind also for historical runs. Accordix per Betreuung. Manual `Ohne Berechnung` positions visible at CHF 0.
 
 ## Eintragsvorlage
 
@@ -41,6 +42,27 @@ Regeln:
 ## 2026-10-10
 
 Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **Common schema/consumer switch and September reproduction**
+  `[Codex / GPT-6, exact variant not exposed]` (Status: implementation completed, acceptance open):
+  Completed DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. Added import preflight, typed
+  mappings, source row order, structured findings, review flags and `v_mandate` (94-row workbook
+  parity). SA has no fictitious care. Frozen identifier-only legacy mapping lives in `resources/`;
+  per-date resolution rejects ambiguous files atomically. Current master budgets use minutes.
+  Switched timesheets, invoices and reports together; Accordix groups continuous Betreuung
+  through renewals; retired `extend-master`. Fixed missing AHV values becoming `nan` and
+  actual header defaults F5/F8. Reports now included in nox. Tests cover renewal boundaries,
+  overlaps, twins, missing contacts, SA, free positions, tariff rejection, real DOCX rendering
+  and generated-sheet roundtrip. September used isolated copies of both versions: 66 sheets,
+  167 identical service rows, 53 DOCX/60 PDFs each, all 53 archived invoice amounts reproduced,
+  CHF 60,385.93 rounded sum. Contact/budget findings documented; nine invoices marked.
+  SCOR validity checked; PDF invoice/payment layout sampled. Added reusable context comparer.
+  Evidence: `dm34_september_2026.md`; contracts: `dm12_dm15_dm22_implementierung.md`.
+  Updated runbooks, config examples and handover. No customer data or generated documents
+  committed; original database and archives unchanged. Validation: 38/38 tests, nox passed.
+  Open: DM-16/61 coverage, DM-06 Windows Excel, DM-41 Accordix August, DM-50/51 review and
+  rehearsal, acceptance and merge. No push, merge or customer distribution.
+
 
 - **DM-14 fixture, DM-21 label and DM-10.1 preparation** `[Codex / GPT-6, exact variant not exposed]`
   (Status: completed stable subtasks): Added `tests/fixtures/create_masterdata.py` and its
