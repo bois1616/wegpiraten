@@ -550,7 +550,7 @@ class InvoiceProcessor:
                         logger.warning("Auftrag {} mit Datenbefunden: Rechnungsdatei als PRÜFEN markiert", client_id)
                     period_von = period.start.strftime("%Y%m%d")
                     period_bis = period.end.strftime("%Y%m%d")
-                    file_stem = f"{invoice_id}_{period_von}_{period_bis}_{application_number}"
+                    file_stem = f"{invoice_id}_{period_von}_{period_bis}_{application_number}_{payer_obj.key}"
                     docx_name = f"{file_stem}.docx"
                     docx_path = output_path / docx_name
                     rendered_invoice.save(docx_path)

@@ -14,6 +14,7 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
+- **Latest change:** invoice DOCX/PDF filenames now end in the payer ID, e.g. `_P1000`; archive entries inherit the same names.
 - **In progress:** none; stable common switch ready for review. The live database was not replaced; the CLI now requires a database rebuilt with the new workbook.
 - **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Do not remove sandbox until DM-06 and DM-41 are complete.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer handover DM-60/52 and merge DM-53. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
@@ -42,6 +43,12 @@ Regeln:
 ## 2026-10-10
 
 Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **Invoice filename payer suffix** `[Codex / GPT-6, exact variant not exposed]`
+  (Status: completed): Added `_{payer_id}` after the application number in the shared
+  invoice filename stem. DOCX, individual PDF and their ZIP entries use the suffix.
+  Existing generated files remain as they were. Validation: invoice integration test passed;
+  nox lint/typecheck passed.
 
 - **Common schema/consumer switch and September reproduction**
   `[Codex / GPT-6, exact variant not exposed]` (Status: implementation completed, acceptance open):
