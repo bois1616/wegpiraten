@@ -1,5 +1,11 @@
 # Data model: person, mandate, care
 
+Archive note (2026-10-10): `sandbox/` paths below refer to historical migration sources.
+They are now retained under ignored `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
+The unchanged final workbook and findings are staged under
+`output/uebergabe_datenmodell_2026-10-10/`; Windows Excel acceptance remains pending.
+
+
 Specification of the entity model that replaces the single `clients` table, as realised in `sandbox/wegpiraten_datenbank_sandbox.xlsx`. Written to be lifted into
 `wegpiraten_v2` without the Excel specifics.
 

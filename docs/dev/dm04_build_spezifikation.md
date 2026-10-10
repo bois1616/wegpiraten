@@ -1,5 +1,11 @@
 # DM-04: Spezifikation für den finalen Build
 
+Archivhinweis 10.10.2026: Die folgenden `sandbox/`-Pfade sind historische Build-Pfade.
+Alle damaligen Dateien liegen nun unter `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
+Der bytegleiche Übergabestand mit Befundliste liegt unter
+`output/uebergabe_datenmodell_2026-10-10/`; Windows-Excel-Prüfung weiterhin offen.
+
+
 Stand 2026-10-09, `[Opus 5.5]`. Vorgabe für DM-05 (`[Sonnet]`). Ergebnis ist das Workbook, das
 Wegpiraten Ende Oktober bekommt; danach ist das Workbook beim Kunden die einzige Quelle.
 

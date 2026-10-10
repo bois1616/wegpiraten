@@ -7,7 +7,7 @@
 # Zelle (Excel liefert 0, LibreOffice leer). Dieses Skript fragt Excel selbst.
 #
 # Aufruf in der Windows-Instanz:
-#   powershell -ExecutionPolicy Bypass -File excel_pruefung.ps1 -Datei "...\wegpiraten_datenbank_sandbox.xlsx"
+#   powershell -ExecutionPolicy Bypass -File excel_pruefung.ps1 -Datei "...\wegpiraten_datenbank.xlsx"
 
 param(
     [Parameter(Mandatory = $true)][string]$Datei,
@@ -76,8 +76,8 @@ $proben = @(
     @("Aufträge", "B4", "Leistungsart"),
     @("Aufträge", "D4", "Ansprechperson"),
     @("Betreuungen", "A4", "Auftrag-Nr"),
-    @("Kinder", "C4", "Familie"),
-    @("Familien", "B4", "Abrechnungskind")
+    @("Kinder", "H4", "Geschlecht"),
+    @("Zuordnung MA", "A4", "Auftrag-Nr")
 )
 foreach ($p in $proben) {
     $z = $wb.Worksheets.Item($p[0]).Range($p[1])

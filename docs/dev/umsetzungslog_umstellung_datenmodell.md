@@ -14,12 +14,12 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
-- **Latest change:** invoice DOCX/PDF filenames now end in the payer ID, e.g. `_P1000`; archive entries inherit the same names.
+- **Latest change:** DM-07 lossless sandbox archive completed. Handover workbook and findings: `output/uebergabe_datenmodell_2026-10-10/`; workbook is byte-identical to final build. Windows checker retained and corrected at `tools/excel_pruefung.ps1`. Excel acceptance and delivery remain open.
 - **In progress:** none; stable common switch ready for review. The live database was not replaced; the CLI now requires a database rebuilt with the new workbook.
-- **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Do not remove sandbox until DM-06 and DM-41 are complete.
+- **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Sandbox has been archived losslessly at Stephan’s explicit request; August reference remains under `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer handover DM-60/52 and merge DM-53. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
-- **Validation:** 38 tests passed in `.nox/test`; `nox` lint/typecheck including reports passed (0 errors/warnings). Nox test dependency installation previously failed on network access; direct tests passed. All 94 workbook-derived mandate headers match the view; all 53 SCOR checks valid; PDF layout sampled. Windows-specific validation remains open.
+- **Validation:** 38 tests passed before retirement of three one-off migration tests; 35 active tests passed after cleanup in `.nox/test`; `nox` lint/typecheck including reports passed (0 errors/warnings). Nox test dependency installation previously failed on network access; direct tests passed. All 94 workbook-derived mandate headers match the view; all 53 SCOR checks valid; PDF layout sampled. Windows-specific validation remains open.
 - **Operating scope:** temporary aid until WEGROSE. Customer-maintained XLSX is authoritative; SQLite disposable. Correct findings in XLSX and rebuild. Skip unusable invoices with logged reasons; keep reviewable invoices marked `PRÜFEN`. Current Indexkind also for historical runs. Accordix per Betreuung. Manual `Ohne Berechnung` positions visible at CHF 0.
 
 ## Eintragsvorlage
@@ -43,6 +43,22 @@ Regeln:
 ## 2026-10-10
 
 Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **DM-07 lossless sandbox archive and handover staging**
+  `[Codex / GPT-6, exact variant not exposed]` (Status: completed; Windows acceptance open):
+  Stephan requested cleanup now. Retained all 43 sandbox files (including old workbooks,
+  source JSON, build scripts, clarification lists and August Accordix reference) under ignored
+  `archiv/umstellung_datenmodell_2026-10-10/sandbox/`; every file hash/size verified against
+  the pre-move manifest. Archived the three one-off migration tests with their dependencies.
+  Removed retired migration tools from Git and sandbox ignore exceptions; active code has
+  no sandbox dependency. Kept the Windows Excel checker in `tools/`, correcting obsolete
+  family-sheet validation samples for the final workbook. Prepared a byte-identical final
+  workbook as `output/uebergabe_datenmodell_2026-10-10/wegpiraten_datenbank.xlsx`, alongside
+  findings and Windows checker. DM-06 and actual customer delivery DM-60/52 remain open;
+  no cloud write or new workbook build. Historic sandbox paths remain labelled as history.
+  Validation: all 43 archived hashes match, handover hash matches, 35 active tests passed,
+  nox lint/typecheck passed. Archive and handover contain customer data and remain ignored.
+
 
 - **Invoice filename payer suffix** `[Codex / GPT-6, exact variant not exposed]`
   (Status: completed): Added `_{payer_id}` after the application number in the shared

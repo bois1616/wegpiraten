@@ -1,5 +1,11 @@
 # DM-05: Finaler Build, 10.10.2026
 
+Archivhinweis 10.10.2026: Die folgenden `sandbox/`-Pfade sind historische Build-Pfade.
+Alle damaligen Dateien liegen nun unter `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
+Der bytegleiche Übergabestand mit Befundliste liegt unter
+`output/uebergabe_datenmodell_2026-10-10/`; Windows-Excel-Prüfung weiterhin offen.
+
+
 Erstellt: `sandbox/wegpiraten_datenbank_final.xlsx`. Begleitliste:
 `sandbox/befundliste_final_2026-10-10.md`. Beide bleiben lokal, ausserhalb von Git.
 Die eingefrorene Originaldatei und der Testbuild sind unverändert (Hashvergleich bestanden).
