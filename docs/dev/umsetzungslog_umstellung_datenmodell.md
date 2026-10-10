@@ -10,12 +10,12 @@ einzige Ort, der den aktuellen Stand trägt; die Einträge darunter sind die Beg
 
 - **Branch:** `feature/datamodel-v2` (ab `e960512`, gepusht); Fallback `backup/pre-datamodel-v2` und Tag `pre-datamodel-v2` (beide `e960512`, gepusht); `main` = `e960512`
 - **Fristen:** Ende Oktober 2026 neues Workbook bei Wegpiraten, Unklarheiten benannt, Datenbefunde markiert; Anfang November Oktober-Abrechnung mit dem neuen Schema
-- **Zuletzt erledigt:** DM-02, DM-03, DM-04 vollständig (alle Fragen beantwortet; Build-Spezifikation final: Originaldaten, Berichte und Folgeaufträge markiert «ZU PRÜFEN:», keine Familien, Rolle P nur wo eindeutig)
+- **Zuletzt erledigt:** DM-02, DM-03, DM-04 gemäss Stand 09.10.; Planprüfung 10.10. als Entwurf dokumentiert, siehe unten. Die Einmaligkeitsregel aus DM-03 bleibt bestätigt; ihre Zuordnung zu ST99 ist nicht belastbar (Datenmodell: PRIVAT).
 - **In Arbeit:** nichts
-- **Nächster Schritt:** DM-05 `[Sonnet]` nach `docs/dev/dm04_build_spezifikation.md`; parallel DM-10 `[Haiku]`
-- **Wartet auf Stephan:** nichts
-- **Entwürfe ohne Opus-Review:** keine
-- **Prüfstand:** `nox` zuletzt nicht gelaufen (keine Codeänderung)
+- **Nächster Schritt:** Planprüfungsentwurf durch Opus/Astra prüfen; DM-05 nach DM-04 mit Verlustnachweis bleibt der nächste Build-Schritt. Vor DM-10 die berechneten Fremdschlüssel, Budgeteinheiten und einen stabilen gemeinsamen Umstellungsschritt klären.
+- **Wartet auf Stephan:** Q1–Q4 in `plan_review_2026-10-10.md`: unbrauchbare Rechnungsgrundlage, historisches Indexkind, Accordix-Kettenzeilen, Erkennung/Erzeugung des Einführungsgesprächs. Im Chat gefragt, noch nicht beantwortet.
+- **Entwürfe ohne Opus-Review:** `plan_review_2026-10-10.md` (Codex/GPT-6, genaue Modellvariante nicht ausgewiesen); keine abhängige Umsetzung dadurch freigegeben.
+- **Prüfstand:** `nox` am 10.10.: lint erfolgreich, pyright 0 Fehler/0 Warnungen; keine Codeänderung.
 
 - **Grundsatz Daten:** Datenpflege ist nicht Aufgabe der Umstellung; Inkonsistenzen benennen und markieren, nicht korrigieren, nicht blockieren (Stephan, 2026-10-09)
 
@@ -36,6 +36,23 @@ Regeln:
   Rohausgaben.
 - Keine Personendaten im Log. Aufträge und Kinder mit Nummer nennen, Namen nur, wo das Konzept
   sie schon als Beispiel führt.
+
+## 2026-10-10
+
+Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **Plan review and Opus task specification drafts** `[Codex / GPT-6, exact variant not exposed]`
+  (Status: draft, Opus review pending): Added `docs/dev/plan_review_2026-10-10.md` and linked it
+  from the backlog. Reviewed the handover, DM-02/04, model/concept/runbook and affected source
+  modules. Draft contracts cover DM-12, DM-15, DM-22, DM-34/41, DM-40, DM-07/43 and DM-70;
+  no existing task closed. Findings: editable-only import omits two calculated foreign keys;
+  SQL lacks Excel row order; legacy mapping would disappear with the sandbox; per-row mandate
+  resolution requires moving header-level tariff/budget lookups; invoice comparison must allow
+  a changed QR reference; ST99 denotes PRIVAT in the model, so the introduction rule needs an
+  identification contract. Four questions sent to Stephan, awaiting answers. No workbook,
+  customer data or runtime code changed. Verification: `nox` lint passed, pyright 0 errors,
+  0 warnings; `git diff --check` passed before commit. Final build, actual invoice/Accordix
+  comparison and Windows Excel acceptance remain outstanding.
 
 ## 2026-10-09
 

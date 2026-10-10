@@ -6,6 +6,10 @@ bestätigte Modell. Fachliche Grundlage: [Konzept](../konzept_person_auftrag_lei
 Der Fortschritt steht im [Umsetzungslog](umsetzungslog_umstellung_datenmodell.md); wer übernimmt,
 liest zuerst dessen Abschnitt «Übergabe».
 
+Planprüfung vom 10.10.2026: [Bewertung und Spezifikationsentwürfe](plan_review_2026-10-10.md).
+Der Entwurf nennt zusätzliche Lücken bei DM-10/11/16, DM-03, DM-22 und den Abnahmekriterien;
+er ist noch keine Freigabe der Opus-Aufgaben und schliesst keinen bestehenden Punkt.
+
 ## Termin und Rahmen
 
 Seit 2026-10-09 ist die alte Stammdatei eingefroren: Stephan hat `wegpiraten_datenbank.xlsx` aus der
