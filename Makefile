@@ -11,6 +11,7 @@
 #                                                       Timesheets von Proton Drive holen (relativ zum Basis-Ordner)
 #   make import-sheets MONTH=2026-02                    Zeiterfassungsbögen importieren
 #   make report        MONTH=2026-02                    Arbeitszeitprotokoll erstellen
+#   make terminliste   MONTH=2026-02                    Berichtstermine je Mitarbeitenden (Excel)
 #   make accordix      MONTH=2026-02                    Accordix-Leistungsmeldung (ambulant) erstellen
 #   make validate                                       Konfiguration prüfen
 #
@@ -23,7 +24,7 @@
 
 CLI := .venv/bin/wegpiraten
 
-.PHONY: help invoices timesheets import-master fetch-master fetch-timesheets import-sheets report accordix validate _require-month _save-month _require-tsdir _save-tsdir
+.PHONY: help invoices timesheets import-master fetch-master fetch-timesheets import-sheets report terminliste accordix validate _require-month _save-month _require-tsdir _save-tsdir
 
 help:
 	@echo ""
@@ -39,6 +40,7 @@ help:
 	@echo "                                                      Timesheets von Proton Drive holen (TSDIR wird gecacht)"
 	@echo "  make import-sheets MONTH=2026-02                    Zeiterfassungsbögen importieren"
 	@echo "  make report        MONTH=2026-02                    Arbeitszeitprotokoll erstellen"
+	@echo "  make terminliste   MONTH=2026-02                    Berichtstermine je Mitarbeitenden (Excel)"
 	@echo "  make accordix      MONTH=2026-02                    Accordix-Leistungsmeldung (ambulant) erstellen"
 	@echo "  make validate                                       Konfiguration prüfen"
 	@echo ""
@@ -66,6 +68,9 @@ import-sheets: _require-month _save-month
 
 report: _require-month _save-month
 	$(CLI) report $(MONTH)
+
+terminliste: _require-month _save-month
+	$(CLI) terminliste $(MONTH)
 
 accordix: _require-month _save-month
 	$(CLI) accordix $(MONTH)

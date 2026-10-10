@@ -14,11 +14,12 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
-- **Latest change:** DM-07 lossless sandbox archive completed. Handover workbook and findings: `output/uebergabe_datenmodell_2026-10-10/`; workbook is byte-identical to final build. Windows checker retained and corrected at `tools/excel_pruefung.ps1`. Excel acceptance and delivery remain open.
+- **Latest change:** DM-70 monthly report task lists implemented, with one XLSX per employee and non-blocking assignment warnings. DM-07 lossless sandbox archive completed. Handover workbook and findings: `output/uebergabe_datenmodell_2026-10-10/`; workbook is byte-identical to final build. Windows checker retained and corrected at `tools/excel_pruefung.ps1`. Excel acceptance and delivery remain open.
 - **In progress:** none; stable common switch ready for review. The live database was not replaced; the CLI now requires a database rebuilt with the new workbook.
 - **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Sandbox has been archived losslessly at Stephan’s explicit request; August reference remains under `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer handover DM-60/52 and merge DM-53. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
+- **DM-70 validation:** 38 active tests passed; nox lint/typecheck passed with 0 errors and 0 warnings. Includes month/status selection, P versus S assignment, non-blocking missing/ambiguous references, empty employee files, literal free text, reruns and CLI invocation.
 - **Validation:** 38 tests passed before retirement of three one-off migration tests; 35 active tests passed after cleanup in `.nox/test`; `nox` lint/typecheck including reports passed (0 errors/warnings). Nox test dependency installation previously failed on network access; direct tests passed. All 94 workbook-derived mandate headers match the view; all 53 SCOR checks valid; PDF layout sampled. Windows-specific validation remains open.
 - **Operating scope:** temporary aid until WEGROSE. Customer-maintained XLSX is authoritative; SQLite disposable. Correct findings in XLSX and rebuild. Skip unusable invoices with logged reasons; keep reviewable invoices marked `PRÜFEN`. Current Indexkind also for historical runs. Accordix per Betreuung. Manual `Ohne Berechnung` positions visible at CHF 0.
 
@@ -43,6 +44,24 @@ Regeln:
 ## 2026-10-10
 
 Journal entries continue in English from this date; earlier German entries remain unchanged.
+
+- **DM-70 monthly report appointments** `[Codex / GPT-6]` (Status: completed):
+  Stephan explicitly requested implementation now, overriding the earlier deferral.
+  Added `reports/terminliste.py`, CLI `terminliste` and separate Make target:
+  `make terminliste MONTH=2026-10`. Read the imported report list from SQLite;
+  include deadlines within the selected month except statuses `erledigt` and
+  `entfällt`, including empty status. No active-mandate or TS filter, no recurring
+  date generation. Exactly one role P determines the responsible employee.
+  Missing P, multiple P, missing employees or missing mandates log a warning with
+  report/mandate IDs and skip only that appointment. All employees get a file,
+  even with no deadlines. Files live in the configured output directory under
+  `Terminlisten_YYYY-MM/Terminliste_YYYY-MM_<MA-ID>.xlsx`, sorted by deadline,
+  mandate and report ID, with real Excel dates, filters and A4 landscape printing.
+  Text is stored literally, including leading formula characters. Repeated runs
+  overwrite the same employee/month files. Updated runbook and data model.
+  Validation: 38 active tests passed; `nox` lint/typecheck passed with 0 errors
+  and 0 warnings. No customer workbook, live DB or cloud files changed.
+
 
 - **DM-07 lossless sandbox archive and handover staging**
   `[Codex / GPT-6, exact variant not exposed]` (Status: completed; Windows acceptance open):

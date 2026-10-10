@@ -12,6 +12,7 @@ Befehle:
     fetch-timesheets Zeiterfassungsbögen von Proton Drive holen
     import-sheets   Ausgefüllte Zeiterfassungsbögen importieren
     accordix        KFSG-Leistungsmeldung (ambulant) für Accordix erstellen
+    terminliste     Monatliche Berichtstermine je Mitarbeitenden als Excel erstellen
 """
 
 import sqlite3
@@ -320,7 +321,8 @@ def fetch_timesheets_cmd(
 def import_timesheets(
     month: str = typer.Argument(
         ...,
-        help="Leistungsmonat im Format MM.YYYY, MM-YYYY oder YYYY-MM (verbindlich)",    ),
+        help="Leistungsmonat im Format MM.YYYY, MM-YYYY oder YYYY-MM (verbindlich)",
+    ),
     config_path: Optional[Path] = typer.Option(
         None,
         "--config",
@@ -428,6 +430,25 @@ def arbeitszeit_report(
         raise typer.Exit(1)
 
 
+@app.command("terminliste")
+def terminliste(
+    month: str = typer.Argument(..., help=MONTH_HELP),
+    config_path: Optional[Path] = typer.Option(None, "--config", "-c", help="Pfad zur Konfigurationsdatei"),
+) -> None:
+    """Erstellt monatliche Excel-Terminlisten aus dem Blatt Berichte, zugeordnet über Rolle P."""
+    try:
+        from reports.terminliste import create_terminlisten
+
+        files = create_terminlisten(get_config(config_path), month)
+        console.print(f"[bold green]{len(files)} Terminlisten erstellt.[/bold green]")
+        if files:
+            console.print(f"Ausgabeverzeichnis: {files[0].parent}")
+    except Exception as e:
+        logger.exception("Fehler beim Erstellen der Terminlisten: {}", e)
+        console.print(f"[red]Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+
 @app.command("accordix")
 def accordix_report(
     month: str = typer.Argument(
@@ -479,6 +500,7 @@ def accordix_report(
 def main() -> None:
     """Haupteinstiegspunkt für die CLI."""
     app()
+
 
 if __name__ == "__main__":
     main()

@@ -39,6 +39,12 @@ The workbook is byte-identical to the final build, named `wegpiraten_datenbank.x
 normal operation. Windows Excel DM-06 and actual delivery DM-60/52 remain open.
 Historical `sandbox/` references below document former paths, not active dependencies.
 
+DM-70 completed on 2026-10-10 at Stephan's explicit request, superseding the earlier
+wait-for-real-use condition. `make terminliste MONTH=2026-10` creates one XLSX per
+employee from the imported report list. Assign through role P; log and skip entries
+without an unambiguous existing primary employee. See the implementation log for
+selection rules and validation.
+
 ## Termin und Rahmen
 
 Seit 2026-10-09 ist die alte Stammdatei eingefroren: Stephan hat `wegpiraten_datenbank.xlsx` aus der
@@ -228,7 +234,7 @@ operator rehearsal remain open. No claim of a production or cloud rehearsal.
 
 ## P2 Nice
 
-- [ ] [P2] [Report] **DM-70** Monatliche Aufgabenliste je Mitarbeitende («Terminzettel»). `[Opus]` spezifiziert, `[Sonnet]` setzt um. Hinweis: aus `report`, zuständig ist die Person mit Rolle P. Eigenes `make`-Target neben den Erfassungsbögen, nicht in deren Lauf (Wunsch von Wegpiraten). Liest nur `due_date` und `report_form` als Text (Bericht/Zwischenbericht ohne Semantik, Stephan 2026-10-09); Rhythmen sind zurückgestellt, Termine werden von Hand eingetragen. Bewusst erst nach einer Runde echter Nutzung der Berichtsliste.
+- [x] [P2] [Report] **DM-70** Monatliche Aufgabenliste je Mitarbeitende («Terminzettel»). `[Opus]` spezifiziert, `[Sonnet]` setzt um. Hinweis: aus `report`, zuständig ist die Person mit Rolle P. Eigenes `make`-Target neben den Erfassungsbögen, nicht in deren Lauf (Wunsch von Wegpiraten). Liest nur `due_date` und `report_form` als Text (Bericht/Zwischenbericht ohne Semantik, Stephan 2026-10-09); Rhythmen sind zurückgestellt, Termine werden von Hand eingetragen. Bewusst erst nach einer Runde echter Nutzung der Berichtsliste.
 - [ ] [P2] [Rechnung] **DM-71** Folgeauftragskette auf der Rechnung oder in der Übersicht sichtbar machen. `[Sonnet]`. Hinweis: nur wenn Wegpiraten es wünscht; heute nicht verlangt.
 
 ## Abhängigkeiten

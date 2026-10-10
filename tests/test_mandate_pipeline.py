@@ -216,3 +216,99 @@ def test_new_timesheet_can_be_filled_and_imported(imported: Config, monkeypatch:
             30,
             30,
         )
+
+
+def test_terminlisten_month_status_assignment_and_excel(imported: Config) -> None:
+    """Monatsgrenzen, Status und P-Zuordnung; auch MA ohne TS erhalten eine Datei."""
+    from reports.terminliste import create_terminlisten
+
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        conn.executemany(
+            "INSERT INTO report(report_id,mandate_id,due_date,report_form,status,notes) VALUES (?,?,?,?,?,?)",
+            [
+                ("R9002", "A26093", "2026-10-01", "Zwischenbericht", None, "=Freitext"),
+                ("R9003", "A26094", "2026-10-31", "Abschlussbericht", "offen", "Nach Auftragsende"),
+                ("R9004", "A26092", "2026-09-30", "Bericht", "offen", None),
+                ("R9005", "A26092", "2026-11-01", "Bericht", "offen", None),
+                ("R9006", "A26092", "2026-10-20", "Bericht", "erledigt", None),
+                ("R9007", "A26092", "2026-10-20", "Bericht", "entfällt", None),
+                ("R9008", "A26092", None, "Bericht", "offen", None),
+            ],
+        )
+    files = create_terminlisten(imported, "10.2026")
+    assert len(files) == 3
+    for path in files:
+        workbook = load_workbook(path)
+        sheet = workbook["Termine"]
+        assert sheet.freeze_panes == "C5"
+        assert sheet.page_setup.fitToWidth == 1
+        if "E9001" in path.name:
+            assert [sheet.cell(row, 9).value for row in (5, 6)] == ["R9001", "R9003"]
+            assert sheet["A6"].value == datetime(2026, 10, 31)
+            assert sheet["A6"].number_format == "dd.mm.yyyy"
+        elif "E9002" in path.name:
+            assert sheet["I5"].value == "R9002"
+            assert sheet["H5"].value == "=Freitext"
+            assert sheet["H5"].data_type == "s"
+        else:
+            assert sheet["A5"].value == "Keine fälligen Berichte."
+        workbook.close()
+    # Gleicher Monat überschreibt die Dateien statt weitere anzulegen.
+    assert create_terminlisten(imported, "2026-10") == files
+
+
+def test_terminlisten_unassignable_reports_warn_and_continue(imported: Config) -> None:
+    """Fehlende oder mehrfache P-Zuordnung blockiert die übrigen Dateien nicht."""
+    from loguru import logger
+
+    from reports.terminliste import create_terminlisten
+
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        conn.execute("DELETE FROM relation_mandate_emp WHERE mandate_id='A26092'")
+        conn.execute("INSERT INTO relation_mandate_emp(mandate_id,employee_id,role) VALUES ('A26093','E9001','P')")
+        conn.execute("INSERT INTO relation_mandate_emp(mandate_id,employee_id,role) VALUES ('A26094','E_MISSING','P')")
+        conn.execute("DELETE FROM relation_mandate_emp WHERE mandate_id='A26094' AND employee_id='E9001'")
+        conn.executemany(
+            "INSERT INTO report(report_id,mandate_id,due_date,status) VALUES (?,?,?,'offen')",
+            [
+                ("R9002", "A26093", "2026-10-15"),
+                ("R9003", "A26094", "2026-10-15"),
+                ("R9004", "A_MISSING", "2026-10-15"),
+                ("R9005", "A26091", "2026-10-15"),
+            ],
+        )
+    messages: list[str] = []
+    sink = logger.add(lambda message: messages.append(str(message)), level="WARNING")
+    try:
+        files = create_terminlisten(imported, "2026-10")
+    finally:
+        logger.remove(sink)
+    assert len(files) == 3
+    for path in files:
+        workbook = load_workbook(path)
+        if "E9001" in path.name:
+            assert workbook["Termine"]["I5"].value == "R9005"
+        else:
+            assert workbook["Termine"]["A5"].value == "Keine fälligen Berichte."
+        workbook.close()
+    assert len(messages) == 4
+    assert any("R9001 / Auftrag A26092" in message and "keine Person mit Rolle P" in message for message in messages)
+    assert any("R9002" in message and "mehrere Personen mit Rolle P" in message for message in messages)
+    assert any("R9003" in message and "Mitarbeiter-Stammdaten" in message for message in messages)
+    assert any("R9004" in message and "Auftrag fehlt" in message for message in messages)
+
+
+def test_terminliste_cli(imported: Config) -> None:
+    """CLI-Aufruf erstellt Dateien und meldet einen ungültigen Monat als Fehler."""
+    from typer.testing import CliRunner
+
+    from cli import app
+
+    runner = CliRunner()
+    config_path = str(Path(imported.structure.prj_root) / "config.yaml")
+    result = runner.invoke(app, ["terminliste", "2026-10", "--config", config_path])
+    assert result.exit_code == 0, result.output
+    assert "3 Terminlisten erstellt" in result.output
+    assert len(list((imported.get_output_path() / "Terminlisten_2026-10").glob("*.xlsx"))) == 3
+    result = runner.invoke(app, ["terminliste", "2026-13", "--config", config_path])
+    assert result.exit_code == 1

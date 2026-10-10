@@ -74,6 +74,33 @@ Bei einer Vertretung bleibt die Rolle P auf der Stammperson, sie erstellt weiter
 entstehen für jede Zeile der Zuordnung, deshalb die Vertretung nach dem Einsatz wieder
 entfernen, sonst entsteht ein Bogen ohne Stunden.
 
+### Monatliche Terminlisten für Berichte
+
+Nach Änderungen im Workbook die Arbeitsdatenbank wie im Betriebsworkflow neu aufsetzen
+und die Stammdaten importieren. Danach die Terminlisten für den gewünschten Monat erstellen:
+
+```bash
+make terminliste MONTH=2026-10
+```
+
+Im konfigurierten Ausgabeverzeichnis entsteht der Ordner `Terminlisten_2026-10`, mit
+`Terminliste_2026-10_<MA-ID>.xlsx` je Mitarbeitenden. Auch Mitarbeitende ohne fällige Berichte
+bekommen eine Datei mit entsprechendem Hinweis. Der Timesheet-Schalter hat keinen Einfluss.
+Die Erstellung läuft separat von den Zeiterfassungsbögen.
+
+Aufgenommen werden Berichte mit «Fällig am» im gewählten Monat, ausser mit Status «erledigt»
+oder «entfällt». Auch Einträge ohne Status werden aufgenommen. Die Liste zeigt Fälligkeit,
+Auftrag, Indexkind, Leistungsart, Leistungsbesteller, Berichtsform, Status, Notizen und Bericht-ID,
+sortiert nach Fälligkeit und Auftrag. Berichtsformen sind Text; Rhythmen erzeugen keine Termine.
+Auch Berichte nach dem Ende eines Auftrags können fällig sein.
+
+Zuständig ist die Person mit Rolle P im Blatt «Zuordnung MA». Fehlt sie, meldet das Log den
+Bericht und Auftrag als Warnung; der Eintrag wird ausgelassen und der Export läuft weiter.
+Dasselbe gilt bei mehreren P, einem fehlenden Auftrag oder einer fehlenden Person in den
+Mitarbeiter-Stammdaten. Solche Befunde im Workbook korrigieren, die Arbeitsdatenbank neu
+aufsetzen und die Listen erneut erzeugen. Ein erneuter Lauf überschreibt die Dateien dieser
+Mitarbeitenden für denselben Monat.
+
 ### Typische Vorgänge
 
 Die Tabelle oben sagt, welche Blätter betroffen sind. Hier stehen die Schritte in der

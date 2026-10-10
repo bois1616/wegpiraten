@@ -927,7 +927,9 @@ rows have none, since the overview knows no done marker (open question 14).
 **Not modelled, on purpose, for this pass:** `ereignisbezogen` reports (e.g.
 *"Kurzberichte nach Besuchen"*) have no due date to compute at all; `notes` is
 where they live for now. A recurring rule that spawns its own rows, and the
-*Terminzettel* proposal below, both wait for the cadence question to be settled first.
+*Terminzettel* originally waited for the cadence question. **Corrected 2026-10-10:**
+the Terminzettel is implemented using manually entered due dates; recurring rules
+remain deferred.
 
 **Invariants** (continuing the numbering above):
 
@@ -939,18 +941,17 @@ where they live for now. A recurring rule that spawns its own rows, and the
 | 40 | `status` = `erledigt` and `completed_date` empty | warning |
 | 41 | `mandate_id` set but no `relation_mandate_emp` row of that mandate has `role` = `P` (assignment cannot resolve) | warning |
 
-**Monthly task list ("Terminzettel"), goal, still not built.** The goal (Stephan,
-2026-09-25): from the report list, a monthly to-do list per employee, created at the start
-of each month together with the timesheets — the employee is the primary care person
-(`role` = `P`) of the mandate, who has to write the report. Wegpiraten's earlier proposal was
-the same: alongside timesheet generation, list what is due this month per employee. Wegpiraten's own caution, 22.09.2026: if built, as its **own `make`
-target, run separately from timesheet generation** — not folded into that
-pipeline, because a shared failure point there is worse than one more manual
-step. Still not started, and still not started on purpose: it reads `report`,
-and `report`'s own cadence rules are the PoC piece most likely to change: better
-to let one round of real use on the table above settle before building a second
-feature on top of it. `src/` changes stay frozen until the table model is
-accepted regardless — see the top of this document and `AGENTS.md`/`CLAUDE.md`.
+**Monthly task list ("Terminzettel"), implemented 2026-10-10 (DM-70).** Stephan
+explicitly requested implementation, superseding the earlier wait for real use.
+`make terminliste MONTH=2026-10` runs separately from timesheet generation and
+creates one Excel file per employee, including employees with no due reports.
+`reports/terminliste.py` reads the imported SQLite tables. It selects reports due
+within the requested month, excluding `erledigt` and `entfällt`; an empty status
+remains eligible. Assignment uses exactly one person with role P on the mandate.
+Missing or ambiguous assignment, missing employees and missing mandates produce
+non-blocking log warnings with report and mandate IDs; those entries are skipped.
+The mandate's active period does not filter report deadlines. Dates are entered
+manually; report forms are labels and cadence rules generate no appointments.
 
 ### Target architecture: a Python reporting engine on SQLite, not Excel formulas
 
@@ -979,11 +980,9 @@ rather than taken on faith:
   business logic, one renamed join on each side — the size of change this
   document already priced in under *Identifiers* and the Stufe 1/2 table in the
   concept document, not a new cost.
-- **Genuinely new, not a schema-driven extension:** the report generator itself
-  — nothing today reads `report` or produces a Terminzettel, because the table
-  did not exist before this session. That is the actual engineering work in this
+- **New in the original proposal:** the report generator itself
+  (implemented on 2026-10-10 as `reports/terminliste.py`). That is the actual engineering work in this
   proposal; the SQLite plumbing around it is mostly already there.
 
-Not started, same reason as everywhere else in this section: `src/` stays frozen
-until the table model is accepted, and `report`'s own fields are a PoC likely to
-move.
+The schema/consumer switch and monthly task list are implemented as of 2026-10-10.
+Recurring appointment generation remains deferred.
