@@ -39,8 +39,19 @@ TABLES: dict[str, tuple[str, str]] = {
 # Neue Zusatzdaten sind in bisherigen Kundenmappen noch nicht vorhanden.
 OPTIONAL_TABLES: dict[str, tuple[str, str]] = {
     "assignment_history": ("assignment_history", "assignment_history"),
+    "related_person": ("related_person", "related_person"),
+    "person_related_person": ("person_related_person", "person_related_person"),
+    "placement": ("placement", "placement"),
 }
-OPTIONAL_NEW_COLUMNS = {"phone", "email"}
+OPTIONAL_NEW_COLUMNS = {
+    "phone",
+    "email",
+    "billing_email",
+    "residence_street",
+    "residence_zip_code",
+    "residence_city",
+    "residence_phone",
+}
 
 # Fremdverweise werden diagnostiziert, nicht durch DB-Constraints verworfen.
 FOREIGN_KEYS: dict[str, list[tuple[str, str, str, int | None]]] = {
@@ -57,6 +68,11 @@ FOREIGN_KEYS: dict[str, list[tuple[str, str, str, int | None]]] = {
     "relation_mandate_emp": [("mandate_id", "mandate", "mandate_id", 12), ("employee_id", "employees", "emp_id", 12)],
     "report": [("mandate_id", "mandate", "mandate_id", 38)],
     "assignment_history": [("mandate_id", "mandate", "mandate_id", None), ("employee_id", "employees", "emp_id", None)],
+    "person_related_person": [
+        ("person_id", "person", "person_id", None),
+        ("related_person_id", "related_person", "related_person_id", None),
+    ],
+    "placement": [("person_id", "person", "person_id", None)],
 }
 
 
@@ -157,7 +173,7 @@ def import_normalized(config: Config, source: Path) -> int:
                         str(key),
                         "Schlüssel doppelt; erste Zeile bleibt erhalten",
                         number,
-                        {"person": 1, "mandate": 2, "mandate_person": 3}.get(target),
+                        {"person": 1, "mandate": 2, "mandate_person": 3, "report": 37}.get(target),
                     )
                     continue
                 seen.add(key)
@@ -187,7 +203,7 @@ def import_normalized(config: Config, source: Path) -> int:
             )
         create_mandate_view(conn)
         for table, refs in FOREIGN_KEYS.items():
-            if table == "assignment_history" and table not in tables:
+            if table in OPTIONAL_TABLES and table not in tables:
                 continue
             for column, ref_table, ref_column, invariant in refs:
                 for key, row, value in conn.execute(
@@ -270,6 +286,12 @@ def import_normalized(config: Config, source: Path) -> int:
                 finding(table, str(key), "Übernommene Angabe zu prüfen", row, 50)
                 if table == "mandate":
                     conn.execute("UPDATE mandate SET needs_review=1 WHERE rowid=?", (key,))
+        from data_imports.masterdata_checks import check_masterdata
+
+        for issue in check_masterdata(conn, config.reporting.accordix_payer_ids):
+            finding(issue.table, issue.key, issue.message, issue.source_row, issue.invariant)
+            if issue.table == "mandate":
+                conn.execute("UPDATE mandate SET needs_review=1 WHERE mandate_id=?", (issue.key,))
     out = config.get_output_path()
     out.mkdir(parents=True, exist_ok=True)
     report = out / "stammdaten_befunde.json"

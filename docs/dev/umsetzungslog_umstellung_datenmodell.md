@@ -15,7 +15,7 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
 - **Latest change:** DM-84/86 implemented on 2026-10-11 after Stephan chose responsibility by due date and requested employee overview sheets. Optional source-maintained assignment_history import and shared resolver serve Terminlisten and the new `make klientenuebersicht MONTH=2026-10`. No Übersicht sheet or repeated name columns; legend precedes employee grids. Synthetic preview retained under ignored `output/report_demo_2026-10-11/`. Customer workbook and live DB unchanged; no customer import performed.
-- **In progress:** customer revision under `import/wegpiraten_datenbank.xlsx` is the input for follow-up work. Repair its formulas and resolve the listed customer findings before trusting the open-check count. The proposal has not been implemented or independently reviewed. The live database was not replaced; the CLI requires a database rebuilt with the new workbook.
+- **In progress:** Stephan approved master-workbook preparation while AFK. Checkpoint 1 complete: additive contact/relationship/placement models and importer warnings, 47 synthetic tests passed and nox green. The customer original is backed up byte-identically under ignored `output/uebergabe_stammdaten_2026-10-11/backup/`. Next: native workbook formula repair and new source tables; keep original/live DB unchanged. No independent review claimed.
 - **Next independent work:** DM-80 formula repair and DM-82 actionable diagnostics, customer-workbook rollout for history/contact columns, remaining DM-83 payer email and DM-85 current parent/placement fields. Contact phone/email import support is implemented; current customer sheet not expanded. Customer data corrections DM-81 happen later. Before the next customer-workbook import, perform and document a general review of the current source; unresolved data may still make the import fail. Synthetic tests are independent; Stephan need not enter fake customer data for them. Other open work: DM-16/61, DM-41, DM-50.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
@@ -42,6 +42,35 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-11
+
+- **Checkpoint 1: additive source schema and independent diagnostics** `[Codex / GPT-6]`
+  (Status: complete): Added optional related_person, person_related_person and
+  placement tables, optional child residence fields and payer billing_email. Shared
+  adults have child-specific role/guardianship links; index-child/family grouping is
+  unchanged. Existing formats remain importable. Added masterdata_checks independent
+  of Excel caches for missing mandate/report references, primary responsibility,
+  report deadlines/completion/closing reports, code spelling, intervals, emails,
+  relationships and overlapping P periods. Planned exits need no exit reason;
+  unplanned exit checks are scoped to configured Accordix payers. Duplicate report
+  import findings now carry invariant 37. Validation: 47 synthetic tests passed;
+  nox lint/typecheck passed, 0 errors/warnings. Customer source and live DB unchanged.
+  Artifact Tool import of the large original exhausted its 4 GB JS heap twice;
+  direct native-package patching will preserve existing Excel extensions instead
+  of round-tripping the source through a lossy workbook writer. No further full
+  Artifact Tool import retry is planned; small addition/preview workbooks remain usable.
+
+- **Customer-master implementation authorised; stable checkpoints** `[Codex / GPT-6]`
+  (Status: in progress): Stephan approved the proposed child/contact relationships
+  and delivery sequence and will be AFK. No further approval is needed for routine
+  technical choices within this scope. Planned independently recoverable checkpoints:
+  (1) additive contact/placement schema and importer warnings, synthetic tests;
+  (2) lossless source-workbook formula repair and stable diagnostics;
+  (3) blank source input tables/dropdowns, handover workbook and instructions;
+  (4) general source review, isolated import and output verification, final manifest.
+  Each completed checkpoint gets a passing check, this log and a local commit.
+  Keep the original import XLSX and live SQLite unchanged. Customer data findings
+  remain customer corrections. Windows-specific acceptance is reported separately
+  and does not block completing all locally verifiable work.
 
 - **Master-workbook handover and child-specific contact proposal** `[Codex / GPT-6]`
   (Status: proposal recorded, implementation open): Stephan clarified that the

@@ -30,6 +30,10 @@ TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
             "canton_of_residence",
             "residence_legal_guardian",
             "notes",
+            "residence_street",
+            "residence_zip_code",
+            "residence_city",
+            "residence_phone",
         ),
     ),
     "mandate": (
@@ -96,7 +100,10 @@ TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
         ),
     ),
     "masterdata_service_requester": ("Leistungsbesteller", ("service_requester_id", "name")),
-    "masterdata_payer": ("Kostenträger", ("payer_id", "name", "name2", "street", "zip_code", "city", "notes")),
+    "masterdata_payer": (
+        "Kostenträger",
+        ("payer_id", "name", "name2", "street", "zip_code", "city", "notes", "billing_email"),
+    ),
     "masterdata_employee": ("Mitarbeiter", ("employee_id", "first_name", "last_name", "fte", "notes", "TS")),
     "masterdata_tenant": ("Büros", ("tenant_id", "name", "tenant_street", "tenant_zip", "tenant_city", "tenant_iban")),
 }

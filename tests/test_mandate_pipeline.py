@@ -392,6 +392,107 @@ def test_old_contact_columns_and_no_history_remain_importable(imported: Config) 
         assert conn.execute("SELECT count(*) FROM assignment_history").fetchone()[0] == 0
 
 
+def test_child_specific_contacts_and_optional_placements(imported: Config) -> None:
+    """Ein gemeinsamer Erwachsener ändert keine Geschwistergruppe oder Indexkind-Auswahl."""
+    from openpyxl.worksheet.table import Table
+
+    source = create_workbook(Path(imported.structure.prj_root) / "contacts.xlsx")
+    workbook = load_workbook(source)
+    for name, title, records in (
+        (
+            "related_person",
+            "Bezugspersonen",
+            [
+                {
+                    "related_person_id": "BP9001",
+                    "first_name": "Test",
+                    "last_name": "Mutter",
+                    "phone": "+41 00 000",
+                    "email": "test@example.invalid",
+                },
+                {"related_person_id": "BP9002", "first_name": "Test", "last_name": "Vater", "phone": "0041 00 000"},
+            ],
+        ),
+        (
+            "person_related_person",
+            "Kind-Bezugsperson",
+            [
+                {
+                    "relationship_id": "KB9001",
+                    "person_id": "C9001",
+                    "related_person_id": "BP9001",
+                    "role": "Mutter",
+                    "is_legal_guardian": "Ja",
+                },
+                {
+                    "relationship_id": "KB9002",
+                    "person_id": "C9002",
+                    "related_person_id": "BP9001",
+                    "role": "Mutter",
+                    "is_legal_guardian": "Nein",
+                },
+                {
+                    "relationship_id": "KB9003",
+                    "person_id": "C9002",
+                    "related_person_id": "BP9002",
+                    "role": "Vater",
+                    "is_legal_guardian": "Unbekannt",
+                },
+            ],
+        ),
+        (
+            "placement",
+            "Platzierungen",
+            [
+                {"placement_id": "PL9001", "person_id": "C9002", "place_name": "Testpflegefamilie", "city": "Testort"},
+            ],
+        ),
+    ):
+        fields = [field.excel_column for field in imported.models[name].fields]
+        sheet = workbook.create_sheet(title)
+        sheet.append(fields)
+        for record in records:
+            sheet.append([record.get(field) for field in fields])
+        from openpyxl.utils import get_column_letter
+
+        sheet.add_table(Table(displayName=name, ref=f"A1:{get_column_letter(len(fields))}{len(records) + 1}"))
+    workbook.save(source)
+    workbook.close()
+    imported.get_db_path().unlink()
+    run_import(imported, source)
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        assert conn.execute("SELECT count(*) FROM related_person").fetchone()[0] == 2
+        assert (
+            conn.execute("SELECT count(*) FROM person_related_person WHERE related_person_id='BP9001'").fetchone()[0]
+            == 2
+        )
+        assert (
+            conn.execute("SELECT phone FROM related_person WHERE related_person_id='BP9002'").fetchone()[0]
+            == "0041 00 000"
+        )
+        assert conn.execute("SELECT index_person_id FROM v_mandate WHERE mandate_id='A26093'").fetchone()[0] == "C9002"
+        assert conn.execute("SELECT start_date,end_date FROM placement").fetchone() == (None, None)
+
+
+def test_additional_checks_planned_exit_and_broken_report_link(imported: Config) -> None:
+    """Geplante Austritte brauchen keinen Grund; Pflichtverweise werden unabhängig geprüft."""
+    from data_imports.masterdata_checks import check_masterdata
+
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        conn.execute(
+            "UPDATE mandate_person SET is_leaving_reason_planned='Ja',leaving_reason=NULL,custom_leaving_reason=NULL WHERE mandate_id='A26094'"
+        )
+        conn.execute("UPDATE report SET mandate_id=NULL WHERE report_id='R9001'")
+        conn.execute("UPDATE mandate SET payer_id=NULL WHERE mandate_id='A26093'")
+        findings = check_masterdata(conn, ["P1000"], date(2026, 10, 11))
+        assert not any("Austrittsgrund" in finding.message for finding in findings)
+        assert any(f.table == "report" and f.key == "R9001" and "Auftragsverweis" in f.message for f in findings)
+        assert any(f.key == "A26093" and "payer_id" in f.message for f in findings)
+        conn.execute("UPDATE mandate_person SET is_leaving_reason_planned='Nein' WHERE mandate_id='A26094'")
+        assert any("Ungeplanter Austritt" in f.message for f in check_masterdata(conn, ["P1000"]))
+        assert not any("Ungeplanter Austritt" in f.message for f in check_masterdata(conn, []))
+
+
 @pytest.mark.parametrize("problem", ["gap", "overlap", "invalid", "missing_employee"])
 def test_report_history_never_falls_back_for_bad_period(imported: Config, problem: str) -> None:
     """Eine lückenhafte/mehrdeutige Historie darf die aktuelle P-Zuordnung nicht nutzen."""

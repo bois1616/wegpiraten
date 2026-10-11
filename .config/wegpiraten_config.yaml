@@ -163,6 +163,10 @@ entities:
         type: str
         excel_column: notes
         optional: true
+      - name: billing_email
+        type: str
+        excel_column: billing_email
+        optional: true
 
   service_requester:
     fields:
@@ -263,6 +267,22 @@ entities:
       - name: residence_legal_guardian
         type: str
         excel_column: residence_legal_guardian
+        optional: true
+      - name: residence_street
+        type: str
+        excel_column: residence_street
+        optional: true
+      - name: residence_zip_code
+        type: str
+        excel_column: residence_zip_code
+        optional: true
+      - name: residence_city
+        type: str
+        excel_column: residence_city
+        optional: true
+      - name: residence_phone
+        type: str
+        excel_column: residence_phone
         optional: true
       - name: notes
         type: str
@@ -451,6 +471,41 @@ entities:
         type: str
         excel_column: notes
         optional: true
+
+  related_person:
+    fields:
+      - {name: related_person_id, type: str, excel_column: related_person_id, primary_key: true}
+      - {name: first_name, type: str, excel_column: first_name, optional: true}
+      - {name: last_name, type: str, excel_column: last_name, optional: true}
+      - {name: street, type: str, excel_column: street, optional: true}
+      - {name: zip_code, type: str, excel_column: zip_code, optional: true}
+      - {name: city, type: str, excel_column: city, optional: true}
+      - {name: phone, type: str, excel_column: phone, optional: true}
+      - {name: email, type: str, excel_column: email, optional: true}
+      - {name: notes, type: str, excel_column: notes, optional: true}
+
+  person_related_person:
+    fields:
+      - {name: relationship_id, type: str, excel_column: relationship_id, primary_key: true}
+      - {name: person_id, type: str, excel_column: person_id}
+      - {name: related_person_id, type: str, excel_column: related_person_id}
+      - {name: role, type: str, excel_column: role}
+      - {name: is_legal_guardian, type: str, excel_column: is_legal_guardian, optional: true}
+      - {name: notes, type: str, excel_column: notes, optional: true}
+
+  placement:
+    fields:
+      - {name: placement_id, type: str, excel_column: placement_id, primary_key: true}
+      - {name: person_id, type: str, excel_column: person_id}
+      - {name: placement_type, type: str, excel_column: placement_type, optional: true}
+      - {name: place_name, type: str, excel_column: place_name, optional: true}
+      - {name: street, type: str, excel_column: street, optional: true}
+      - {name: zip_code, type: str, excel_column: zip_code, optional: true}
+      - {name: city, type: str, excel_column: city, optional: true}
+      - {name: phone, type: str, excel_column: phone, optional: true}
+      - {name: start_date, type: str, excel_column: start_date, optional: true}
+      - {name: end_date, type: str, excel_column: end_date, optional: true}
+      - {name: notes, type: str, excel_column: notes, optional: true}
 
   mandate_employee_relation:
     fields:
