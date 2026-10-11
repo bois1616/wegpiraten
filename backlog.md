@@ -2,6 +2,18 @@
 
 Stand 2026-03-14: Nachträglich aus Git-Historie rekonstruiert.
 
+## Update 2026-10-11: customer workbook and extensions
+
+New journal entries continue in English from this point; the existing German
+backlog entries below retain their original language.
+
+- [ ] [P0/P1] [Master data/Reports] Customer revision review and implementation
+  proposal: see [DM-80–86 in the data-model backlog](docs/dev/backlog_umstellung_datenmodell.md#plan-2026-10-11-customer-workbook-review-and-requested-additions).
+  Covers broken Fehlerliste formulas, every comment in Prüfungen column G,
+  concrete data findings, dated employee responsibility, parent/guardian and
+  placement contacts, contact phone/email fields and the annual Klientenübersicht.
+  Proposal only; workbook repair and extensions have not been implemented.
+
 ## P0 Must
 
 - [x] [P0] [Architektur] CLI-only Entry-Point mit typer. Hinweis: `src/cli.py` mit typer; GUI/Flask nach `src/unused/` verschoben.

@@ -14,8 +14,8 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
-- **Latest change:** DM-70 monthly report task lists implemented, with one XLSX per employee and non-blocking assignment warnings. DM-07 lossless sandbox archive completed. Handover workbook and findings: `output/uebergabe_datenmodell_2026-10-10/`; workbook is byte-identical to final build. Windows checker retained and corrected at `tools/excel_pruefung.ps1`. Stephan reports test handover completed and his own testing without findings so far; customer feedback and final acceptance remain open.
-- **In progress:** customer testing after Stephan’s test handover on 2026-10-10; no issues reported so far. The live database was not replaced; the CLI now requires a database rebuilt with the new workbook.
+- **Latest change:** 2026-10-11 customer workbook reviewed read-only; implementation proposal DM-80–86 is in the backlog, including all Prüfungen column-G comments, dated responsibility, contact/placement data and annual overview. Fifteen broken `issue_run` formulas cause the Fehlerliste errors; three report FKs are blank, two report IDs duplicated, and A26050 lacks requester/payer/business number. No workbook or live DB changed.
+- **In progress:** customer revision under `import/wegpiraten_datenbank.xlsx` is the input for follow-up work. Repair its formulas and resolve the listed customer findings before trusting the open-check count. The proposal has not been implemented or independently reviewed. The live database was not replaced; the CLI requires a database rebuilt with the new workbook.
 - **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Sandbox has been archived losslessly at Stephan’s explicit request; August reference remains under `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
@@ -40,6 +40,30 @@ Regeln:
   Rohausgaben.
 - Keine Personendaten im Log. Aufträge und Kinder mit Nummer nennen, Namen nur, wo das Konzept
   sie schon als Beispiel führt.
+
+## 2026-10-11
+
+- **Customer workbook review and proposal DM-80–86** `[Codex / GPT-6]`
+  (Status: review and requested plan completed; implementation open):
+  Reviewed formulas, stored values, import-table structure, keys, references,
+  dates and customer input changes against the handover copy. Read the original
+  Klientenübersicht layout and report-colour legend. Added findings, all six
+  column-G comment dispositions, implementation order, risks, acceptance criteria
+  and open customer decisions to the data-model backlog; linked from the main
+  backlog. Fifteen literal `#REF!` formulas propagate through hidden counters into
+  5,623 stored error cells. Missing report helpers leave three FKs blank, and
+  R076/R126 each occur twice. A26050 lacks requester/payer/business number.
+  The 14 missing-exit-reason warnings concern planned exits and contradict the
+  existing Accordix mapping. Other findings and exact cells/IDs are in the plan.
+  Recommended additive history/contact/placement tables and a SQLite annual-grid
+  export with full report detail; no general history reconstruction or recurrence
+  engine. Historical responsibility/date semantics require customer agreement.
+  Customer workbooks, their comments, live SQLite and cloud files remain unchanged;
+  reference workbook contains customer data and remains untracked, not committed.
+  Validation: read-only extraction and input-field comparison; source SHA-256
+  retained in the backlog. `nox`: lint/typecheck passed, 0 errors and 0 warnings.
+  No new implementation tests, Excel recalculation or financial run were claimed.
+  No independent Opus/Astra review; proposal only.
 
 ## 2026-10-10
 

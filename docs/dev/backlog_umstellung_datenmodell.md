@@ -49,6 +49,286 @@ employee from the imported report list. Assign through role P; log and skip entr
 without an unambiguous existing primary employee. See the implementation log for
 selection rules and validation.
 
+## Plan 2026-10-11: customer workbook review and requested additions
+
+Status: proposal requested by Stephan, not implementation approval. New entries follow
+the English journal seam above. This section processes every customer note in
+`Prüfungen!G:G`; the source workbook and its notes have not been overwritten.
+Resolve the workbook defects first, then add contact data, dated responsibility and
+the annual report overview. Keep the scope appropriate to the temporary v1 system.
+
+### Evidence from the initial customer revision
+
+Reviewed `import/wegpiraten_datenbank.xlsx` against the handover workbook in
+`output/uebergabe_datenmodell_2026-10-10/`. Customer revision SHA-256:
+`b671fd25324368b9e020f7f2ceb26b94ae64ae3fc43c8b3f07fcd810db95aa09`.
+Read formulas, stored results, table definitions and raw input fields separately.
+No import into the live DB, recalculation in Windows Excel or financial acceptance
+was performed. Stored results are evidence of the last save, not a fresh Excel run.
+
+All eleven required import tables and their configured columns exist. Actual input
+records, excluding empty rows containing only helper formulas:
+
+| Entity | Handover | Customer revision | Observation |
+| --- | ---: | ---: | --- |
+| Kinder | 87 | 86 | C1063 removed; several personal-data fields corrected |
+| Aufträge | 94 | 94 | A26019 removed, A26050 added; numbers, dates and budgets edited |
+| Betreuungen | 94 | 94 | A26019/C1063 replaced by A26050/C1061; exit data edited |
+| Zuordnung MA | 101 | 102 | A26050/M011 added; 24 existing roles changed |
+| Ansprechpersonen | 49 | 49 | One salutation and one note changed |
+| Berichte | 153 | 146 | 144 distinct IDs, two duplicate IDs; forms/dates/status edited |
+
+Mitarbeiter (11), Kostenträger (14), Leistungsbesteller (26), Büros (2) and
+Leistungstypen (15) retain their imported input fields. No unknown non-empty FK,
+contact/requester mismatch or reversed care/mandate date interval was found in the
+reviewed records. Empty required references are listed below rather than counted
+as valid FKs. Customer edits are not automatically approved or reverted.
+
+Concrete findings:
+
+1. **Broken Fehlerliste is a formula defect.** Fifteen formulas contain literal
+   `#REF!`: `Aufträge!AP56`, `Betreuungen!AD67,AD94`, and
+   `Berichte!T4,T8,T10,T13,T39,T50,T52,T53,T62,T94,T115,T142`.
+   These `issue_run` formulas reference a missing predecessor cell. Their errors
+   propagate into `Fehlerliste!L1:L7`, the offsets and the displayed rows. Stored
+   error cells total 5,623: Aufträge 1,944, Betreuungen 1,932, Berichte 137,
+   Fehlerliste 1,610. Row deletion/movement is a plausible trigger, not proven
+   editing history. Hiding errors with `IFERROR(...,0)` would lose findings.
+2. **Missing formulas on added report rows.** `Berichte!C44` (R154), `C45`
+   (R155), and `C147` (R126) are blank although column B contains A24014,
+   A24014 and A26046 respectively. Several diagnostic formulas are also missing
+   in these rows, and most display helpers are absent in row 147. The importer
+   reads column C, not the visible selection B. These reports lose their mandate
+   link; the current diagnostics do not catch an empty report FK.
+3. **Duplicate report IDs.** R076 occurs in rows 141/146 for A26042/A26046;
+   R126 occurs in rows 142/147 for A26042/the visible choice A26046. They are
+   different appointments. The importer keeps the first row and omits the second,
+   so customer-confirmed unique IDs are required. Do not delete the appointments
+   or renumber them silently. The fixed 43-check catalogue omits report-ID
+   duplicates, missing report references and status findings, despite some of
+   these checks existing in row helpers.
+4. **A26050, Aufträge row 60:** Leistungsbesteller, Kostenträger and
+   Geschäftsnummer are empty; Ansprechperson is also absent. It has care,
+   employee and report records. Filling only the Geschäftsnummer is insufficient
+   for invoicing. A26009 (row 14) and A26048 (row 76) have P1000 number placeholders,
+   not valid nine-digit business numbers. Keep these as unresolved customer data.
+5. **Follow-up closing reports:** R066/A24014 (`Berichte!43`) and
+   R068/A26037 (`Berichte!137`) are Abschlussberichte on predecessor mandates.
+   Check whether they should be reclassified or assigned to the last mandate;
+   preserve the customer date until confirmed.
+6. **Other findings:** 12 expired mandates still have open care, 30 employee
+   assignment rows refer to expired mandates, and 22 reports marked `offen`
+   are due before 2026-10-11. There are 38 reports without status, which does not
+   establish completion. Five mandates have no employee assignment at all:
+   A24015, A26004, A26010, A26040, A26048; none currently has a report row.
+   The displayed missing-P count of zero therefore does not cover all mandates.
+7. **Planned exits falsely flagged:** all 14 care records flagged for a missing
+   Austrittsgrund have `is_leaving_reason_planned = Ja`. The existing local
+   [Accordix mapping](../accordix_mapping.md) requires `leaving_reason` only for
+   an unplanned exit. This is a check defect, not fourteen missing customer values.
+
+### Disposition of the comments in Prüfungen column G
+
+The references below describe the saved revision. A7:E49 is a dynamically compacted
+list, while G contains fixed text. After a finding disappears, a note can stand next
+to another check. Preserve these comments with a stable check ID before any repair
+and recalculation. Resolve them in a fixed catalogue/comment table; the open view
+looks up the comment by ID. Findings should carry check ID, record ID, sheet, current
+row and an internal hyperlink. Row numbers are navigation aids, not identities.
+
+| Source | Customer comment (verbatim) | Proposed treatment |
+| --- | --- | --- |
+| G7 | Finde die passenden Einträge nicht | List R066/A24014 and R068/A26037 explicitly and link to their rows. Repair Fehlerliste first; retain the closing-report rule pending customer classification. |
+| G8 | Nummern werden nach gereicht | Retain the missing-number finding for A26050. Also show its missing payer/requester. Close only after workbook correction and recheck. |
+| G9 | Nummern werden nach gereicht | Retain invalid-number findings for A26009/A26048. No invented number and no disabling validation while awaiting delivery. |
+| G11 | Nur wenn Austrittsgrund "Nein" ist, dann kommt ein Austrittsgrund | Interpret as **Austritt geplant = Nein** (column E), not a value of Austrittsgrund (column F). For an exit, require Ja/Nein; require reason for Nein, custom reason for Anderer. Ja needs no reason. Match workbook and Python warnings. |
+| G12 | wäre coool wenn man direkt sieht welche das betrifft, so muss ich zwischen den tabellen hin und her switchen | Show affected IDs/names and clickable findings, filtered by check. Current IDs: A26014, A26029, A23005, A26037, A26040, A26030, A24005, A26024, A26017, A26031, A26032, A24014. No automatic exit or authorisation extension. |
+| G14 | korrekt | Treat as acknowledgement, not permission to invent an Accordix mapping. The three flagged types are ST00/UNBEKANNT, ST02_alt/BBT and ST09/KOB. Separate known inactive/unused placeholders from actual P1000 reporting gaps; retain explicit warnings for unmapped reportable care. |
+
+### Proposed implementation tasks
+
+- [ ] [P0] [Workbook] **DM-80** Repair diagnostics on a backed-up copy of the
+  customer revision. `[Sonnet]`. Replace predecessor-dependent `issue_run`
+  formulas with a cumulative count of non-empty `issue_kind` cells from the first
+  data row to the current row. This removes the reference to a deletable preceding
+  row; row 4 must not count its header. Refill missing calculated cells across
+  actual table rows, preserve all input fields and comments, and check the
+  diagnostic ranges beyond the last input row. Use structured table references
+  where Excel supports them and explicitly test insert/delete/sort and new rows.
+  Do not rebuild from archived migration JSON or overwrite customer work with
+  the old handover file. Check that conditional formatting, dropdowns, named
+  ranges, table metadata and print settings survive the chosen patch method.
+  Acceptance: no formula errors after Windows Excel full recalculation; insert,
+  delete, sort and add a report row without missing FKs or losing findings.
+
+- [ ] [P0] [Data] **DM-81** Resolve the customer data findings above. `[Stephan]`
+  with Wegpiraten. Assign distinct IDs to the two added appointments, confirm
+  the three missing report links, complete A26050's payer/requester/number and
+  the two P1000 number placeholders. Review closing reports, overdue statuses
+  and expired-but-open care. Confirm intentional deletion of C1063/A26019 and
+  budget/date/role changes; retain the revision as the source, not automatic
+  rollback. Do not remove historical employee rows merely because a mandate ended.
+  Existing skip-and-warning behavior remains for unusable invoices. Acceptance:
+  corrected XLSX and a reviewed finding list, followed by a clean disposable-DB
+  import; no fixes exclusively in SQLite.
+
+- [ ] [P1] [Workbook/Import] **DM-82** Make checks actionable and preserve customer
+  comments. `[Sonnet]`. Add stable catalogue IDs and fixed comment/disposition
+  fields; include the report-key, missing-reference, overdue and completion-date
+  checks, plus mandates with no employee rows. Link each open check to its record
+  findings. Correct the planned-exit condition and scope Accordix-only requirements
+  to configured reportable payers. An unknown planned flag is a separate warning,
+  not silently treated as Ja. Implement equivalent Python warnings under DM-61,
+  including missing required payer/requester and an empty derived report FK.
+  Acceptance: every G comment remains attached to its original check after
+  resolving another finding, and Excel/Python agree on synthetic planned and
+  unplanned exits, duplicate IDs, empty references and absent assignments.
+
+- [ ] [P1] [Contacts] **DM-83** Add optional contact details. `[Sonnet]` after field
+  agreement. Add `phone` and `email` to Ansprechpersonen, and `billing_email` to
+  Kostenträger, available to all payers including private customers. Store phone
+  numbers as text to retain `+` and leading zeroes. Empty contact data must not
+  block import or invoices. Warn on obvious malformed email data without rejecting
+  the row. No automatic sending or new address printed on invoices. Update Config,
+  import models, synthetic fixtures and the customer workbook together. Currently
+  even a field marked optional must have an Excel column in the importer; support
+  absent **new** optional columns as NULL so the existing format still imports.
+  Acceptance: both old and extended workbook formats import; existing invoice
+  recipients, amounts and QR data remain unchanged.
+
+- [ ] [P1] [Responsibility] **DM-84** Specify dated employee responsibility.
+  `[Opus]`, with customer confirmation by `[Stephan]`; implementation `[Sonnet]`.
+  Add a separate `Zuständigkeitsverlauf` table with `assignment_id`, `mandate_id`,
+  `employee_id`, `role` (P/S), `valid_from`, `valid_to` and `notes`. A separate PK
+  allows the same employee to return to the same mandate without changing the
+  existing `relation_mandate_emp` key. One row records one uninterrupted role
+  period. Dates are inclusive; a switch on 15 October closes the former period
+  on 14 October and starts the new period on 15 October. Blank end means ongoing.
+  Show changes with mandate, employee IDs/names, role and dates; preserve closed
+  periods in the source XLSX across monthly rebuilds.
+
+  The history is authoritative for **dated report responsibility**; the existing
+  Zuordnung MA remains the operational assignment for timesheets in this first
+  step. Warn if its current P differs from the current historical P. This limited
+  duplication requires a documented update procedure; it avoids silently changing
+  timesheet generation while extending reporting. Replacing operational assignment
+  with history is a separate follow-up requiring all consumers to use month-overlap
+  selection, including two employees during a switch month.
+
+  Proposed report lookup: optional `responsibility_date`, otherwise `due_date`.
+  It returns exactly one P whose interval contains that day. Gaps, overlapping P
+  periods or missing dates produce an explicit unassigned finding. If a mandate
+  has no history yet, retain today's P for operational compatibility but label it
+  as **current assignment; historical responsibility unknown** in historical views.
+  Never fall back to current P for a gap in an existing history. `completed_date`
+  is the completion date and must not silently change responsibility. If actual
+  authorship is needed, model `author_employee_id` separately; responsibility
+  alone does not prove who wrote the report. Use the same resolver in Berichte,
+  DM-70 Terminlisten and DM-86; show unassigned entries in a finding output.
+
+  Acceptance: switch-day boundaries, return of a previous employee, simultaneous S
+  support, P overlap/gap, future assignment, predecessor/successor mandates and
+  old-workbook fallback verified with synthetic records. Customer must provide
+  known historical periods; do not backdate today's assignment to mandate start.
+  Risk: extra data maintenance and apparently precise but unsupported history.
+  This explicitly extends the 2026-10-10 limit on historical reconstruction only
+  by recording supplied periods; there is no event log or reconstruction from
+  old invoices. The report-date definition remains a customer decision.
+
+- [ ] [P1] [Domain] **DM-85** Specify parents, guardians and child residences.
+  `[Opus]`, answers `[Stephan]`; implementation `[Sonnet]`. For v1, propose a
+  `Bezugspersonen` table with `contact_id`, `person_id` (child), relationship,
+  explicit guardianship status (Ja/Nein/Unbekannt), name, street, postal code,
+  locality, phone, optional email and notes. Allow several contacts per child;
+  a parent is not automatically a legal guardian and a guardian need not be a
+  parent. One row per child/contact is simpler than a general person/relationship
+  subsystem; shared sibling contacts may be duplicated and need consistent updates.
+
+  Add optional current residence fields to Kinder and an optional `Platzierungen`
+  table with `placement_id`, child, start/end, placement type/place, address,
+  contact phone and notes, so both current and past placements can be shown.
+  Warn on reversed periods and unexplained overlaps; keep an unknown start unknown.
+  Keep the child's residence, guardian residence and placement separate. Existing
+  `residence_legal_guardian` is already imported and exported to Accordix as a
+  locality field; preserve it. With several guardians, do not automatically select
+  one address or infer `canton_of_residence` from a placement. Decide explicitly
+  which address is maintained for Accordix, and warn on conflicting entries.
+  No parent/placement details flow into invoices or employee report exports by
+  default. Acceptance: separated parents, non-parent guardian, sibling contacts,
+  changed placement and missing optional data work without changing index-child
+  selection, billing or existing Accordix address behavior. Risk: contact/address
+  duplication and more sensitive information in workbook, backups and exports.
+
+- [ ] [P1] [Report] **DM-86** Generate a Klientenübersicht from the report table.
+  `[Opus]` specifies mapping, `[Sonnet]` implements. Reference:
+  `resources/2026 Klientenübersicht.xlsx`, eight sheets (overview and seven
+  employee sheets), with 2026/2027 Jan–Dec grids and legend: red Bericht,
+  orange Zwischenbericht, blue Abschluss + Bericht. Employee layouts differ
+  between 39 and 42 columns. Use the structure and legend as the reference;
+  customer sheets with old personal data must not become the output template.
+
+  Proposed separate CLI/Make command `make klientenuebersicht YEAR=2026`, using
+  imported SQLite and configured output paths. Produce an overview plus sheets
+  per employee, with the requested year and following year, one row per mandate
+  with index child/family display and explicit A-ID. Keeping separate mandates
+  avoids merging parallel services or follow-up orders under one family name.
+  Show requester, contact/phone, authorisation dates, service type and employees;
+  fill Jan–Dec cells from actual due dates and forms. Use DM-84 responsibility at
+  each report's reference date so a switched mandate can appear on both employee
+  sheets, each with only that employee's appointments. Supporting S roles may be
+  displayed but do not duplicate P responsibility. Add a visible unassigned
+  section and a detail list with every report ID, mandate, date, form, status,
+  completion date and assignment basis. Include all statuses in the annual view;
+  use text to distinguish completed/cancelled entries, keeping colours for forms.
+
+  Several reports in one month must remain visible as multiple dated lines; a
+  mixed-form cell needs text labels and a neutral fill, not one misleading colour.
+  No-date and out-of-grid appointments belong in the detail list with a reason.
+  Do not copy old day values: initial migration assumed the 15th for red month
+  markers and sometimes used mandate end for blue closing reports. A reverse
+  export can restore the **view**, not those lost original facts or obsolete
+  per-employee copies. Current revision contains Zwischenbericht/Abschlussbericht
+  entries only; do not reintroduce deleted Bericht entries from the reference.
+  Do not equate legacy F/D/I/Gst/Std columns with current budgets before defining
+  their meanings and units. Unknown columns remain unfilled and documented.
+  No recurrence generation, source-workbook editing or report re-import.
+  Acceptance: synthetic year boundary, employee switch, all statuses, multiple
+  appointments/forms per month, missing assignment and no-date report; reconcile
+  the detail list to every imported report, distinguishing deliberate employee-sheet
+  duplication from duplicates. Verify Excel opening, filters and printed layout.
+
+### Delivery order, risks and decisions needed
+
+1. DM-80 plus DM-81, then DM-82 and Windows acceptance DM-06. Structural repair is
+   urgent; optional extensions must not delay the October billing path.
+2. DM-83 is small and can ship independently. DM-85 needs field/maintenance agreement
+   before implementation; contact details alone do not require a general CRM.
+3. DM-84 before the historical employee version of DM-86. A first overview can
+   precede history if it clearly labels current assignment and does not claim past
+   responsibility. DM-70 then needs the shared date-aware resolver.
+4. Back up and patch the customer workbook in place, retaining manual changes;
+   import into an isolated disposable DB and compare invoice/Accordix output
+   before handover. New optional tables must be optional when reading an older
+   workbook. Do not destructively change the existing assignment schema.
+
+Main risks are already visible: table operations break hidden formulas, blank
+calculated FKs drop reports, duplicate IDs omit appointments, static notes drift
+beside dynamic checks, and current employee assignment rewrites the apparent past.
+Row-level findings and synthetic editing/interval tests address these directly.
+History and placement dates supplied without evidence must remain incomplete.
+The annual grid compresses information, so its detail list is required for review.
+Parent and placement contacts expand the personal-data footprint; employee exports
+must include only the agreed operational fields. The reference XLSX is currently
+untracked and contains customer data; do not add it to Git. Commit plans and
+synthetic fixtures only.
+
+Before implementing DM-84–86, obtain the customer's decisions on: the date that
+defines responsibility (due date versus report date), actual author versus responsible
+employee, available historical switches, guardian/contact structure and placement
+history scope, and any legacy overview columns required beyond the report grid.
+These questions do not block formula repair or the agreed optional contact columns.
+No independent Opus/Astra review is claimed for this draft.
+
 ## Termin und Rahmen
 
 Seit 2026-10-09 ist die alte Stammdatei eingefroren: Stephan hat `wegpiraten_datenbank.xlsx` aus der
