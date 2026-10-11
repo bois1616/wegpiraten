@@ -148,12 +148,74 @@ Auftrag, Indexkind, Leistungsart, Leistungsbesteller, Berichtsform, Status, Noti
 sortiert nach Fälligkeit und Auftrag. Berichtsformen sind Text; Rhythmen erzeugen keine Termine.
 Auch Berichte nach dem Ende eines Auftrags können fällig sein.
 
-Zuständig ist die Person mit Rolle P im Blatt «Zuordnung MA». Fehlt sie, meldet das Log den
+Zuständig ist die Person mit Rolle P am **Fälligkeitstag** aus dem
+«Zuständigkeitsverlauf», sofern für den Auftrag eine Historie gepflegt ist.
+Ohne Historie gilt weiterhin die P-Person aus «Zuordnung MA»; die Ausgabe nennt
+ausdrücklich «Aktuelle Zuordnung; historische Zuständigkeit unbekannt».
+Eine Lücke oder Überschneidung in einer vorhandenen Historie führt zu einem Befund;
+die aktuelle P-Person ersetzt diesen fehlenden eindeutigen Zeitraum nicht.
+Fehlt eine zuständige Person, meldet das Log den
 Bericht und Auftrag als Warnung; der Eintrag wird ausgelassen und der Export läuft weiter.
 Dasselbe gilt bei mehreren P, einem fehlenden Auftrag oder einer fehlenden Person in den
 Mitarbeiter-Stammdaten. Solche Befunde im Workbook korrigieren, die Arbeitsdatenbank neu
 aufsetzen und die Listen erneut erzeugen. Ein erneuter Lauf überschreibt die Dateien dieser
 Mitarbeitenden für denselben Monat.
+
+### Zuständigkeitsverlauf pflegen
+
+Das zusätzliche Blatt wird als Excel-Tabelle mit dem **Tabellennamen
+`assignment_history`** angelegt. Der Blattname allein genügt nicht. Die Spalten
+heissen `assignment_id`, `mandate_id`, `employee_id`, `role`, `valid_from`,
+`valid_to`, `notes`. Jede Zeile braucht eine eigene eindeutige `assignment_id`.
+Datumsfelder als echte Excel-Daten erfassen; `valid_to` darf bei einem laufenden
+Zeitraum leer bleiben. Beide Grenzen zählen mit. P bezeichnet die Berichtszuständigkeit,
+S eine Unterstützung. Zwei P-Zeiträume dürfen sich nicht überschneiden.
+
+Beispiel: M0567 ist für A26123 vom 01.01.2026 bis 31.07.2026 zuständig, M0123 vom
+01.08.2026 bis 31.12.2026, M0789 ab 01.01.2027. Der im Oktober fällige Bericht
+erscheint bei M0123. Eine spätere Erledigung ändert diese Zuordnung nicht.
+Bei einem Folgeauftrag dessen eigene A-Nummer in den neuen Zeiträumen verwenden.
+
+Abgeschlossene Zeiträume in der Mappe behalten. Nach jedem DB-Neuaufbau liest der
+Import sie erneut ein; Terminlisten und Klientenübersicht berechnen daraus die
+Zuständigkeit. Sie schreiben diese weder in die Kundenmappe zurück noch erzeugen
+sie zusätzliche Berichtstermine. Ohne das Zusatzblatt bleibt die bisherige Mappe
+importierbar. Die operative «Zuordnung MA» für Erfassungsbögen weiterhin separat
+pflegen; der Zuständigkeitsverlauf ersetzt sie derzeit nicht.
+
+### Klientenübersicht neu erzeugen
+
+```bash
+make klientenuebersicht MONTH=2026-10
+```
+
+Im konfigurierten Output entsteht
+`Klientenuebersichten_2026-10/Klientenuebersicht_2026-10.xlsx`. Die Mappe enthält
+eine Legende vor den Mitarbeiterblättern, das Monatsraster für 2026 und 2027,
+«Berichtsdetails» und «Nicht zugeordnet». Ein Sammelblatt «Übersicht» gibt es nicht.
+Die mehrfachen Vor-/Nachnamensspalten der alten Datei entfallen.
+
+Eine Zeile entspricht einem ausdrücklich genannten Auftrag mit Berichtsterminen
+im Raster. Folgeaufträge und parallele Leistungen bleiben getrennt. Termine werden
+nach Fälligkeit zugeordnet; alle Statuswerte bleiben sichtbar. Mehrere Termine in
+einem Monat stehen einzeln mit Datum, Form, Bericht-ID und Status in der Zelle.
+Rot bedeutet Bericht, Orange Zwischenbericht, Blau Abschlussbericht. Bei gemischten
+Berichtsformen ist die Zelle grau. «Berichtsdetails» enthält jeden importierten
+Bericht genau einmal; fehlende Zuordnungen und Termine ausserhalb des Rasters
+erscheinen zusätzlich unter «Nicht zugeordnet».
+
+G:N zeigen den aktuellen **importierten Stand des angezeigten Auftrags**:
+Bewilligungsbeginn/-ende, operative MA-Zuordnung, Kontingente in Stunden pro Monat
+und Leistungsart. Diese Angaben belegen keinen früheren Auftragsstand. Die heutige
+MA-Zuordnung in I kann von der datierten Berichtszuständigkeit abweichen.
+Die Telefonnummer kommt aus dem optionalen Feld `phone` bei Ansprechpersonen.
+
+Die Ausgabe jeden Monat neu erzeugen. Fachliche Änderungen ausschliesslich in der
+Stammdatenmappe pflegen, neu importieren und die Ausgabe erneut erstellen; keine
+manuell weitergeführte Kopie als zweite Datenquelle. Vor dem nächsten Kundenimport
+prüft der Agent die gesamte aktuelle Stammdatenmappe. Offene Datenfehler dürfen
+diesen Import weiterhin scheitern lassen. Zeilen und Spalten sind im Export
+bereits fixiert; das Monatsraster beginnt nach den Stammdaten in O.
 
 ### Typische Vorgänge
 

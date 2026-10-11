@@ -1,7 +1,6 @@
 """Monatliche Terminlisten für die zuständigen Mitarbeitenden."""
 
 import sqlite3
-from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
@@ -10,58 +9,11 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.properties import PageSetupProperties
-from pydantic import BaseModel
 
+from reports.report_data import Employee, ReportAppointment, assignment_problem, load_report_data
 from shared_modules.config import Config
 from shared_modules.month_period import get_month_period
 from shared_modules.utils import ensure_dir
-
-
-class Employee(BaseModel):
-    """Mitarbeitende aus den Stammdaten, unabhängig vom Timesheet-Schalter."""
-
-    emp_id: str
-    first_name: str | None
-    last_name: str | None
-
-
-class ReportAppointment(BaseModel):
-    """Fälliger Bericht mit der abgeleiteten Zuständigkeit."""
-
-    report_id: str
-    mandate_id: str
-    due_date: date
-    report_form: str | None
-    status: str | None
-    notes: str | None
-    index_child: str | None
-    service_type: str | None
-    requester: str | None
-    employee_id: str | None
-    primary_count: int
-    existing_mandate: str | None
-
-
-_SQL = """
-WITH primary_employees AS (
-    SELECT mandate_id, MIN(employee_id) AS employee_id, COUNT(*) AS primary_count
-    FROM relation_mandate_emp WHERE role='P' GROUP BY mandate_id
-)
-SELECT r.report_id, r.mandate_id, date(r.due_date) AS due_date,
-    r.report_form, r.status, r.notes,
-    m.last_name || ' ' || m.first_name AS index_child,
-    st.code AS service_type, sr.name AS requester,
-    p.employee_id, COALESCE(p.primary_count, 0) AS primary_count,
-    m.mandate_id AS existing_mandate
-FROM report r
-LEFT JOIN v_mandate m ON m.mandate_id=r.mandate_id
-LEFT JOIN service_types st ON st.service_type_id=m.service_type_id
-LEFT JOIN service_requester sr ON sr.service_requester_id=m.service_requester_id
-LEFT JOIN primary_employees p ON p.mandate_id=r.mandate_id
-WHERE date(r.due_date) BETWEEN ? AND ?
-    AND COALESCE(r.status, '') NOT IN ('erledigt', 'entfällt')
-ORDER BY date(r.due_date), r.mandate_id, r.report_id
-"""
 
 
 def create_terminlisten(config: Config, reporting_month: str) -> list[Path]:
@@ -72,29 +24,18 @@ def create_terminlisten(config: Config, reporting_month: str) -> list[Path]:
     if not db_path.is_file():
         raise FileNotFoundError(f"SQLite-Datenbank fehlt: {db_path}. Zuerst import-master ausführen.")
     with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        employees = [
-            Employee.model_validate(dict(row))
-            for row in conn.execute(
-                "SELECT emp_id,first_name,last_name FROM employees ORDER BY last_name,first_name,emp_id"
-            )
-        ]
+        employees, reports = load_report_data(conn)
         appointments = [
-            ReportAppointment.model_validate(dict(row))
-            for row in conn.execute(_SQL, (period.start.date().isoformat(), period.end.date().isoformat()))
+            report
+            for report in reports
+            if report.due_date is not None
+            and period.start.date() <= report.due_date <= period.end.date()
+            and report.status not in ("erledigt", "entfällt")
         ]
     grouped: dict[str, list[ReportAppointment]] = {employee.emp_id: [] for employee in employees}
     skipped = 0
     for appointment in appointments:
-        reason = None
-        if appointment.existing_mandate is None:
-            reason = "Auftrag fehlt in den Stammdaten"
-        elif appointment.primary_count == 0:
-            reason = "keine Person mit Rolle P"
-        elif appointment.primary_count > 1:
-            reason = "mehrere Personen mit Rolle P"
-        elif appointment.employee_id not in grouped:
-            reason = "Person mit Rolle P fehlt in den Mitarbeiter-Stammdaten"
+        reason = assignment_problem(appointment, set(grouped))
         if reason:
             logger.warning(
                 "Terminliste: Bericht {} / Auftrag {} ausgelassen: {}",
@@ -144,6 +85,7 @@ def _write_excel(employee: Employee, appointments: list[ReportAppointment], path
             "Status",
             "Notizen",
             "Bericht-ID",
+            "Zuordnungsbasis",
         ]
     )
     for appointment in appointments:
@@ -158,6 +100,7 @@ def _write_excel(employee: Employee, appointments: list[ReportAppointment], path
                 appointment.status,
                 appointment.notes,
                 appointment.report_id,
+                appointment.assignment_basis,
             ]
         )
     if not appointments:
@@ -175,14 +118,14 @@ def _write_excel(employee: Employee, appointments: list[ReportAppointment], path
         cell.fill = PatternFill("solid", fgColor="2E4057")
     for row_number in range(5, 5 + len(appointments)):
         sheet.cell(row_number, 1).number_format = "dd.mm.yyyy"
-    for column, width in enumerate((14, 14, 26, 20, 26, 22, 14, 45, 14), 1):
+    for column, width in enumerate((14, 14, 26, 20, 26, 22, 14, 45, 14, 40), 1):
         sheet.column_dimensions[get_column_letter(column)].width = width
     for row_number in (1, 2, 3):
-        sheet.merge_cells(start_row=row_number, start_column=1, end_row=row_number, end_column=9)
+        sheet.merge_cells(start_row=row_number, start_column=1, end_row=row_number, end_column=10)
     sheet.freeze_panes = "C5"
-    sheet.auto_filter.ref = f"A4:I{max(4, 4 + len(appointments))}"
+    sheet.auto_filter.ref = f"A4:J{max(4, 4 + len(appointments))}"
     sheet.print_title_rows = "1:4"
-    sheet.print_area = f"A1:I{sheet.max_row}"
+    sheet.print_area = f"A1:J{sheet.max_row}"
     sheet.page_setup.orientation = "landscape"
     sheet.page_setup.paperSize = sheet.PAPERSIZE_A4
     sheet.page_setup.fitToWidth = 1

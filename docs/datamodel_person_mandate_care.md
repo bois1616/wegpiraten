@@ -955,6 +955,52 @@ manually; report forms are labels and cadence rules generate no appointments.
 
 ### Target architecture: a Python reporting engine on SQLite, not Excel formulas
 
+**Correction 2026-10-11, Stephan's decision:** report outputs now derive
+responsibility at `due_date` from the optional `assignment_history` table described
+below. The earlier description of unconditional current-P selection applies only
+to the fallback and to the existing source-workbook display helpers, which were
+not patched in this implementation. `completed_date` does not change responsibility.
+
+The optional Excel table `assignment_history` lives on Zuständigkeitsverlauf and
+imports to an additive SQLite table with the same name:
+
+| Field | Type | Null | Meaning |
+| --- | --- | --- | --- |
+| `assignment_id` | text | no | Stable unique period identifier |
+| `mandate_id` | text | no | Mandate whose responsibility is recorded |
+| `employee_id` | text | no | Employee in the period |
+| `role` | code | no | P or S |
+| `valid_from` | date | no | Inclusive first day |
+| `valid_to` | date | yes | Inclusive final day, empty means ongoing |
+| `notes` | text | yes | Customer-maintained context |
+
+`reports/report_data.py` resolves exactly one P covering the due date. S does not
+assign a report. No matching P, overlapping P periods, invalid periods, missing
+employee or missing/invalid due date produce a finding. A mandate with supplied
+history never falls back to its current assignment for gaps. Without any history,
+the legacy P selection remains available and explicitly labelled
+«Aktuelle Zuordnung; historische Zuständigkeit unbekannt». The source XLSX
+retains the periods across disposable-DB rebuilds. Import and reporting do not
+write derived responsibility back to XLSX or manufacture report rows. The current
+`relation_mandate_emp` remains the timesheet source; history is scoped to reports.
+
+`make klientenuebersicht MONTH=2026-10` creates the stand-year/following-year grid
+with a preceding legend and sheets per employee. It deliberately omits the old
+Übersicht sheet, the repeated name columns O/P and AC/AD and the row-1 legend.
+The new month blocks start at O and AA. One row represents one explicitly named
+mandate with assigned report dates in the grid. Metadata comes from that imported
+mandate, not from a parallel manually maintained overview. Authorised budgets are
+labelled hours/month. A report can remain due after the mandate ends. All statuses
+are included, several same-month reports remain separate lines, mixed forms use a
+neutral colour and text, and Berichtsdetails retains every explicit report once.
+Unassignable or out-of-grid records also appear in Nicht zugeordnet. Existing
+workbooks without the history table or new optional contact phone/email columns
+remain importable. Windows Excel acceptance remains open.
+
+Stephan also confirmed that missing parent/guardian/placement history is accepted
+for v1; changing guardian responsibilities is outside the present scope. This
+does not infer historical addresses or alter the Accordix guardian-residence field.
+
 Proposed by Stephan, 22.09.2026, for later: read this workbook into SQLite —
 after the corresponding programs are adjusted — and generate every report from
 SQLite, not from Excel formulas at runtime. Checked against the current code

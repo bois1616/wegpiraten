@@ -74,7 +74,7 @@ TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     ),
     "masterdata_contact_person": (
         "Ansprechpersonen",
-        ("contact_person_id", "service_requester_id", "gender", "first_name", "last_name", "notes"),
+        ("contact_person_id", "service_requester_id", "gender", "first_name", "last_name", "notes", "phone", "email"),
     ),
     "relation_mandate_emp": ("Zuordnung MA", ("mandate_id", "employee_id", "role")),
     "report": (
@@ -183,6 +183,8 @@ def fixture_records() -> dict[str, list[dict[str, object]]]:
                 "gender": "Frau",
                 "first_name": "Test",
                 "last_name": "Kontakt",
+                "phone": "+41 00 000 00 00",
+                "email": "kontakt@example.invalid",
             }
         ],
         "relation_mandate_emp": [

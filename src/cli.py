@@ -13,6 +13,7 @@ Befehle:
     import-sheets   Ausgefüllte Zeiterfassungsbögen importieren
     accordix        KFSG-Leistungsmeldung (ambulant) für Accordix erstellen
     terminliste     Monatliche Berichtstermine je Mitarbeitenden als Excel erstellen
+    klientenuebersicht Zweijähriges Berichtsraster je Mitarbeitenden als Excel erstellen
 """
 
 import sqlite3
@@ -446,6 +447,23 @@ def terminliste(
     except Exception as e:
         logger.exception("Fehler beim Erstellen der Terminlisten: {}", e)
         console.print(f"[red]Fehler: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("klientenuebersicht")
+def klientenuebersicht(
+    month: str = typer.Argument(..., help="Standmonat im Format MM.YYYY, MM-YYYY oder YYYY-MM"),
+    config_path: Optional[Path] = typer.Option(None, "--config", "-c", help="Pfad zur Konfigurationsdatei"),
+) -> None:
+    """Erstellt Mitarbeiterblätter mit Berichtsraster für das Standjahr und Folgejahr."""
+    try:
+        from reports.klientenuebersicht import create_klientenuebersicht
+
+        path = create_klientenuebersicht(get_config(config_path), month)
+        console.print(f"[bold green]Klientenübersicht erstellt: {path}[/bold green]")
+    except Exception as exc:
+        logger.exception("Fehler beim Erstellen der Klientenübersicht: {}", exc)
+        console.print(f"[red]Fehler: {exc}[/red]")
         raise typer.Exit(1)
 
 

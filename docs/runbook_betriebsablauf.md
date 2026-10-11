@@ -126,6 +126,12 @@ Der Import ist Bestandteil jedes Neuaufbaus. Pfade kommen aus Config; die alten 
    Diagnose nennt nicht erzeugte Zuordnungen und Gründe. Blattschutz-Passwort kommt wie
    bisher aus der bestehenden Secret-Konfiguration. Nur die geprüften Bögen verteilen.
 
+Berichtsausgaben werden separat aus der importierten DB neu erzeugt:
+`make terminliste MONTH=2026-10` und `make klientenuebersicht MONTH=2026-10`.
+Beide nutzen die Zuständigkeit am Fälligkeitstag, soweit die Historie gepflegt ist.
+Die Klientenübersicht ersetzt manuell fortgeschriebene Mitarbeiterblätter; Details
+stehen im [Datenpflege-Runbook](runbook_umstellung_datenmodell.md#klientenübersicht-neu-erzeugen).
+
 ## Erster Lauf nach der Umstellung
 
 Die ersten ausgefüllten Bögen tragen noch C-Nummern. Sie werden anhand der versionierten

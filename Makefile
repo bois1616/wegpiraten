@@ -12,6 +12,7 @@
 #   make import-sheets MONTH=2026-02                    Zeiterfassungsbögen importieren
 #   make report        MONTH=2026-02                    Arbeitszeitprotokoll erstellen
 #   make terminliste   MONTH=2026-02                    Berichtstermine je Mitarbeitenden (Excel)
+#   make klientenuebersicht MONTH=2026-10                Berichtsraster Standjahr und Folgejahr (Excel)
 #   make accordix      MONTH=2026-02                    Accordix-Leistungsmeldung (ambulant) erstellen
 #   make validate                                       Konfiguration prüfen
 #
@@ -24,7 +25,7 @@
 
 CLI := .venv/bin/wegpiraten
 
-.PHONY: help invoices timesheets import-master fetch-master fetch-timesheets import-sheets report terminliste accordix validate _require-month _save-month _require-tsdir _save-tsdir
+.PHONY: help invoices timesheets import-master fetch-master fetch-timesheets import-sheets report terminliste klientenuebersicht accordix validate _require-month _save-month _require-tsdir _save-tsdir
 
 help:
 	@echo ""
@@ -41,6 +42,7 @@ help:
 	@echo "  make import-sheets MONTH=2026-02                    Zeiterfassungsbögen importieren"
 	@echo "  make report        MONTH=2026-02                    Arbeitszeitprotokoll erstellen"
 	@echo "  make terminliste   MONTH=2026-02                    Berichtstermine je Mitarbeitenden (Excel)"
+	@echo "  make klientenuebersicht MONTH=2026-10                Berichtsraster Standjahr und Folgejahr (Excel)"
 	@echo "  make accordix      MONTH=2026-02                    Accordix-Leistungsmeldung (ambulant) erstellen"
 	@echo "  make validate                                       Konfiguration prüfen"
 	@echo ""
@@ -71,6 +73,9 @@ report: _require-month _save-month
 
 terminliste: _require-month _save-month
 	$(CLI) terminliste $(MONTH)
+
+klientenuebersicht: _require-month _save-month
+	$(CLI) klientenuebersicht $(MONTH)
 
 accordix: _require-month _save-month
 	$(CLI) accordix $(MONTH)

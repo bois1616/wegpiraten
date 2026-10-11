@@ -57,6 +57,36 @@ the English journal seam above. This section processes every customer note in
 Resolve the workbook defects first, then add contact data, dated responsibility and
 the annual report overview. Keep the scope appropriate to the temporary v1 system.
 
+**Update after Stephan's decisions, 2026-10-11:** the original proposal below is
+retained as its planning baseline. Stephan requested implementation of the employee
+overview and decided that report responsibility uses **due_date**. Responsibility is
+derived in both outputs from source-maintained assignment periods; no report writer
+updates the XLSX and no durable state is expected in SQLite. DM-84's date choice is
+settled. Parents/guardians/placements need only currently supplied data; missing
+history is accepted and changing guardian responsibilities is deferred. That
+narrows DM-85's proposal for mandatory placement/history semantics.
+
+DM-86 is implemented as `make klientenuebersicht MONTH=2026-10`, rather than the
+earlier YEAR proposal: one workbook with employee sheets, a preceding Legende,
+Berichtsdetails and Nicht zugeordnet. No Übersicht sheet. The repeated name pairs
+formerly O/P and AC/AD are removed; the month blocks now start at O and AA. Row 1
+has no legend. G:N show fresh imported data for the explicitly identified mandate;
+parallel and follow-up mandates retain separate rows. J:M are clearly defined as
+current monthly authorised hours, not inherited meanings of the old abbreviations.
+All explicit report entries are retained in details, including completed/cancelled
+and out-of-grid entries. Employee grids include assigned report dates in the stand
+year/following year. These exports are regenerated output, not another data source.
+
+DM-84 implementation is complete for optional `assignment_history` import and a
+shared due-date resolver used by DM-70 and DM-86. Periods remain in the customer
+XLSX; the customer workbook has not been expanded or imported in this session.
+The runbook defines the new table. Missing history uses current P with an explicit
+historical-unknown label; gaps/overlaps in supplied history never use that fallback.
+Contact phone/email import support is added for the report, but adding those columns
+to the customer workbook and the remaining payer-email part of DM-83 remain open.
+DM-80/82 and customer corrections DM-81 remain open; no repair is implied by these
+report changes. Synthetic end-to-end import/report tests require no customer fake data.
+
 Operating clarification from Stephan, 2026-10-11: customer data corrections happen
 later and do not block technical implementation. A current `make import-master`
 failure due to unresolved data is accepted. Do not run another customer-workbook
@@ -206,7 +236,10 @@ row and an internal hyperlink. Row numbers are navigation aids, not identities.
   Acceptance: both old and extended workbook formats import; existing invoice
   recipients, amounts and QR data remain unchanged.
 
-- [ ] [P1] [Responsibility] **DM-84** Specify dated employee responsibility.
+- [x] [P1] [Responsibility] **DM-84** Specify dated employee responsibility.
+  Completed 2026-10-11 using Stephan's due-date decision and the shared tested
+  resolver. Source-workbook rollout remains open. The original proposal below is
+  superseded where it offers another reference date; see the update above.
   `[Opus]`, with customer confirmation by `[Stephan]`; implementation `[Sonnet]`.
   Add a separate `Zuständigkeitsverlauf` table with `assignment_id`, `mandate_id`,
   `employee_id`, `role` (P/S), `valid_from`, `valid_to` and `notes`. A separate PK
@@ -269,7 +302,10 @@ row and an internal hyperlink. Row numbers are navigation aids, not identities.
   selection, billing or existing Accordix address behavior. Risk: contact/address
   duplication and more sensitive information in workbook, backups and exports.
 
-- [ ] [P1] [Report] **DM-86** Generate a Klientenübersicht from the report table.
+- [x] [P1] [Report] **DM-86** Generate a Klientenübersicht from the report table.
+  Implemented 2026-10-11 with synthetic verification. Windows/customer acceptance
+  remains open. The original proposal below is superseded for YEAR, Übersicht
+  and repeated name columns by Stephan's decision recorded above.
   `[Opus]` specifies mapping, `[Sonnet]` implements. Reference:
   `resources/2026 Klientenübersicht.xlsx`, eight sheets (overview and seven
   employee sheets), with 2026/2027 Jan–Dec grids and legend: red Bericht,

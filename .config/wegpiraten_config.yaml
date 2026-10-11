@@ -416,6 +416,41 @@ entities:
         type: str
         excel_column: notes
         optional: true
+      - name: phone
+        type: str
+        excel_column: phone
+        optional: true
+      - name: email
+        type: str
+        excel_column: email
+        optional: true
+
+  assignment_history:
+    fields:
+      - name: assignment_id
+        type: str
+        excel_column: assignment_id
+        primary_key: true
+      - name: mandate_id
+        type: str
+        excel_column: mandate_id
+      - name: employee_id
+        type: str
+        excel_column: employee_id
+      - name: role
+        type: str
+        excel_column: role
+      - name: valid_from
+        type: str
+        excel_column: valid_from
+      - name: valid_to
+        type: str
+        excel_column: valid_to
+        optional: true
+      - name: notes
+        type: str
+        excel_column: notes
+        optional: true
 
   mandate_employee_relation:
     fields:

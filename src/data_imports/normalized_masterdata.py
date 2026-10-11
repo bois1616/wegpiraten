@@ -36,6 +36,12 @@ TABLES: dict[str, tuple[str, str]] = {
     "report": ("report", "report"),
 }
 
+# Neue Zusatzdaten sind in bisherigen Kundenmappen noch nicht vorhanden.
+OPTIONAL_TABLES: dict[str, tuple[str, str]] = {
+    "assignment_history": ("assignment_history", "assignment_history"),
+}
+OPTIONAL_NEW_COLUMNS = {"phone", "email"}
+
 # Fremdverweise werden diagnostiziert, nicht durch DB-Constraints verworfen.
 FOREIGN_KEYS: dict[str, list[tuple[str, str, str, int | None]]] = {
     "masterdata_contact_person": [("service_requester_id", "service_requester", "service_requester_id", 13)],
@@ -50,6 +56,7 @@ FOREIGN_KEYS: dict[str, list[tuple[str, str, str, int | None]]] = {
     "mandate_person": [("mandate_id", "mandate", "mandate_id", 4), ("person_id", "person", "person_id", 5)],
     "relation_mandate_emp": [("mandate_id", "mandate", "mandate_id", 12), ("employee_id", "employees", "emp_id", 12)],
     "report": [("mandate_id", "mandate", "mandate_id", 38)],
+    "assignment_history": [("mandate_id", "mandate", "mandate_id", None), ("employee_id", "employees", "emp_id", None)],
 }
 
 
@@ -69,18 +76,26 @@ def import_normalized(config: Config, source: Path) -> int:
 
     workbook = openpyxl.load_workbook(source, data_only=True)
     frames: dict[str, tuple[pd.DataFrame, int]] = {}
+    tables = TABLES | {key: value for key, value in OPTIONAL_TABLES.items() if value[1] in config.models}
     try:
-        for excel, (_, entity) in TABLES.items():
+        for excel, (_, entity) in tables.items():
             fields = config.models[entity].fields
             sheet = next((ws for ws in workbook if excel in ws.tables), None)
             if sheet is None:
+                if excel in OPTIONAL_TABLES:
+                    frames[excel] = (pd.DataFrame(columns=[f.excel_column for f in fields]), 1)
+                    continue
                 raise ValueError(f"Erforderliche Excel-Tabelle fehlt: {excel}")
             left, top, right, bottom = range_boundaries(sheet.tables[excel].ref)
             if left is None or top is None or right is None or bottom is None:
                 raise ValueError(f"{excel}: Tabellenbereich ist ungültig")
             values = list(sheet.iter_rows(min_row=top, max_row=bottom, min_col=left, max_col=right, values_only=True))
             frame = pd.DataFrame(values[1:], columns=values[0])
-            missing = [f.excel_column for f in fields if f.excel_column not in frame.columns]
+            missing = [
+                f.excel_column
+                for f in fields
+                if f.excel_column not in frame.columns and not (f.optional and f.excel_column in OPTIONAL_NEW_COLUMNS)
+            ]
             if missing:
                 raise ValueError(f"{excel}: erforderliche Spalten fehlen: {missing}")
             frames[excel] = (frame, top + 1)
@@ -109,7 +124,7 @@ def import_normalized(config: Config, source: Path) -> int:
         existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if existing:
             raise ValueError("Arbeitsdatenbank ist nicht leer. Nach Sicherung löschen und den Lauf neu beginnen.")
-        for excel, (target, entity) in TABLES.items():
+        for excel, (target, entity) in tables.items():
             fields = config.models[entity].fields
             keys = [f.name for f in fields if f.primary_key]
             columns = [f"{f.name} {sql_type(f.type)}" for f in fields]
@@ -172,6 +187,8 @@ def import_normalized(config: Config, source: Path) -> int:
             )
         create_mandate_view(conn)
         for table, refs in FOREIGN_KEYS.items():
+            if table == "assignment_history" and table not in tables:
+                continue
             for column, ref_table, ref_column, invariant in refs:
                 for key, row, value in conn.execute(
                     f"SELECT t.rowid,t.source_row,t.{column} FROM {table} t LEFT JOIN {ref_table} r ON t.{column}=r.{ref_column} WHERE t.{column} IS NOT NULL AND t.{column}<>'' AND r.{ref_column} IS NULL"

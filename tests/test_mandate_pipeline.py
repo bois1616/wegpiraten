@@ -312,3 +312,172 @@ def test_terminliste_cli(imported: Config) -> None:
     assert len(list((imported.get_output_path() / "Terminlisten_2026-10").glob("*.xlsx"))) == 3
     result = runner.invoke(app, ["terminliste", "2026-13", "--config", config_path])
     assert result.exit_code == 1
+
+
+def test_report_history_import_and_due_day_assignment(imported: Config) -> None:
+    """Datierte XLSX-Zuordnung überlebt den Neuaufbau und gilt für beide Reports."""
+    from openpyxl.worksheet.table import Table
+
+    from reports.klientenuebersicht import create_klientenuebersicht
+    from reports.report_data import load_report_data
+    from reports.terminliste import create_terminlisten
+
+    source = create_workbook(Path(imported.structure.prj_root) / "with_history.xlsx")
+    workbook = load_workbook(source)
+    sheet = workbook.create_sheet("Zuständigkeitsverlauf")
+    sheet.append(["assignment_id", "mandate_id", "employee_id", "role", "valid_from", "valid_to", "notes"])
+    sheet.append(["Z1", "A26092", "E9001", "P", datetime(2026, 1, 1), datetime(2026, 7, 31), None])
+    sheet.append(["Z2", "A26092", "E9002", "P", datetime(2026, 8, 1), datetime(2026, 12, 31), None])
+    sheet.append(["Z3", "A26092", "E9003", "P", datetime(2027, 1, 1), None, None])
+    sheet.append(["Z4", "A26092", "E9001", "S", datetime(2026, 8, 1), None, None])
+    sheet.add_table(Table(displayName="assignment_history", ref="A1:G5"))
+    workbook.save(source)
+    workbook.close()
+    # Ausschliesslich die isolierte Test-DB verwerfen, niemals die Kunden-DB.
+    imported.get_db_path().unlink()
+    run_import(imported, source)
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        conn.executemany(
+            "INSERT INTO report(report_id,mandate_id,due_date,report_form,status) VALUES (?,?,?,'Bericht','offen')",
+            [
+                ("R9010", "A26092", "2026-07-31"),
+                ("R9011", "A26092", "2026-08-01"),
+                ("R9012", "A26092", "2026-12-31"),
+                ("R9013", "A26092", "2027-01-01"),
+            ],
+        )
+        _, reports = load_report_data(conn)
+        assert {r.report_id: r.employee_id for r in reports} == {
+            "R9001": "E9002",
+            "R9010": "E9001",
+            "R9011": "E9002",
+            "R9012": "E9002",
+            "R9013": "E9003",
+        }
+        assert all("Fälligkeitstag" in r.assignment_basis for r in reports)
+        count_before = conn.execute("SELECT count(*) FROM report").fetchone()[0]
+    files = create_terminlisten(imported, "2026-10")
+    own = next(path for path in files if "E9002" in path.name)
+    workbook = load_workbook(own)
+    assert workbook["Termine"]["I5"].value == "R9001"
+    workbook.close()
+    overview = load_workbook(create_klientenuebersicht(imported, "2026-10"))
+    assert "Übersicht" not in overview.sheetnames
+    sheets = [sheet for sheet in overview if sheet.title.startswith("E900")]
+    assigned = next(sheet for sheet in sheets if "E9002" in sheet["A2"].value)
+    assert "R9001" in assigned["X6"].value
+    successor = next(sheet for sheet in sheets if "E9003" in sheet["A2"].value)
+    assert "R9013" in successor["AA6"].value
+    overview.close()
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        assert conn.execute("SELECT count(*) FROM report").fetchone()[0] == count_before
+    source_workbook = load_workbook(source)
+    assert source_workbook["Zuständigkeitsverlauf"].max_row == 5
+    source_workbook.close()
+
+
+def test_old_contact_columns_and_no_history_remain_importable(imported: Config) -> None:
+    """Neue Kontaktfelder und Historientabelle sind bei alten Mappen optional."""
+    source = create_workbook(Path(imported.structure.prj_root) / "old_columns.xlsx")
+    workbook = load_workbook(source)
+    sheet = workbook["Ansprechpersonen"]
+    sheet.delete_cols(7, 2)
+    sheet.tables["masterdata_contact_person"].ref = "A2:F3"
+    workbook.save(source)
+    workbook.close()
+    imported.get_db_path().unlink()
+    run_import(imported, source)
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        assert conn.execute("SELECT phone,email FROM masterdata_contact_person").fetchone() == (None, None)
+        assert conn.execute("SELECT count(*) FROM assignment_history").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("problem", ["gap", "overlap", "invalid", "missing_employee"])
+def test_report_history_never_falls_back_for_bad_period(imported: Config, problem: str) -> None:
+    """Eine lückenhafte/mehrdeutige Historie darf die aktuelle P-Zuordnung nicht nutzen."""
+    from reports.klientenuebersicht import create_klientenuebersicht
+    from reports.report_data import assignment_problem, load_report_data
+
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        start = "2026-11-01" if problem == "gap" else "bad date" if problem == "invalid" else "2026-01-01"
+        employee = "E_MISSING" if problem == "missing_employee" else "E9002"
+        conn.execute(
+            "INSERT INTO assignment_history(assignment_id,mandate_id,employee_id,role,valid_from) VALUES ('Z1','A26092',?,'P',?)",
+            (employee, start),
+        )
+        if problem == "overlap":
+            # Auch zwei Perioden derselben Person sind eine Überschneidung.
+            conn.execute(
+                "INSERT INTO assignment_history(assignment_id,mandate_id,employee_id,role,valid_from) VALUES ('Z2','A26092','E9002','P','2026-10-01')"
+            )
+        employees, reports = load_report_data(conn)
+        assert assignment_problem(reports[0], {e.emp_id for e in employees}) is not None
+        assert reports[0].employee_id != "E9001"
+    workbook = load_workbook(create_klientenuebersicht(imported, "2026-10"))
+    assert workbook["Nicht zugeordnet"]["A2"].value == "R9001"
+    assert workbook["Berichtsdetails"]["A2"].value == "R9001"
+    workbook.close()
+
+
+def test_klientenuebersicht_grid_status_details_and_cli(imported: Config) -> None:
+    """Gemischte Termine, Folgejahr und fehlende Daten bleiben ohne Kopien sichtbar."""
+    from typer.testing import CliRunner
+
+    from cli import app
+    from reports.klientenuebersicht import create_klientenuebersicht
+
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        conn.executemany(
+            "INSERT INTO report(report_id,mandate_id,due_date,report_form,status,notes) VALUES (?,?,?,?,?,?)",
+            [
+                ("R9010", "A26092", "2026-10-20", "Zwischenbericht", "erledigt", "=Kein Formeltext"),
+                ("R9011", "A26092", "2027-01-01", "Abschlussbericht", "entfällt", None),
+                ("R9012", "A26092", None, "Bericht", "offen", None),
+                ("R9013", "A26092", "2028-01-01", "Bericht", "offen", None),
+                ("R9014", "A_MISSING", "2026-10-15", "Bericht", None, None),
+            ],
+        )
+    path = create_klientenuebersicht(imported, "2026-10")
+    workbook = load_workbook(path)
+    assert workbook.sheetnames == [
+        "Legende",
+        "E9001 Test",
+        "E9003 Test",
+        "E9002 Test",
+        "Berichtsdetails",
+        "Nicht zugeordnet",
+    ]
+    sheet = workbook["E9001 Test"]
+    assert sheet["A1"].value is None
+    assert sheet["O4"].value == "Jan" and sheet["AA4"].value == "Jan"
+    assert sheet["X6"].fill.fgColor.rgb == "FFE2E8F0"
+    assert "R9001" in sheet["X6"].value and "R9010" in sheet["X6"].value
+    assert "erledigt" in sheet["X6"].value
+    assert "R9011" in sheet["AA6"].value and "entfällt" in sheet["AA6"].value
+    assert sheet["AA6"].fill.fgColor.rgb == "FF00B0F0"
+    assert sheet["J6"].value == 0.5 and sheet["M6"].value == 15.5
+    assert sheet.freeze_panes == "O6" and sheet.max_column == 38
+    details = workbook["Berichtsdetails"]
+    assert details.max_row == 7
+    assert sorted(details.cell(row, 1).value for row in range(2, 8)) == [
+        "R9001",
+        "R9010",
+        "R9011",
+        "R9012",
+        "R9013",
+        "R9014",
+    ]
+    text = next(details.cell(row, 10) for row in range(2, 8) if details.cell(row, 1).value == "R9010")
+    assert text.value == "=Kein Formeltext" and text.data_type == "s"
+    assert all(
+        "historische Zuständigkeit unbekannt" in details.cell(row, 8).value
+        for row in range(2, 8)
+        if details.cell(row, 7).value
+    )
+    assert workbook["Nicht zugeordnet"].max_row == 4
+    workbook.close()
+    assert create_klientenuebersicht(imported, "2026-10") == path
+    runner = CliRunner()
+    config_path = str(Path(imported.structure.prj_root) / "config.yaml")
+    assert runner.invoke(app, ["klientenuebersicht", "2026-10", "--config", config_path]).exit_code == 0
+    assert runner.invoke(app, ["klientenuebersicht", "2026-13", "--config", config_path]).exit_code == 1
