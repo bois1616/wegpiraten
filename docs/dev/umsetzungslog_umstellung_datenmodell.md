@@ -16,7 +16,7 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
 - **Latest change:** 2026-10-11 customer workbook reviewed read-only; implementation proposal DM-80–86 is in the backlog. At Stephan's request, both runbooks now warn against overwriting calculated columns and copying whole rows; the data-care runbook lists exact input/formula ranges and the interim deletion procedure. Formula repair and the proposed extensions remain open. No workbook or live DB changed.
 - **In progress:** customer revision under `import/wegpiraten_datenbank.xlsx` is the input for follow-up work. Repair its formulas and resolve the listed customer findings before trusting the open-check count. The proposal has not been implemented or independently reviewed. The live database was not replaced; the CLI requires a database rebuilt with the new workbook.
-- **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Sandbox has been archived losslessly at Stephan’s explicit request; August reference remains under `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
+- **Next independent work:** DM-80 formula repair and DM-82 actionable diagnostics, then optional contact fields DM-83. Customer data corrections DM-81 happen later and do not block this work. Before the next customer-workbook import, the agent must perform and document a general review of the current source; unresolved data may still make the import fail, accepted by Stephan. Synthetic tests are independent. Other open work: DM-16/61, DM-41, DM-50.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
 - **DM-70 validation:** 38 active tests passed; nox lint/typecheck passed with 0 errors and 0 warnings. Includes month/status selection, P versus S assignment, non-blocking missing/ambiguous references, empty employee files, literal free text, reruns and CLI invocation.
@@ -42,6 +42,17 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-11
+
+- **Implementation order and pre-import review** `[Codex / GPT-6]`
+  (Status: operating clarification recorded): Stephan accepts a temporarily failing
+  `make import-master` while customer data remains uncorrected. Customer corrections
+  happen later and do not block technical implementation. Added a general agent
+  review before the next customer-workbook import and moved DM-80/82 ahead of
+  DM-81 in the delivery order. Existing model-class requirements for domain
+  specifications do not apply to routine formula repair or optional contact fields.
+  Confirmed from code that interval values are imported but neither import nor
+  reporting creates implicit report appointments. No new import, workbook changes
+  or implementation claimed in this planning update.
 
 - **Runbook warnings for workbook formulas** `[Codex / GPT-6]`
   (Status: completed): At Stephan's request, added German customer-facing

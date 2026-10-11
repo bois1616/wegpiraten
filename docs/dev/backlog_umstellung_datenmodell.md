@@ -57,6 +57,16 @@ the English journal seam above. This section processes every customer note in
 Resolve the workbook defects first, then add contact data, dated responsibility and
 the annual report overview. Keep the scope appropriate to the temporary v1 system.
 
+Operating clarification from Stephan, 2026-10-11: customer data corrections happen
+later and do not block technical implementation. A current `make import-master`
+failure due to unresolved data is accepted. Do not run another customer-workbook
+import before the agent has performed a general review of the then-current source:
+tables/columns, formula integrity and coverage, calculated references, duplicate and
+missing keys, FK completeness, dates, diagnostic coverage and preservation of
+customer input. Record remaining findings explicitly. Synthetic implementation
+tests may run independently; a successful real-data import is not a prerequisite
+for implementing DM-80/82/83. The review must not silently correct customer data.
+
 ### Evidence from the initial customer revision
 
 Reviewed `import/wegpiraten_datenbank.xlsx` against the handover workbook in
@@ -299,8 +309,11 @@ row and an internal hyperlink. Row numbers are navigation aids, not identities.
 
 ### Delivery order, risks and decisions needed
 
-1. DM-80 plus DM-81, then DM-82 and Windows acceptance DM-06. Structural repair is
-   urgent; optional extensions must not delay the October billing path.
+1. Implement DM-80 and DM-82 first, independently of the later customer corrections
+   in DM-81. Windows acceptance DM-06 remains separate. Before the next import of
+   the customer workbook, the agent performs the general review described above.
+   Unresolved data may still make that import fail; Stephan accepts this. Structural
+   repair is urgent; optional extensions must not delay the October billing path.
 2. DM-83 is small and can ship independently. DM-85 needs field/maintenance agreement
    before implementation; contact details alone do not require a general CRM.
 3. DM-84 before the historical employee version of DM-86. A first overview can
@@ -328,6 +341,15 @@ employee, available historical switches, guardian/contact structure and placemen
 history scope, and any legacy overview columns required beyond the report grid.
 These questions do not block formula repair or the agreed optional contact columns.
 No independent Opus/Astra review is claimed for this draft.
+
+The existing `[Opus]` tags on DM-84–86 follow this backlog's model-assignment rule
+for specifications with domain risk. They are not a prerequisite for DM-80/82/83.
+Use that review for date-based responsibility, changes to operational assignment,
+address semantics or lossy report mappings; routine formula repair and optional
+phone/email fields do not need it. Actual missing dates, numbers and contact data
+remain customer maintenance, not specification decisions. Automatic generation
+from `report_interval_months` is not implemented and is not part of DM-86; current
+import/reporting consume only explicit report rows.
 
 ## Termin und Rahmen
 
