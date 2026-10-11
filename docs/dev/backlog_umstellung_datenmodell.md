@@ -97,6 +97,52 @@ customer input. Record remaining findings explicitly. Synthetic implementation
 tests may run independently; a successful real-data import is not a prerequisite
 for implementing DM-80/82/83. The review must not silently correct customer data.
 
+### Proposed handover sequence and contact relationships, 2026-10-11
+
+Stephan will return an expanded workbook **based on the current customer revision
+in import/wegpiraten_datenbank.xlsx** after the technical conversion, so the customer
+can continue entering/correcting data. It is not a generated employee overview or
+a rebuild from migration seeds. Preserve all customer input; back up and retain the
+source hash, compare input fields before/after each technical patch, and deliver
+the working master workbook separately from generated reports. Formula repair,
+new source tables and their dropdowns/checks are still outstanding.
+
+Recommended order: DM-80 formula integrity, DM-82 diagnostics and fixed comments,
+then source-workbook history/contact additions plus the remaining importer fields,
+then synthetic editing/pipeline checks and a full general review of the prepared
+customer workbook. Provide the outstanding customer-data findings alongside the
+handover copy. Customer corrections may follow; failures due to those data remain
+accepted. After correction, review the then-current file again before its next
+import and verify real report output in an isolated DB. Windows Excel opening,
+new-row formulas and dropdown acceptance remain necessary for the source workbook.
+
+**Refinement proposed for DM-85, not yet implemented:** use two small source tables:
+`Bezugspersonen` (`related_person`) with stable `related_person_id`, name, current
+address, phone, optional email and notes; and `Kind–Bezugsperson`
+(`person_related_person`) with stable relationship ID, `person_id`,
+`related_person_id`, relationship role and explicit guardianship status
+Ja/Nein/Unbekannt. Several children can reference the same adult without copying
+phone/address data. A child can have several adults. Parent/guardian roles belong
+to the child/adult relationship, not to an assumed family-wide contact. No
+historical relationships or addresses are required. Internal employee responsibility
+remains the mandate assignment/history and is not merged with these domain contacts.
+
+The existing sibling label in `Kinder.family_id` continues to serve index-child
+selection. Shared adults, surnames or addresses do not create family membership.
+Adding a family table is unnecessary for these contact requirements alone; propose
+it only when there are independent family-level properties to maintain. If that
+later happens, map existing labels explicitly onto stable family IDs and preserve
+the child groups/index-child results during the conversion. A family table would
+still not replace child-specific adult relationships. This refinement supersedes
+the earlier DM-85 suggestion of duplicating an adult contact row per child if
+Stephan approves it; do not start a family-key migration on the current proposal.
+
+Stephan clarified that the assumed Nipote grouping was his demonstration, not a
+confirmed customer relationship. No grouping, parent links or contact records are
+to be populated from that example. Current/past placement data can be entered
+where known; absent history and changes in guardian responsibility remain outside
+the required scope.
+
 ### Evidence from the initial customer revision
 
 Reviewed `import/wegpiraten_datenbank.xlsx` against the handover workbook in

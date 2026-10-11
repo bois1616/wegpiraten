@@ -334,6 +334,12 @@ Nipote, both Meiringen, nine years apart: two families, said Wegpiraten). Which 
 belong together is knowledge that only a person has, and it is entered or it does not
 exist. The field stays empty until siblings actually appear.
 
+**Correction 2026-10-11 (Stephan):** the Nipote family grouping used in the
+demonstration was assumed by Stephan, not a confirmed customer relationship.
+The attribution in the example above must not be treated as established data
+about either shared or separate families. Neither that demo nor matching
+surname/locality authorises populating a family label or adult/child relationship.
+
 `person.family_id` is a single value with no history. A child moving between households
 is a deliberate edit, and no requirement for household history has come up.
 
@@ -803,6 +809,9 @@ reading of each and marks it on the `Anleitung` sheet.
    parallel. The migration could not reconstruct `predecessor_mandate_id` for
    existing data (see *Migration from `clients`* below), so this chain has to be
    set by hand once the family is confirmed.
+   **Clarification 2026-10-11:** this Nipote illustration is hypothetical, based
+   on Stephan's demo assumption. It establishes no family membership or required
+   correction to those real mandates.
 4. ~~Accordix entry date~~ **Settled 2026-09-21: manual entry**, separate from the
    first mandate date, because not all past mandates are on record. The
    consistency rule is invariant 32.

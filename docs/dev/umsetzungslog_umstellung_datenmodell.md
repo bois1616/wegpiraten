@@ -43,6 +43,17 @@ Regeln:
 
 ## 2026-10-11
 
+- **Master-workbook handover and child-specific contact proposal** `[Codex / GPT-6]`
+  (Status: proposal recorded, implementation open): Stephan clarified that the
+  customer receives a technically expanded copy based on the current import XLSX
+  and continues correcting it. Added the proposed delivery sequence and preservation
+  checks to the backlog. Refined DM-85's draft into one adult/contact table plus
+  child-specific relationships to avoid duplicate contacts and incorrect family-wide
+  guardian assumptions. Retaining the existing sibling label is proposed; no family
+  table/key migration is approved or implemented. Corrected the data-model document
+  to mark the Nipote family grouping as Stephan's demo assumption, not confirmed
+  customer data. No source-workbook, code, live DB or customer import changes.
+
 - **Due-date responsibility and employee overview DM-84/86** `[Codex / GPT-6]`
   (Status: implementation complete; customer-workbook rollout/Windows acceptance
   open): Stephan decided report responsibility at due date and requested the
