@@ -14,7 +14,7 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
-- **Latest change:** 2026-10-11 customer workbook reviewed read-only; implementation proposal DM-80–86 is in the backlog, including all Prüfungen column-G comments, dated responsibility, contact/placement data and annual overview. Fifteen broken `issue_run` formulas cause the Fehlerliste errors; three report FKs are blank, two report IDs duplicated, and A26050 lacks requester/payer/business number. No workbook or live DB changed.
+- **Latest change:** 2026-10-11 customer workbook reviewed read-only; implementation proposal DM-80–86 is in the backlog. At Stephan's request, both runbooks now warn against overwriting calculated columns and copying whole rows; the data-care runbook lists exact input/formula ranges and the interim deletion procedure. Formula repair and the proposed extensions remain open. No workbook or live DB changed.
 - **In progress:** customer revision under `import/wegpiraten_datenbank.xlsx` is the input for follow-up work. Repair its formulas and resolve the listed customer findings before trusting the open-check count. The proposal has not been implemented or independently reviewed. The live database was not replaced; the CLI requires a database rebuilt with the new workbook.
 - **Next independent work:** remaining invariant/warning coverage DM-16/61, Accordix August comparison DM-41, runbook review DM-50. Sandbox has been archived losslessly at Stephan’s explicit request; August reference remains under `archiv/umstellung_datenmodell_2026-10-10/sandbox/`.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
@@ -42,6 +42,20 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-11
+
+- **Runbook warnings for workbook formulas** `[Codex / GPT-6]`
+  (Status: completed): At Stephan's request, added German customer-facing
+  instructions to the data-care runbook: exact editable/calculated column ranges,
+  separate copying of Berichte A:B and D:H to preserve C, no whole-row pasting,
+  preservation checks for new table rows, and an interim procedure for deleting
+  records while DM-80 is open. Explained the broken counters in Aufträge AP,
+  Betreuungen AD and Berichte T, the unreliable Fehlerliste on reference errors,
+  and drifting notes next to the dynamic check list. Updated renewal and employee
+  removal instructions to agree with the warning; corrected the obsolete
+  Prüfkatalog-sheet reference and the claim that ended mandates keep generating
+  timesheets. Linked the warning from the monthly operating runbook before import.
+  Workbook repair is not claimed. Validation: documentation diff/link review and
+  `nox` lint/typecheck; no implementation changes or new tests.
 
 - **Customer workbook review and proposal DM-80–86** `[Codex / GPT-6]`
   (Status: review and requested plan completed; implementation open):

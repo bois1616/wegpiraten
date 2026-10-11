@@ -22,6 +22,13 @@ Der Import ist Bestandteil jedes Neuaufbaus. Pfade kommen aus Config; die alten 
    anderer Monate oder alte Klientenstruktur als Ersatz verwenden. Proton-Zugriff bleibt
    unter dem zentralen flock. Eine fehlende Arbeits-DB ist beim Validieren zulässig.
 
+   Vor dem Import auf fehlende berechnete Auftragsnummern und Bezugsfehler in der
+   «Fehlerliste» achten. **#BEZUG! / #REF!** ist ein technischer Defekt; die
+   Fehlerliste liefert dann keine verlässliche Kontrolle. Die aktuelle Kundenmappe
+   vom 11.10.2026 braucht eine Formelreparatur. Datei sichern und reparieren lassen,
+   bevor ihre Prüfung als abgeschlossen gilt. Eingabefelder und Kopierregeln stehen
+   im [Datenpflege-Runbook](runbook_umstellung_datenmodell.md#formeln-nicht-bearbeiten-hier-keine-daten-hineinkopieren).
+
 2. **Bestehende Arbeits-DB sichern und entfernen.** Nur die konfigurierte SQLite-Datei:
 
    ```bash

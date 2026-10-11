@@ -1,6 +1,6 @@
 # Runbook: Umstellung auf Kinder, Aufträge und Betreuungen
 
-Stand 10.10.2026. Dieses Runbook beschreibt die kundenseitige Datenpflege. Den Hintergrund
+Stand 11.10.2026. Dieses Runbook beschreibt die kundenseitige Datenpflege. Den Hintergrund
 erklärt das [Konzept](konzept_person_auftrag_leistung.md), die Felder und Regeln stehen im
 [Datenmodell](datamodel_person_mandate_care.md). Für den CLI-Monatslauf gilt das
 [Betriebs-Runbook](runbook_betriebsablauf.md).
@@ -21,13 +21,65 @@ aus den ausgefüllten Bögen neu aufgebaut. Befunde werden fachlich im Workbook 
 | Berichte gab es in der Datenbank nicht                                                                  | Neu: Blatt «Berichte» mit Fälligkeit, Berichtsform, Status. Die Erstbefüllung stammt aus der Klientenübersicht (Farben im Monatsraster) |
 | Kontrolle von Hand                                                                                      | Blätter «Prüfungen» (offene Punkte) und «Fehlerliste» (zeilenweise)                                                                     |
 
+## Formeln nicht bearbeiten: hier keine Daten hineinkopieren
+
+Nur Eingabefelder ändern. Berechnete und ausgeblendete Spalten nicht überschreiben,
+leeren oder mit Daten aus anderen Dateien füllen. Auch «Nur Werte einfügen» zerstört
+eine Formel, wenn der Zielbereich eine Formelzelle enthält. Die Blätter «Prüfungen»
+und «Fehlerliste» sind berechnete Ansichten; dort keine Stammdaten eintragen.
+
+Für den aktuellen Spaltenstand gilt:
+
+| Blatt | Hier dürfen Daten eingegeben oder als Werte eingefügt werden | Nicht bearbeiten / nicht hineinkopieren |
+| --- | --- | --- |
+| Kinder | A:M | N:AC, berechnete Anzeigen und Prüfungen |
+| Aufträge | A:Q | R:AP, berechnete Anzeigen, Verweise und Prüfungen |
+| Betreuungen | A:L | M:AD, berechnete Anzeigen und Prüfungen |
+| Zuordnung MA | A:C | D:O, berechnete Anzeigen und Prüfungen |
+| Ansprechpersonen | A:F | G:N, berechnete Anzeigen und Prüfungen |
+| Berichte | A:B und D:H | **C** (berechnete Auftrag-Nr) sowie I:T |
+
+Bei «Berichte» wird der Auftrag in **B** ausgewählt. **C muss seine Formel behalten**;
+der Import liest die berechnete Nummer aus C. Ein sichtbarer Auftrag in B genügt
+nicht, wenn die Formel in C fehlt. Nach dem Anlegen einer Zeile kontrollieren, dass
+Auftrag und berechnete Anzeigen erscheinen. Fehlt etwas, die Datei zur technischen
+Prüfung an Stephan geben; keine Ersatzwerte in die Formelspalten schreiben.
+
+Neue Datensätze innerhalb der jeweiligen Excel-Tabelle anlegen und nur die
+Eingabefelder füllen. Beim Übernehmen eines bestehenden Datensatzes nur die oben
+genannten Eingabefelder als Werte kopieren, keine ganze Zeile und keinen ganzen
+Blattbereich. In «Berichte» A:B und D:H getrennt kopieren, damit C erhalten bleibt.
+Neue Nummern selbst vergeben und auf Eindeutigkeit prüfen.
+
+**Bis zur technischen Reparatur keine ganzen Blattzeilen löschen, ausschneiden
+oder verschieben.** Einen Auftrag oder eine Betreuung fachlich über die vorgesehenen
+Enddaten beenden. Muss ein irrtümlicher Datensatz oder eine Vertretungszuordnung
+entfernt werden, vorher eine Dateikopie sichern und die Entfernung mit Stephan
+abstimmen. Danach Formeln und Fehlerliste prüfen. Diese Vorsicht ersetzt die
+geplante Reparatur nicht.
+
+Beim Kundenstand vom 11.10.2026 enthalten die versteckten Zählspalten **Aufträge AP**,
+**Betreuungen AD** und **Berichte T** insgesamt 15 defekte Formeln. Sie verursachen
+die Bezugsfehler in der «Fehlerliste». Solange dort **#BEZUG! / #REF!** steht, ist
+die Fehlerliste unbrauchbar; das bedeutet nicht, dass die Daten fehlerfrei sind.
+Datei sichern und Stephan informieren. Den Fehler weder mit Leerwerten noch mit
+einer Formel unterdrücken. Reparatur und vollständige Neuberechnung in Excel sind
+noch offen, siehe [DM-80 im Backlog](dev/backlog_umstellung_datenmodell.md#plan-2026-10-11-customer-workbook-review-and-requested-additions).
+
+Kommentare in «Prüfungen», Spalte G, stehen derzeit neben einer wechselnden Liste.
+Bei Rückmeldungen deshalb immer die Bezeichnung der Prüfung und die betroffenen
+Datensatznummern dazuschreiben; die Zeilennummer allein kann nach einer Korrektur
+zu einer anderen Prüfung gehören.
+
 ## Einmalig zu tun
 
 Die Reihenfolge ist absichtlich so gewählt: Fehler zuerst, dann Fachfragen, dann die Ergänzungen.
 
 1. **Blatt «Prüfungen» öffnen.** Es zeigt nur, was offen ist. «Fehler» sind zu bereinigen,
    «Hinweis» ist zu prüfen. Wer die Zeilen sucht, findet sie in der «Fehlerliste» oder über
-   den Filter «prüfen» im «Prüfkatalog».
+   den Katalog rechts im Blatt «Prüfungen». Bei Bezugsfehlern zuerst den Abschnitt
+   [Formeln nicht bearbeiten](#formeln-nicht-bearbeiten-hier-keine-daten-hineinkopieren)
+   beachten.
 2. **Geschäftsnummern beim Kostenträger P1000 (KJA) korrigieren.** Verbindlich ist
    yymmddnnn, zum Beispiel 260819008 für den achten Auftrag vom 19.08.2026. Das Datum ist das des Auftrags, nicht der Bewilligung.
    Aktuell weichen 14 Aufträge ab (Text wie «beendet» oder «on hold» statt Nummer), einer hat keine. Ob eine
@@ -73,6 +125,8 @@ Auftrag, Betreuung, Zuordnung MA, Berichte.
 Bei einer Vertretung bleibt die Rolle P auf der Stammperson, sie erstellt weiterhin die Berichte. Die Erfassungsbögen
 entstehen für jede Zeile der Zuordnung, deshalb die Vertretung nach dem Einsatz wieder
 entfernen, sonst entsteht ein Bogen ohne Stunden.
+Bis zur Formelreparatur gilt dafür das oben beschriebene Vorgehen für das Entfernen
+von Zuordnungen; keine ganze Blattzeile löschen.
 
 ### Monatliche Terminlisten für Berichte
 
@@ -135,15 +189,18 @@ die «Fehlerliste» schauen.
 
 **Verlängerung erfassen** (bestehenden Auftrag kopieren)
 
-1. Im Blatt «Aufträge» die Zeile des bisherigen Auftrags kopieren und darunter einfügen. Die
-   alte Zeile bleibt unverändert, auch «Bewilligung bis».
+1. Im Blatt «Aufträge» eine neue Tabellenzeile anlegen und nur die Eingabefelder A:Q
+   des bisherigen Auftrags als Werte übernehmen. Keine ganze Blattzeile kopieren.
+   Die alte Zeile bleibt unverändert, auch «Bewilligung bis».
 2. In der Kopie ändern: Auftrag-Nr, «Bewilligung von» (Tag nach dem alten Ende), «Bewilligung
    bis», Geschäftsnummer, wenn nötig Kontingent und Ansprechperson, dazu «Vorgängerauftrag»
    (Auswahl, der alte Auftrag) und die Bemerkung. Wer die Auftrag-Nr vergisst, sieht «Auftrag-Nr
    doppelt». Wer beim KJA die Geschäftsnummer vergisst, sieht «kommt mehrfach vor».
-3. Im Blatt «Betreuungen» die Zeilen des alten Auftrags kopieren und nur die Auftrag-Nr
-   ändern. Der Eintritt bleibt gleich, der Austritt leer.
-4. Im Blatt «Zuordnung MA» die Zeilen kopieren und die Auftrag-Nr ändern. Die Rollen bleiben.
+3. Im Blatt «Betreuungen» neue Tabellenzeilen anlegen und nur die Eingabefelder A:L
+   der bisherigen Betreuungen als Werte übernehmen. Auftrag-Nr ändern, Eintritt
+   beibehalten und Austritt leeren. Die Formelspalten bleiben erhalten.
+4. Im Blatt «Zuordnung MA» neue Tabellenzeilen anlegen, nur A:C als Werte übernehmen
+   und die Auftrag-Nr ändern. Die Rollen bleiben.
 5. Im Blatt «Berichte» die Berichte des neuen Auftrags eintragen.
 6. Beim alten Auftrag bleibt der Hinweis «Bewilligung abgelaufen, Betreuung noch offen» stehen,
    solange seine Betreuung keinen Austritt trägt. Bei einer Verlängerung ist das kein Fehler.
@@ -164,11 +221,15 @@ die «Fehlerliste» schauen.
    Der Auftrag bleibt, solange andere Kinder weiterlaufen.
 2. Endet der ganze Auftrag, in «Aufträge» «Bewilligung bis» setzen und bei allen Betreuungen den
    Austritt eintragen.
-3. Die Zeilen in «Zuordnung MA» entfernen, sonst entstehen weiter Erfassungsbögen.
+3. Die Zuordnungen in «Zuordnung MA» prüfen und bei Bedarf entfernen. Bis zur
+   Formelreparatur die Entfernung wie oben beschrieben mit Stephan abstimmen.
+   Abgelaufene Bewilligungen werden bei der Bogenerzeugung bereits berücksichtigt.
 
 **Vertretung**
 
-Zeile in «Zuordnung MA» mit Rolle S ergänzen, nach dem Einsatz wieder entfernen.
+Tabellenzeile in «Zuordnung MA» mit Rolle S ergänzen, nach dem Einsatz wieder
+entfernen. Bis zur Formelreparatur die Entfernung mit Stephan abstimmen; keine
+ganze Blattzeile löschen.
 
 ### Regeln, die man sich merken muss
 
