@@ -1,4 +1,4 @@
-# Prüft die Arbeitsmappe in echtem Excel und schreibt einen Bericht daneben.
+﻿# Prüft die Arbeitsmappe in echtem Excel und schreibt einen Bericht daneben.
 #
 # Hintergrund: gebaut und getestet wird unter Linux mit LibreOffice, und
 # LibreOffice ist an mehreren Stellen nachsichtiger als Excel. Zwei Fehler sind
@@ -14,25 +14,36 @@ param(
     [string]$Bericht = ""
 )
 
+$ErrorActionPreference = "Stop"
+$Datei = (Resolve-Path -LiteralPath $Datei).ProviderPath
 if ($Bericht -eq "") { $Bericht = [IO.Path]::ChangeExtension($Datei, ".pruefung.txt") }
 $zeilen = New-Object System.Collections.Generic.List[string]
 function Sag($t) { $zeilen.Add($t); Write-Host $t }
 
-# Reparaturprotokolle, die Excel beim Öffnen schreibt, vorher wegräumen,
-# damit hinterher nur die dieses Laufs übrig sind.
+# Nur neue Reparaturprotokolle betrachten; fremde Protokolle bleiben erhalten.
 $tmp = [IO.Path]::GetTempPath()
-Get-ChildItem $tmp -Filter "error*.xml" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 $vorher = Get-Date
 
 Sag "Datei:  $Datei"
 Sag "Excel:  gestartet $(Get-Date -Format 'dd.MM.yyyy HH:mm')"
 Sag ""
 
+$excel = $null
+$wb = $null
+try {
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
 $excel.AskToUpdateLinks = $false
 $wb = $excel.Workbooks.Open($Datei, 0, $true)   # ReadOnly, keine Verknüpfungen aktualisieren
+if ($null -eq $wb) { throw "Excel hat keine Arbeitsmappe zurueckgegeben." }
+Sag ("Geoeffnet: " + $wb.FullName)
+Sag ("Arbeitsblaetter: " + $wb.Worksheets.Count)
+if ($wb.Names.Count -eq 0) { throw "Keine benannten Bereiche: falsche oder unvollstaendige Stammdatei." }
+# Ein fehlendes Blatt oder ein Zeichencodierungsproblem muss den Lauf abbrechen.
+foreach ($name in @("Prüfungen", "Fehlerliste", "Aufträge", "Betreuungen", "Kinder", "Zuordnung MA", "Berichte", "Prüfkatalog")) {
+    $null = $wb.Worksheets.Item($name)
+}
 
 # --- 1. Hat Excel repariert?
 $logs = Get-ChildItem $tmp -Filter "error*.xml" -ErrorAction SilentlyContinue |
@@ -81,8 +92,9 @@ $proben = @(
 )
 foreach ($p in $proben) {
     $z = $wb.Worksheets.Item($p[0]).Range($p[1])
-    try   { Sag ("Gültigkeit  {0,-16} {1,-4} {2,-16} {3}" -f $p[0], $p[1], $p[2], $z.Validation.Formula1) }
-    catch { Sag ("Gültigkeit  {0,-16} {1,-4} {2,-16} FEHLT" -f $p[0], $p[1], $p[2]) }
+    $formel = $z.Validation.Formula1
+    if ([string]::IsNullOrWhiteSpace("$formel")) { throw ("Auswahlliste fehlt: " + $p[0] + "!" + $p[1]) }
+    Sag ("Gültigkeit  {0,-16} {1,-4} {2,-16} {3}" -f $p[0], $p[1], $p[2], $formel)
 }
 
 # --- 5. Was die Mappe selbst über sich sagt
@@ -99,10 +111,22 @@ for ($r = 5; $r -lt 45; $r++) {
          $fl.Cells.Item($r, 3).Text, $fl.Cells.Item($r, 4).Text, $fl.Cells.Item($r, 5).Text)
 }
 
-$wb.Close($false)
-$excel.Quit()
-[void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
-
-$zeilen | Set-Content -Path $Bericht -Encoding UTF8
-Write-Host ""
-Write-Host "Bericht geschrieben: $Bericht"
+Sag ""
+if ($gesamt -eq 0 -and -not $logs) {
+    Sag "Automatische Pruefung abgeschlossen. Manuelle Eingabe-/Sortiertests bleiben erforderlich."
+} else {
+    throw "Excel-Reparatur oder Formelfehler festgestellt; Datei vor Uebergabe pruefen."
+}
+} catch {
+    Sag ("PRUEFUNG FEHLGESCHLAGEN: " + $_.Exception.Message)
+    throw
+} finally {
+    if ($null -ne $wb) { $wb.Close($false) }
+    if ($null -ne $excel) {
+        $excel.Quit()
+        [void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
+    }
+    $zeilen | Set-Content -LiteralPath $Bericht -Encoding UTF8
+    Write-Host ""
+    Write-Host "Bericht geschrieben: $Bericht"
+}

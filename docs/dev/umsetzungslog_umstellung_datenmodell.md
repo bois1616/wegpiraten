@@ -17,6 +17,7 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Reports:** DM-84/86 implemented on 2026-10-11. Optional source-maintained assignment_history import and shared resolver serve Terminlisten and `make klientenuebersicht MONTH=2026-10`. No Übersicht sheet or repeated name columns; legend precedes employee grids. Synthetic preview retained under ignored `output/report_demo_2026-10-11/`. Isolated import/report verification of the prepared customer copy completed on 2026-10-12.
 - **Customer-workbook checkpoint:** prepared copy under ignored `output/uebergabe_stammdaten_2026-10-11/wegpiraten_datenbank.xlsx`, with 3,981 non-empty source input cells unchanged, added blank source tables and stable check catalogue. LibreOffice recalculation: 0 formula errors; 194,377 caches merged, native extensions preserved. Existing styles retained, two new styles added for wrapping/text inputs; shared strings unchanged. General review: 0 technical defects, 13 customer-data findings. Isolated import and report generation succeeded; delivery notes and visual previews created. Original/live DB unchanged.
 - **Next independent work:** remaining Windows Excel acceptance for DM-80/82 and customer corrections DM-81. DM-83 and the authorised DM-85 contact/residence/placement fields are implemented in source copy and importer. Before the next customer-workbook import, perform and document a fresh general review of the edited source; unresolved data may still make import fail. Synthetic tests are independent; no fake customer data required. Other open work: DM-16/61, DM-41, DM-50.
+- **Windows check attempt 2026-10-12:** uploaded report is inconclusive: 0 names, empty validation formulas and missing workbook check values. Both delivered XLSX files have the verified hash and 29 native defined names. Do not accept its empty error scan as evidence of Excel compatibility. Hardened tools/excel_pruefung.ps1 with absolute source path, terminating errors, workbook/sheet/name preconditions, nonempty validation checks, cleanup/reporting in finally and UTF-8 BOM for Windows PowerShell. Repeat with the updated script; Linux cannot execute Excel COM.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
 - **DM-70 validation:** 38 active tests passed; nox lint/typecheck passed with 0 errors and 0 warnings. Includes month/status selection, P versus S assignment, non-blocking missing/ambiguous references, empty employee files, literal free text, reruns and CLI invocation.
@@ -42,6 +43,16 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-12
+
+- **Windows acceptance report rejected as inconclusive** `[Codex / GPT-6]`
+  (Status: script corrected; Windows rerun required): Uploaded report says zero
+  defined names and empty validations; source and duplicate copy remain identical
+  to the final prepared hash and contain 29 defined names. The previous script
+  continued after PowerShell errors and used a relative path. Mojibake also shows
+  an encoding mismatch. Neither cause is confirmed without the console errors.
+  Added fail-fast checks, absolute paths, finally cleanup and BOM; removed deletion
+  of unrelated Excel repair logs. No workbook data changes. Windows Excel COM and
+  PowerShell are unavailable locally, so no successful script execution is claimed.
 
 - **Checkpoint 3: isolated customer import, delivery guidance and final diagnostics**
   `[Codex / GPT-6]` (Status: locally verified; Windows Excel acceptance open):
