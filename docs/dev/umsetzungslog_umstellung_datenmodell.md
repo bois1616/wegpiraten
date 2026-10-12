@@ -19,6 +19,7 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Next independent work:** remaining Windows Excel acceptance for DM-80/82 and customer corrections DM-81. DM-83 and the authorised DM-85 contact/residence/placement fields are implemented in source copy and importer. Before the next customer-workbook import, perform and document a fresh general review of the edited source; unresolved data may still make import fail. Synthetic tests are independent; no fake customer data required. Other open work: DM-16/61, DM-41, DM-50.
 - **Windows automatic check 2026-10-12:** the 10:36 pass belongs to the previous workbook version (22 sheets). Repeat after the assignment consolidation (21 sheets). Manual insert/delete/sort, new-row autofill, new dropdown and link/comment checks remain outstanding; DM-06 is not fully closed.
 - **Excel opening failure at 14:34:** inspection found an orphan shared formula in Fehlerliste M10: the consolidation overwrote its shared anchor M2 when reducing the helper-source list. LibreOffice did not reject it and the former general review missed it. Restored the formula from the preserved source, expanded shared formulas before future finding-list edits, and added a technical orphan check. Two regression tests added (57 total). The defect is corrected locally; Windows reopening is still required to confirm it caused the COM Open failure.
+- **Excel repair log at 14:44:** opening still failed after the formula correction. Stephan supplied Excel's repair log: styles.xml was rejected, followed by lost worksheet formatting. The new instruction style (cellXfs index 101) appended alignment after protection, violating CT_Xf child order. Corrected the builder to insert alignment first and patched only this element order in the delivery workbook; every other ZIP part is byte-identical. Backup: backup/vereinigung_vor_excel_formatkorrektur.xlsx. General review now detects invalid cell-format child order; two regression cases pass. Ten package tests and nox lint/typecheck pass; corrected workbook review: 0 technical issues, unchanged 13 data findings. SHA-256: bdcf8359df821cebd24ffbb2cad66da23d4442007a1548a0bc7d383b866595af. Windows reopening and full acceptance remain pending; the earlier orphan was a separate defect, not established as the opening failure's cause.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
 - **DM-70 validation:** 38 active tests passed; nox lint/typecheck passed with 0 errors and 0 warnings. Includes month/status selection, P versus S assignment, non-blocking missing/ambiguous references, empty employee files, literal free text, reruns and CLI invocation.
@@ -44,6 +45,22 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-12
+
+- **Excel style XML order corrected after repair evidence** `[Codex / GPT-6]`
+  (Status: locally corrected; Windows opening confirmation pending): The 14:44
+  repeat still failed in Workbooks.Open. Excel's manual recovery log rejected
+  styles.xml and then repaired formatting throughout the workbook. The assignment
+  consolidation copied a protected style and appended alignment after protection;
+  CT_Xf requires alignment, protection, extLst in that order. Fixed the builder
+  and changed only the two-child order in the delivery style. All other ZIP parts
+  remain byte-identical, preserving inputs, formulas, caches, sheet order and
+  colours. Saved the prior file in backup/vereinigung_vor_excel_formatkorrektur.xlsx.
+  General review now rejects invalid or duplicate cell-format child order.
+  Regression cases cover invalid and valid sequences; ten package tests pass.
+  Validation: nox lint/typecheck passed with 0 errors/warnings; workbook general
+  review has 0 technical issues and the same 13 customer findings. Windows opening
+  remains unverified. The earlier shared-formula fix repaired a separate defect;
+  it did not resolve the actual observed opening failure.
 
 - **Orphan Excel shared formula corrected** `[Codex / GPT-6]`
   (Status: locally corrected; Windows opening confirmation pending): Stephan's

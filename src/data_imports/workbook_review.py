@@ -3,6 +3,7 @@
 import hashlib
 import re
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 from openpyxl.utils.cell import get_column_letter, range_boundaries
 from openpyxl.utils.datetime import from_excel
@@ -38,6 +39,20 @@ def review_workbook(config: Config, source: Path) -> WorkbookReview:
     """Prüft Struktur, Formeln, Schlüssel und Pflichtverweise unabhängig von Caches."""
     package = WorkbookPackage(source)
     result = WorkbookReview(sha256=hashlib.sha256(source.read_bytes()).hexdigest())
+    styles = ET.fromstring(package.parts["xl/styles.xml"])
+    style_order = {tag("alignment"): 0, tag("protection"): 1, tag("extLst"): 2}
+    for group in ("cellXfs", "cellStyleXfs"):
+        for index, style in enumerate(styles.findall(f"m:{group}/m:xf", NS)):
+            children = [style_order.get(child.tag, 3) for child in style]
+            if children != sorted(set(children)) or 3 in children:
+                result.issues.append(
+                    WorkbookIssue(
+                        table="styles.xml",
+                        field=f"{group}[{index}]",
+                        message="Ungültige XML-Reihenfolge in Excel-Formatvorlage",
+                        technical=True,
+                    )
+                )
     sheet_for_table: dict[str, str] = {}
     roots = {title: package.read_sheet(title) for title in package.sheets}
     for title, path in package.sheets.items():
@@ -48,8 +63,6 @@ def review_workbook(config: Config, source: Path) -> WorkbookReview:
         }
         rel_path = path.replace("/worksheets/", "/worksheets/_rels/") + ".rels"
         if rel_path in package.parts:
-            from xml.etree import ElementTree as ET
-
             for relationship in ET.fromstring(package.parts[rel_path]):
                 target = relationship.get("Target", "")
                 if "/tables/" in target:

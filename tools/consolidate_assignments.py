@@ -71,7 +71,9 @@ def consolidate(config: Config, source: Path, destination: Path) -> None:
     wrap_style.set("applyAlignment", "1")
     alignment = wrap_style.find(tag("alignment"))
     if alignment is None:
-        alignment = ET.SubElement(wrap_style, tag("alignment"))
+        # CT_Xf verlangt alignment vor protection und extLst.
+        alignment = ET.Element(tag("alignment"))
+        wrap_style.insert(0, alignment)
     alignment.set("wrapText", "1")
     alignment.set("vertical", "top")
     wrap_index = str(len(formats))

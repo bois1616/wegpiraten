@@ -156,6 +156,34 @@ def test_review_rejects_orphan_shared_formula(tmp_path: Path, monkeypatch: pytes
     assert any(issue.technical and issue.field == "J4" and "Sammelformel" in issue.message for issue in result.issues)
 
 
+@pytest.mark.parametrize("valid_order", [False, True])
+def test_review_checks_cell_format_child_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid_order: bool
+) -> None:
+    from data_imports.workbook_review import review_workbook
+    from shared_modules.config import Config
+    from tests.fixtures.create_masterdata import create_workbook
+
+    monkeypatch.setattr(Config, "_instance", None)
+    config = Config(Path(__file__).resolve().parents[1] / ".config/wegpiraten_config.yaml")
+    source = create_workbook(tmp_path / "fixture.xlsx")
+    package = WorkbookPackage(source)
+    styles = ET.fromstring(package.parts["xl/styles.xml"])
+    formats = styles.find(tag("cellXfs"))
+    assert formats is not None
+    style = ET.SubElement(formats, tag("xf"), {"numFmtId": "0", "fontId": "0", "fillId": "0", "borderId": "0"})
+    children = ("alignment", "protection") if valid_order else ("protection", "alignment")
+    for name in children:
+        ET.SubElement(style, tag(name))
+    formats.set("count", str(len(formats)))
+    package.parts["xl/styles.xml"] = serialize(styles, package.parts["xl/styles.xml"])
+    package.write(source)
+    result = review_workbook(config, source)
+    issues = [issue for issue in result.issues if issue.table == "styles.xml"]
+    assert bool(issues) is not valid_order
+    assert all(issue.technical for issue in issues)
+
+
 def test_remove_empty_history_preserves_remaining_order_colors_and_local_names(tmp_path: Path) -> None:
     from openpyxl.workbook.defined_name import DefinedName
 
