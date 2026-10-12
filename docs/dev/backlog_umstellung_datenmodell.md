@@ -57,8 +57,12 @@ Excel opening at 14:34 failed after consolidation. Inspection found an orphan
 shared formula in Fehlerliste M10 caused by overwriting its M2 anchor. Restored
 from the preserved source; future partial edits expand shared formulas first.
 General review now rejects missing shared anchors; two regression tests added.
-Local recalculation/import checks pass, but Windows opening must be confirmed
-again before DM-80/06 acceptance or customer delivery.
+The 14:44 repeat still failed; Excel's repair log identified invalid styles.xml.
+Corrected the new instruction style's XML child order. The 14:52 Windows check
+then opened all 21 sheets without repair and found no formula errors after full
+rebuild, 34 runtime names and the five sampled dropdown formulas. Diagnostics:
+five open error checks and 72 records with findings. Full DM-80/06 acceptance
+still requires the manual editing checks below.
 
 **Revised assignment source, Stephan 2026-10-12:** remove the duplicate empty
 Zuständigkeitsverlauf source. Zuordnung MA is the sole relation table, with optional
@@ -67,8 +71,8 @@ A change ends the old row and adds a new row; historical roles and support rows
 must remain. Report assignment uses due_date, monthly timesheets use interval
 overlap and one header per mandate/employee. Distinct periods of a returning
 employee survive import. Customer-edited sheet order and tab colours are retained.
-The maintenance rule is embedded in Anleitung and the runbook. The prior Windows
-automatic pass applies to the previous workbook; rerun it after this change.
+The maintenance rule is embedded in Anleitung and the runbook. The 14:52 Windows
+automatic pass applies to this consolidated workbook.
 
 Windows automatic check passed on 2026-10-12 at 10:36: no Excel repair or formula
 errors after full rebuild, 22 sheets opened, names present and sampled dropdowns
