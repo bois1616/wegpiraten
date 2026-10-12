@@ -51,6 +51,28 @@ selection rules and validation.
 
 ## Plan 2026-10-11: customer workbook review and requested additions
 
+### Implementation checkpoint 2026-10-12
+
+DM-80/82 are implemented locally: repaired native formulas, zero errors after
+LibreOffice recalculation, stable Prüfkatalog with all six customer comments and
+linked findings. Windows Excel acceptance (including table insertion/deletion/sort)
+remains open. DM-83 and the authorised two-table refinement of DM-85 are implemented
+in Config, importer, diagnostics and a separate customer-workbook copy. Empty new
+tables remain optional; no adult/family data were inferred. Original source and live
+SQLite were not changed. Customer corrections DM-81 remain open.
+
+General review of the prepared copy: no technical defects and 13 customer-data
+findings. Additional domain warnings are retained in the import finding list.
+Isolated real-data import succeeded: 637 imported records, 144 of 146 report rows
+(two duplicate report IDs skipped with warnings), eleven employee lists and the
+employee overview generated. No interval-generated report rows exist.
+
+Delivery: ignored output/uebergabe_stammdaten_2026-10-11/wegpiraten_datenbank.xlsx,
+with UEBERGABE.md and review/evidence manifests. A new general review is required
+after customer edits and before the next import. The task descriptions below retain
+the original proposal; the two-table contact refinement supersedes the earlier
+per-child duplication proposal.
+
 Status: proposal requested by Stephan, not implementation approval. New entries follow
 the English journal seam above. This section processes every customer note in
 `Prüfungen!G:G`; the source workbook and its notes have not been overwritten.

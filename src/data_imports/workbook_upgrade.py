@@ -7,11 +7,11 @@ from xml.etree import ElementTree as ET
 
 from loguru import logger
 from openpyxl.formula.translate import Translator
-from openpyxl.utils.cell import get_column_letter, range_boundaries
+from openpyxl.utils.cell import column_index_from_string, get_column_letter, range_boundaries
 from pydantic import BaseModel
 
 from data_imports.normalized_masterdata import TABLES
-from data_imports.workbook_package import NS, WorkbookPackage, cell_map, set_cell, tag
+from data_imports.workbook_package import NS, WorkbookPackage, cell_map, serialize, set_cell, tag
 from shared_modules.config import Config
 
 _DIAGNOSTICS = {
@@ -743,6 +743,67 @@ def _findings(package: WorkbookPackage) -> None:
     package.save_sheet("Fehlerliste", root)
 
 
+def finish_presentation(package: WorkbookPackage) -> None:
+    """Ergänzt lesbare Katalogtexte und Textformat für neue Telefon-/PLZ-Eingaben."""
+    from copy import deepcopy
+
+    styles = ET.fromstring(package.parts["xl/styles.xml"])
+    formats = styles.find(tag("cellXfs"))
+    assert formats is not None
+    text_style = deepcopy(formats[24])
+    text_style.set("numFmtId", "49")
+    text_style.set("applyNumberFormat", "1")
+    text_index = str(len(formats))
+    formats.append(text_style)
+    wrap_style = deepcopy(formats[26])
+    wrap_style.set("applyAlignment", "1")
+    alignment = wrap_style.find(tag("alignment"))
+    if alignment is None:
+        alignment = ET.SubElement(wrap_style, tag("alignment"))
+    alignment.set("wrapText", "1")
+    alignment.set("vertical", "top")
+    wrap_index = str(len(formats))
+    formats.append(wrap_style)
+    formats.set("count", str(len(formats)))
+    package.parts["xl/styles.xml"] = serialize(styles, package.parts["xl/styles.xml"])
+    for title, columns in {
+        "Kinder": ("AE", "AG"),
+        "Ansprechpersonen": ("O",),
+        "Bezugspersonen": ("E", "G"),
+        "Platzierungen": ("F", "H"),
+    }.items():
+        root = package.read_sheet(title)
+        for cell in root.findall(".//m:c", NS):
+            reference = cell.get("r", "")
+            if re.sub(r"\d", "", reference) in columns and int(re.sub(r"\D", "", reference)) >= 4:
+                cell.set("s", text_index)
+        cols = root.find(tag("cols"))
+        assert cols is not None
+        for column in columns:
+            number = str(column_index_from_string(column))
+            for node in cols:
+                if node.get("min") == number and node.get("max") == number:
+                    node.set("style", text_index)
+        package.save_sheet(title, root)
+    root = package.read_sheet("Prüfkatalog")
+    cols = root.find(tag("cols"))
+    assert cols is not None
+    for node in cols:
+        number = int(node.get("min", "0"))
+        if number in (4, 5, 7, 8):
+            node.set("width", "65" if number in (4, 5) else "48")
+        if number in (9, 10):
+            node.set("hidden", "1")
+    for row in root.findall("m:sheetData/m:row", NS):
+        if int(row.get("r", "0")) >= 4:
+            row.set("ht", "84")
+            row.set("customHeight", "1")
+            for cell in row:
+                if re.sub(r"\d", "", cell.get("r", "")) in ("D", "E", "G", "H"):
+                    cell.set("s", wrap_index)
+    package.save_sheet("Prüfkatalog", root)
+
+
 def prepare_workbook(config: Config, source: Path, destination: Path) -> UpgradeReport:
     """Bereitet eine separate, rückverfolgbare Kopie des bestätigten Formats vor."""
     if source.resolve() == destination.resolve():
@@ -762,6 +823,7 @@ def prepare_workbook(config: Config, source: Path, destination: Path) -> Upgrade
     _catalog(package, config)
     _due_assignment(package)
     _findings(package)
+    finish_presentation(package)
     if _inputs(package, config) != inputs:
         raise ValueError("Eingabewerte wurden verändert; Ausgabe wird nicht geschrieben.")
     report.preserved_input_cells = len(inputs)

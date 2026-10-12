@@ -143,6 +143,7 @@ def test_review_detects_nonimported_rows_and_duplicate_keys(tmp_path: Path, monk
     workbook.close()
     result = review_workbook(config, source)
     assert any(issue.technical and "ausserhalb" in issue.message for issue in result.issues)
+    assert not any(issue.table == "masterdata_contact_person" and issue.field == "gender" for issue in result.issues)
     workbook = load_workbook(source)
     workbook["Berichte"].tables["report"].ref = "A2:H4"
     workbook.save(source)

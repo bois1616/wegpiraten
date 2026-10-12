@@ -158,6 +158,8 @@ def review_workbook(config: Config, source: Path) -> WorkbookReview:
                     WorkbookIssue(table=name, row=row, key="/".join(key), message="Enddatum liegt vor Beginn")
                 )
             for field, allowed in FIELD_VALUE_LISTS.items():
+                if field == "gender" and name != "person":
+                    continue
                 if values.get(field) and values[field] not in allowed:
                     result.issues.append(
                         WorkbookIssue(

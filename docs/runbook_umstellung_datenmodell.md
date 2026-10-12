@@ -32,12 +32,18 @@ Für den aktuellen Spaltenstand gilt:
 
 | Blatt | Hier dürfen Daten eingegeben oder als Werte eingefügt werden | Nicht bearbeiten / nicht hineinkopieren |
 | --- | --- | --- |
-| Kinder | A:M | N:AC, berechnete Anzeigen und Prüfungen |
+| Kinder | A:M und AD:AG (Wohnort/Kontakt Kind) | N:AC, berechnete Anzeigen und Prüfungen |
 | Aufträge | A:Q | R:AP, berechnete Anzeigen, Verweise und Prüfungen |
 | Betreuungen | A:L | M:AD, berechnete Anzeigen und Prüfungen |
 | Zuordnung MA | A:C | D:O, berechnete Anzeigen und Prüfungen |
-| Ansprechpersonen | A:F | G:N, berechnete Anzeigen und Prüfungen |
+| Ansprechpersonen | A:F und O:P (Telefon/E-Mail) | G:N, berechnete Anzeigen und Prüfungen |
 | Berichte | A:B und D:H | **C** (berechnete Auftrag-Nr) sowie I:T |
+| Kostenträger | B:I, einschliesslich E-Mail Rechnung | Technische Überschriften nicht verändern |
+| Zuständigkeitsverlauf | A:G | H:N, Anzeigen und Prüfungen |
+| Bezugspersonen | A:I | J:N, Prüfungen |
+| Kind-Bezugsperson | A:F | G:M, Anzeigen und Prüfungen |
+| Platzierungen | A:K | L:Q, Prüfungen |
+| Prüfkatalog | G:H (Kommentar/Bearbeitung) | A:F und I:J, fester Katalog und Berechnungen |
 
 Bei «Berichte» wird der Auftrag in **B** ausgewählt. **C muss seine Formel behalten**;
 der Import liest die berechnete Nummer aus C. Ein sichtbarer Auftrag in B genügt
@@ -51,12 +57,11 @@ genannten Eingabefelder als Werte kopieren, keine ganze Zeile und keinen ganzen
 Blattbereich. In «Berichte» A:B und D:H getrennt kopieren, damit C erhalten bleibt.
 Neue Nummern selbst vergeben und auf Eindeutigkeit prüfen.
 
-**Bis zur technischen Reparatur keine ganzen Blattzeilen löschen, ausschneiden
-oder verschieben.** Einen Auftrag oder eine Betreuung fachlich über die vorgesehenen
+**Keine ganzen Blattzeilen ausschneiden oder verschieben.** Einen Auftrag oder eine Betreuung fachlich über die vorgesehenen
 Enddaten beenden. Muss ein irrtümlicher Datensatz oder eine Vertretungszuordnung
 entfernt werden, vorher eine Dateikopie sichern und die Entfernung mit Stephan
-abstimmen. Danach Formeln und Fehlerliste prüfen. Diese Vorsicht ersetzt die
-geplante Reparatur nicht.
+abstimmen. Danach Formeln und Fehlerliste prüfen. Datensätze nur über die jeweilige
+Excel-Tabelle entfernen; nach Strukturänderungen vor dem Import neu berechnen und prüfen.
 
 Beim Kundenstand vom 11.10.2026 enthalten die versteckten Zählspalten **Aufträge AP**,
 **Betreuungen AD** und **Berichte T** insgesamt 15 defekte Formeln. Sie verursachen
@@ -64,12 +69,43 @@ die Bezugsfehler in der «Fehlerliste». Solange dort **#BEZUG! / #REF!** steht,
 die Fehlerliste unbrauchbar; das bedeutet nicht, dass die Daten fehlerfrei sind.
 Datei sichern und Stephan informieren. Den Fehler weder mit Leerwerten noch mit
 einer Formel unterdrücken. Reparatur und vollständige Neuberechnung in Excel sind
-noch offen, siehe [DM-80 im Backlog](dev/backlog_umstellung_datenmodell.md#plan-2026-10-11-customer-workbook-review-and-requested-additions).
+in der separat vorbereiteten Kundenkopie vom 12.10.2026 erfolgt. Die ursprüngliche
+Datei unter import/ bleibt unverändert. Die Abnahme mit Windows Excel steht noch aus,
+siehe [DM-80 im Backlog](dev/backlog_umstellung_datenmodell.md#plan-2026-10-11-customer-workbook-review-and-requested-additions).
 
-Kommentare in «Prüfungen», Spalte G, stehen derzeit neben einer wechselnden Liste.
-Bei Rückmeldungen deshalb immer die Bezeichnung der Prüfung und die betroffenen
-Datensatznummern dazuschreiben; die Zeilennummer allein kann nach einer Korrektur
-zu einer anderen Prüfung gehören.
+Kommentare werden in der vorbereiteten Kundenkopie im **Prüfkatalog, Spalte G**
+bei der festen Prüfung-ID gepflegt. Spalte H nimmt Bearbeitungsnotizen auf.
+«Prüfungen», Spalte G, zeigt den Kommentar automatisch an; dort nicht hineinkopieren.
+Die sechs bisherigen Kundenkommentare wurden den festen Prüfungen zugeordnet.
+Die Fehlerliste verlinkt die betroffenen Eingabezeilen. Bei Rückmeldungen immer
+Prüfung-ID und Datensatznummer nennen.
+
+### Bezugspersonen, Wohnorte und Zuständigkeitsverlauf
+
+Eine erwachsene Person einmal in «Bezugspersonen» erfassen, mit eigener eindeutiger
+Nummer, Namen, Wohnadresse, Telefon und E-Mail. In «Kind-Bezugsperson» wird diese
+Nummer mit einem Kind verknüpft. Rolle und Sorgeberechtigung gelten je Verknüpfung;
+dieselbe Person kann für mehrere Kinder unterschiedliche Rollen haben. Unbekannte
+Sorgeberechtigung als «Unbekannt» erfassen. Das Feld «Familie» in «Kinder» bleibt
+die bisherige Geschwisterkennung; eine gemeinsame Bezugsperson erzeugt keine Familie.
+
+Die aktuelle Wohnadresse des Kindes steht in «Kinder», AD:AG. Ein Aufenthalt in
+einer Einrichtung oder Pflegefamilie kann zusätzlich in «Platzierungen» erfasst
+werden. Bekannte Zeiträume eintragen; fehlende alte Angaben bleiben leer. Wohnadresse
+der Bezugsperson und Wohnadresse des Kindes sind getrennte Angaben.
+
+In «Zuständigkeitsverlauf» je Auftrag, Mitarbeiter und Zeitraum eine eigene Zeile
+anlegen. Beginn und Ende gelten einschliesslich. Für Berichte zählt die Fälligkeit:
+ein am 31.07. endender P-Zeitraum ist für diesen Tag zuständig, der ab 01.08. beginnende
+für spätere Fälligkeiten. P-Zeiträume dürfen sich nicht überschneiden. Ein leeres Ende
+bedeutet fortlaufend. Ohne Verlauf verwendet das Programm die aktuelle P-Zuordnung
+und kennzeichnet die fehlende Historie. Die operative «Zuordnung MA» weiter pflegen.
+
+Das Berichtsintervall erzeugt **keine** Berichtseinträge. Fälligkeiten müssen in
+«Berichte» ausdrücklich eingetragen werden. Import und Reporting schreiben weder
+Termine noch Zuständigkeiten in die Stammdatei zurück. Terminliste und Klientenübersicht
+werden aus der aktuellen Stammdatei neu erzeugt; den Übersichtsreport nicht parallel
+als zweite Datenquelle pflegen.
 
 ## Einmalig zu tun
 
