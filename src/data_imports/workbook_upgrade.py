@@ -837,6 +837,9 @@ def prepare_workbook(config: Config, source: Path, destination: Path) -> Upgrade
     _due_assignment(package)
     _findings(package)
     finish_presentation(package)
+    from data_imports.workbook_check_comments import enable_direct_check_comments
+
+    enable_direct_check_comments(package)
     if _inputs(package, config) != inputs:
         raise ValueError("Eingabewerte wurden verändert; Ausgabe wird nicht geschrieben.")
     report.preserved_input_cells = len(inputs)

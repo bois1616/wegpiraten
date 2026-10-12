@@ -53,6 +53,13 @@ selection rules and validation.
 
 ### Implementation checkpoint 2026-10-12
 
+**Comment workflow superseded on 2026-10-12:** Stephan requires direct free text
+in Prüfungen G as the sole comment input. All checks now have fixed IDs/rows;
+count-zero checks stay visible, gray and struck through in A:F. G remains editable
+and readable, with all six existing comments retained. The technical Prüfkatalog
+is hidden and mirrors these comments. This replaces the earlier catalogue-input
+and dynamically compacted open-check workflow described in the historical plan.
+
 Excel opening at 14:34 failed after consolidation. Inspection found an orphan
 shared formula in Fehlerliste M10 caused by overwriting its M2 anchor. Restored
 from the preserved source; future partial edits expand shared formulas first.

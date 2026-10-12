@@ -287,7 +287,7 @@ def finish_input_presentation(package: WorkbookPackage) -> None:
         for column in "ABCDEFG":
             cell = cells.get(f"{column}{row}")
             if cell is not None:
-                cell.set("s", style_index(cell.get("s", "25"), True))
+                cell.set("s", style_index(cell.get("s", "25"), column != "G" or cell.find(tag("f")) is not None))
     for col in root.findall("m:cols/m:col", NS):
         if int(col.get("min", "0")) >= 8:
             col.set("hidden", "1")

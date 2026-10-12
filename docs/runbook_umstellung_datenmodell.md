@@ -26,7 +26,8 @@ aus den ausgefüllten Bögen neu aufgebaut. Befunde werden fachlich im Workbook 
 Nur Eingabefelder ändern. Berechnete und ausgeblendete Spalten nicht überschreiben,
 leeren oder mit Daten aus anderen Dateien füllen. Auch «Nur Werte einfügen» zerstört
 eine Formel, wenn der Zielbereich eine Formelzelle enthält. Die Blätter «Prüfungen»
-und «Fehlerliste» sind berechnete Ansichten; dort keine Stammdaten eintragen.
+und «Fehlerliste» zeigen berechnete Informationen. In «Prüfungen» ist ausschliesslich
+G für freie Kommentare vorgesehen; dort keine Stammdaten eintragen.
 
 Eingabezellen haben keine Füllung, berechnete Anzeigen sind grau hinterlegt.
 Beide haben einen dünnen Rahmen. Die Kopfzeilen und Warnfarben folgen eigenen Regeln.
@@ -45,7 +46,7 @@ Für den aktuellen Spaltenstand gilt:
 | Bezugspersonen | A:I | J:N, Prüfungen |
 | Kind-Bezugsperson | A:F | G:M, Anzeigen und Prüfungen |
 | Platzierungen | A:K | L:Q, Prüfungen |
-| Prüfkatalog | G:H (Kommentar/Bearbeitung) | A:F und I:J, fester Katalog und Berechnungen |
+| Prüfungen | G (freier Kommentar) | A:F und ausgeblendete technische Spalten |
 
 Bei «Berichte» wird der Auftrag in **B** ausgewählt. **H muss seine Formel behalten**;
 der Import liest die berechnete Nummer aus H. Ein sichtbarer Auftrag in B genügt
@@ -75,14 +76,17 @@ in der separat vorbereiteten Kundenkopie vom 12.10.2026 erfolgt. Die ursprüngli
 Datei unter import/ bleibt unverändert. Die Abnahme mit Windows Excel steht noch aus,
 siehe [DM-80 im Backlog](dev/backlog_umstellung_datenmodell.md#plan-2026-10-11-customer-workbook-review-and-requested-additions).
 
-Kommentare werden in der vorbereiteten Kundenkopie im **Prüfkatalog, Spalte G**
-bei der festen Prüfung-ID gepflegt. Spalte H nimmt Bearbeitungsnotizen auf.
-«Prüfungen», Spalte G, zeigt den Kommentar automatisch an; dort nicht hineinkopieren.
-Die sechs bisherigen Kundenkommentare wurden den festen Prüfungen zugeordnet.
+Kommentare direkt in **Prüfungen, Spalte G** schreiben. Dies ist die einzige
+Freitextspalte für Prüfungen. Alle Prüfungen bleiben sichtbar und ihren festen
+Prüfung-IDs zugeordnet. Bei Anzahl 0 ist die Prüfungszeile grau und durchgestrichen;
+der Kommentar bleibt normal lesbar und erhalten. Wird die Prüfung wieder offen,
+erscheint die Zeile wieder normal. Beim Sortieren die gesamte Liste nehmen,
+niemals eine einzelne Spalte. Der technische Prüfkatalog ist ausgeblendet.
+Die sechs bisherigen Kundenkommentare bleiben bei ihren Prüfungen.
 Die Fehlerliste verlinkt die betroffenen Eingabezeilen. Bei Rückmeldungen immer
 Prüfung-ID und Datensatznummer nennen.
 Die Links in «Prüfungen» F öffnen jeweils die gesamte Fehlerliste, ohne Filter
-auf die angeklickte Prüfung. H:M ist ein ausgeblendeter technischer Hilfsbereich.
+auf die angeklickte Prüfung. Die ausgeblendete Spalte H enthält die feste Prüfung-ID.
 
 ### Bezugspersonen, Wohnorte und datierte Zuordnung MA
 
