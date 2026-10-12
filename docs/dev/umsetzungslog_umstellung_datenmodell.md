@@ -15,7 +15,7 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
 - **Latest change:** DM-84/86 implemented on 2026-10-11 after Stephan chose responsibility by due date and requested employee overview sheets. Optional source-maintained assignment_history import and shared resolver serve Terminlisten and the new `make klientenuebersicht MONTH=2026-10`. No Übersicht sheet or repeated name columns; legend precedes employee grids. Synthetic preview retained under ignored `output/report_demo_2026-10-11/`. Customer workbook and live DB unchanged; no customer import performed.
-- **In progress:** Stephan approved master-workbook preparation while AFK. Checkpoint 1 complete: additive contact/relationship/placement models and importer warnings, 47 synthetic tests passed and nox green. The customer original is backed up byte-identically under ignored `output/uebergabe_stammdaten_2026-10-11/backup/`. Next: native workbook formula repair and new source tables; keep original/live DB unchanged. No independent review claimed.
+- **In progress:** checkpoints 1 and 2 complete. Prepared copy under ignored `output/uebergabe_stammdaten_2026-10-11/wegpiraten_datenbank.xlsx`, with 3,981 non-empty source input cells unchanged, added blank source tables and stable check catalogue. LibreOffice recalculation has 0 formula errors; 194,377 caches merged while preserving native extensions, styles and shared strings. General review found 0 technical defects and remaining customer-data findings. Next: isolated import/report verification, visual QA and delivery instructions. Original/live DB remain unchanged.
 - **Next independent work:** DM-80 formula repair and DM-82 actionable diagnostics, customer-workbook rollout for history/contact columns, remaining DM-83 payer email and DM-85 current parent/placement fields. Contact phone/email import support is implemented; current customer sheet not expanded. Customer data corrections DM-81 happen later. Before the next customer-workbook import, perform and document a general review of the current source; unresolved data may still make the import fail. Synthetic tests are independent; Stephan need not enter fake customer data for them. Other open work: DM-16/61, DM-41, DM-50.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
@@ -40,6 +40,32 @@ Regeln:
   Rohausgaben.
 - Keine Personendaten im Log. Aufträge und Kinder mit Nummer nennen, Namen nur, wo das Konzept
   sie schon als Beispiel führt.
+
+## 2026-10-12
+
+- **Checkpoint 2: native customer-workbook preparation and general review**
+  `[Codex / GPT-6]` (Status: complete; isolated import/visual handover next):
+  Added workbook_package and workbook_upgrade plus tools/prepare_masterdata.py.
+  Native ZIP/XML patches preserve unknown Excel extensions instead of round-tripping
+  the large original through the unavailable Artifact Tool importer. Refilled lost
+  report FKs/helper formulas; cumulative counters now anchor to the header through
+  INDEX/ROW, never to a deletable predecessor. An initial structured-row counter
+  variant failed in LibreOffice and was replaced before delivery. Added blank
+  assignment_history, related_person, person_related_person and placement source
+  tables, contact/residence/billing-email columns, validations and helper formulas.
+  Added stable Prüfkatalog and retained all six customer comments against fixed IDs;
+  expanded open checks and Fehlerliste with direct row links. Berichte now derives
+  responsibility at due date from source history. General review is independent of
+  import and catches broken/missing caches, missing/duplicate keys, unknown FKs,
+  dates/codes and input outside table boundaries.
+  Evidence: 3,981 existing non-empty input cells preserved; original SHA unchanged.
+  After LibreOffice recalculation of a disposable copy, 0 formula errors and
+  194,377 formula cache values merged into the native deliverable. All four original
+  x14 extension subtrees preserved semantically; styles/shared strings byte-identical.
+  General review: 0 technical issues, 13 outstanding customer-data issues in the
+  first reviewed pass, including two duplicate report IDs. No customer data corrected.
+  Validation: 52 synthetic tests passed, including five native-package/review tests;
+  nox lint/typecheck passed. Delivery files and private evidence remain ignored.
 
 ## 2026-10-11
 
