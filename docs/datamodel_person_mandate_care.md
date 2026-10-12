@@ -375,7 +375,13 @@ SR015 and SR025, and nothing in the data says whether that is one human or two.
 
 ### relation_mandate_emp
 
-`mandate_id` + `employee_id`, both parts of the PK. Employees hang off the
+**Revised 2026-10-12, Stephan:** one source table also contains historical periods.
+Repeated mandate/employee pairs with distinct role/date bounds are retained. The
+disposable SQLite table uses source_row with the pair as its physical primary key;
+source_row is provenance, not a customer-entered period ID. Exact duplicate periods
+are reported and skipped. Legacy rows without date columns remain importable.
+
+`mandate_id` + `employee_id` identify the pair. Employees hang off the
 mandate, not off the child — a consequence of the model, and what makes the
 `is_index_case` flag from the concept's stage 1 unnecessary as a guard against
 double invoicing.
@@ -385,6 +391,14 @@ double invoicing.
 | `mandate_id` | text | no | PK part → `mandate` |
 | `employee_id` | text | no | PK part → `employees` |
 | `role` | code | yes | `P` primary / `S` support, added 2026-09-22 |
+| `valid_from` | date | yes | Inclusive first day; blank means unknown/unbounded |
+| `valid_to` | date | yes | Inclusive last day; blank means ongoing |
+
+A change ends the previous row and creates a new row; historical roles and rows
+are retained. Reports require exactly one P covering due_date. Timesheets select
+all rows overlapping the performance month, deduplicated by mandate/employee.
+Several historical P rows are valid when their periods do not overlap. P checks
+at import use the current date; report checks use each report's due date.
 
 **`role`, Wegpiraten 2026-09-22.** There is always one primary care person
 (*primäre Betreuungsperson*), the one named to the KESB. Recorded here rather
@@ -963,6 +977,20 @@ The mandate's active period does not filter report deadlines. Dates are entered
 manually; report forms are labels and cadence rules generate no appointments.
 
 ### Target architecture: a Python reporting engine on SQLite, not Excel formulas
+
+**Current decision 2026-10-12, Stephan:** the separate assignment_history source
+described below is superseded. Zuordnung MA / relation_mandate_emp is the sole
+assignment source, extended with optional valid_from/valid_to. Blank boundaries
+are unbounded, and entirely undated assignments retain the explicit historical-
+unknown label. Gaps, overlaps and invalid dates never choose a substitute P.
+Monthly timesheets and timesheet-import employee lookup filter the same source
+by overlap with the performance month and deduplicate returning employees.
+Current employee metadata in overview reports uses the generation date. The
+customer workbook also derives its report assignment at due_date. Source input
+and all historical rows stay in XLSX; SQLite remains disposable. No report rows
+are generated from cadence rules.
+
+#### Historical design of 2026-10-11, superseded on 2026-10-12
 
 **Correction 2026-10-11, Stephan's decision:** report outputs now derive
 responsibility at `due_date` from the optional `assignment_history` table described

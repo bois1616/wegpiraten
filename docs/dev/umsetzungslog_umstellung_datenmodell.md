@@ -14,10 +14,10 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
-- **Reports:** DM-84/86 implemented on 2026-10-11. Optional source-maintained assignment_history import and shared resolver serve Terminlisten and `make klientenuebersicht MONTH=2026-10`. No Übersicht sheet or repeated name columns; legend precedes employee grids. Synthetic preview retained under ignored `output/report_demo_2026-10-11/`. Isolated import/report verification of the prepared customer copy completed on 2026-10-12.
-- **Customer-workbook checkpoint:** prepared copy under ignored `output/uebergabe_stammdaten_2026-10-11/wegpiraten_datenbank.xlsx`, with 3,981 non-empty source input cells unchanged, added blank source tables and stable check catalogue. LibreOffice recalculation: 0 formula errors; 194,377 caches merged, native extensions preserved. Existing styles retained, two new styles added for wrapping/text inputs; shared strings unchanged. General review: 0 technical defects, 13 customer-data findings. Isolated import and report generation succeeded; delivery notes and visual previews created. Original/live DB unchanged.
+- **Reports and assignments:** DM-84/86 implemented; Stephan's 2026-10-12 correction merges responsibility history into Zuordnung MA / relation_mandate_emp. Optional valid_from/valid_to in P:Q; no separate assignment_history source. Reports use due_date, timesheets use month overlap and one header per pair, distinct returning-employee periods survive import. Historical roles/rows stay unchanged; a change closes the old row and adds a new one. Maintenance instructions are in Anleitung rows 91–99 and the runbook.
+- **Customer-workbook checkpoint:** same delivery path under ignored `output/uebergabe_stammdaten_2026-10-11/wegpiraten_datenbank.xlsx`, now 21 sheets and unified assignments. All 3,981 non-empty input cells, customer-edited sheet order and register colours preserved. Snapshot of the edited pre-consolidation source under backup/kundenstand_reihenfolge_farben_vor_vereinigung.xlsx; - Kopie remains unchanged. LibreOffice recalculation has 0 formula errors, including a disposable three-switch boundary example. General review: 0 technical defects, 13 customer-data findings. Isolated import/report regeneration succeeded: 637 records, 144/146 reports, eleven employee lists, 72 unique monthly timesheet pairs. Original import/live DB unchanged.
 - **Next independent work:** remaining Windows Excel acceptance for DM-80/82 and customer corrections DM-81. DM-83 and the authorised DM-85 contact/residence/placement fields are implemented in source copy and importer. Before the next customer-workbook import, perform and document a fresh general review of the edited source; unresolved data may still make import fail. Synthetic tests are independent; no fake customer data required. Other open work: DM-16/61, DM-41, DM-50.
-- **Windows automatic check 2026-10-12:** rerun at 10:36 completed successfully with the corrected script: 22 sheets, no repair, no formula errors after CalculateFullRebuild, named areas present and all five sampled validations resolve to expected lists. Workbook diagnostics remain visible: five open error checks, 71 records with findings. The first inconclusive report is superseded. Manual insert/delete/sort, new-row autofill, new dropdown and link/comment checks remain outstanding; DM-06 is not fully closed.
+- **Windows automatic check 2026-10-12:** the 10:36 pass belongs to the previous workbook version (22 sheets). Repeat after the assignment consolidation (21 sheets). Manual insert/delete/sort, new-row autofill, new dropdown and link/comment checks remain outstanding; DM-06 is not fully closed.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
 - **DM-70 validation:** 38 active tests passed; nox lint/typecheck passed with 0 errors and 0 warnings. Includes month/status selection, P versus S assignment, non-blocking missing/ambiguous references, empty employee files, literal free text, reruns and CLI invocation.
@@ -43,6 +43,32 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-12
+
+- **One assignment source instead of duplicate history** `[Codex / GPT-6]`
+  (Status: implemented; new Windows acceptance required): Stephan identified the
+  duplicated mandate/employee/role relationship and authorised merging its periods
+  into Zuordnung MA. Added optional valid_from/valid_to; legacy empty bounds are
+  unbounded. Import retains distinct periods for a returning employee, identifies
+  exact duplicates and uses source_row only as derived SQLite provenance. Reports
+  resolve P at due_date without fallback for gaps/overlap/invalid periods. Current
+  overview metadata uses the generation date. Timesheet generation and importer
+  employee lookup filter month overlap and deduplicate each pair. Current-P data
+  warnings use today's date; P interval overlaps are diagnosed separately.
+  Native workbook patch removes the empty history sheet, extends Zuordnung MA in
+  P:Q, updates report and assignment formulas and stable catalogue checks, and adds
+  explicit maintenance rules in Anleitung. Old workflows for deleting support rows
+  were corrected in the runbook. Customer-edited sheet order and register colours
+  are preserved; original import source and the earlier - Kopie remain untouched.
+  Verification: 55 tests passed, nox lint/typecheck passed. Legacy blank secondary
+  roles remain warnings and do not hide an otherwise unique P. A stale isolated
+  test config initially lacked the date columns; refreshed its entity definitions
+  and reran successfully. Final general review: 0 technical issues / 13 customer
+  findings. Isolated import: 637 records, 144/146 report rows (known duplicates
+  skipped), eleven employee lists and overview regenerated, 72 unique monthly pairs.
+  Native formula recalculation has no errors; 31.07./01.08./01.01. boundaries select
+  the expected successive employees. Four changed views rendered and inspected.
+  Windows full rebuild and manual table editing acceptance remain required for the
+  consolidated file; the earlier automatic pass is not reused as final evidence.
 
 - **Windows automatic acceptance check passed** `[Codex / GPT-6]`
   (Status: automatic check complete; manual editing checks open): Stephan supplied

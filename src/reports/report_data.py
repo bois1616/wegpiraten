@@ -85,8 +85,11 @@ def load_report_data(conn: sqlite3.Connection) -> tuple[list[Employee], list[Rep
                 {phone} AS phone,m.start_date,m.end_date,
                 m.allowed_travel_time AS travel_minutes,m.allowed_direct_effort AS direct_minutes,
                 m.allowed_indirect_effort AS indirect_minutes,
-                (SELECT group_concat(employee_id,', ') FROM relation_mandate_emp a
-                 WHERE a.mandate_id=r.mandate_id) AS current_employees,
+                (SELECT group_concat(employee_id,', ') FROM
+                  (SELECT DISTINCT employee_id FROM relation_mandate_emp a
+                   WHERE a.mandate_id=r.mandate_id AND COALESCE(a.is_active,1)=1
+                   AND (NULLIF(a.valid_from,'') IS NULL OR date(a.valid_from)<=date('now'))
+                   AND (NULLIF(a.valid_to,'') IS NULL OR date(a.valid_to)>=date('now')))) AS current_employees,
                 m.mandate_id AS existing_mandate
             FROM report r LEFT JOIN v_mandate m ON m.mandate_id=r.mandate_id
             LEFT JOIN service_types st ON st.service_type_id=m.service_type_id
@@ -96,22 +99,21 @@ def load_report_data(conn: sqlite3.Connection) -> tuple[list[Employee], list[Rep
         )
     ]
     history: dict[str, list[AssignmentPeriod]] = {}
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='assignment_history'").fetchone():
-        for row in conn.execute(
-            "SELECT assignment_id,mandate_id,employee_id,role,valid_from,valid_to FROM assignment_history"
-        ):
-            period = AssignmentPeriod.model_validate(dict(row))
-            if period.mandate_id:
-                history.setdefault(period.mandate_id, []).append(period)
-    current: dict[str, list[str]] = {}
-    for row in conn.execute("SELECT mandate_id,employee_id FROM relation_mandate_emp WHERE role='P'"):
-        current.setdefault(row[0], []).append(row[1])
+    for row in conn.execute(
+        "SELECT COALESCE(source_row,rowid) AS assignment_id,mandate_id,employee_id,role,valid_from,valid_to "
+        "FROM relation_mandate_emp WHERE COALESCE(is_active,1)=1"
+    ):
+        values = dict(row)
+        values["assignment_id"] = str(values["assignment_id"])
+        period = AssignmentPeriod.model_validate(values)
+        if period.mandate_id:
+            history.setdefault(period.mandate_id, []).append(period)
     for report in appointments:
-        _assign(report, history.get(report.mandate_id or "", []), current.get(report.mandate_id or "", []))
+        _assign(report, history.get(report.mandate_id or "", []))
     return employees, appointments
 
 
-def _assign(report: ReportAppointment, periods: list[AssignmentPeriod], current: list[str]) -> None:
+def _assign(report: ReportAppointment, periods: list[AssignmentPeriod]) -> None:
     """Historienlücken führen niemals zu einem Rückfall auf die heutige Zuordnung."""
     if not report.existing_mandate:
         report.assignment_error = "Auftrag fehlt in den Stammdaten"
@@ -121,20 +123,29 @@ def _assign(report: ReportAppointment, periods: list[AssignmentPeriod], current:
         return
     matches: list[str] = []
     if periods:
-        report.assignment_basis = "Zuständigkeitsverlauf am Fälligkeitstag"
+        dated = any(p.valid_from or p.valid_to for p in periods)
+        report.assignment_basis = (
+            "Zuordnung MA am Fälligkeitstag"
+            if dated
+            else "Zuordnung MA ohne Datumsgrenzen; historische Zuständigkeit unbekannt"
+        )
         for period in periods:
             start, end = parse_db_date(period.valid_from), parse_db_date(period.valid_to)
-            if period.role not in ("P", "S") or not start or (period.valid_to and not end) or (end and end < start):
+            if (
+                period.role not in (None, "", "P", "S")
+                or (period.valid_from and not start)
+                or (period.valid_to and not end)
+                or (start and end and end < start)
+            ):
                 report.assignment_error = f"Ungültiger Zuständigkeitszeitraum {period.assignment_id}"
                 return
-            if period.role == "P" and start <= report.due_date and (not end or report.due_date <= end):
+            if period.role == "P" and (not start or start <= report.due_date) and (not end or report.due_date <= end):
                 if not period.employee_id:
                     report.assignment_error = f"Mitarbeiter fehlt im Zuständigkeitszeitraum {period.assignment_id}"
                     return
                 matches.append(period.employee_id)
     else:
-        report.assignment_basis = "Aktuelle Zuordnung; historische Zuständigkeit unbekannt"
-        matches = current
+        report.assignment_basis = "Keine Zuordnung MA"
     report.primary_count = len(matches)
     if not matches:
         report.assignment_error = "keine Person mit Rolle P" + (" am Fälligkeitstag" if periods else "")

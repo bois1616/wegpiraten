@@ -23,7 +23,6 @@ _DIAGNOSTICS = {
     "Berichte": ("report", "P", "Q", "R", "S", "T"),
 }
 _TITLES = {
-    "assignment_history": "Zuständigkeitsverlauf",
     "related_person": "Bezugspersonen",
     "person_related_person": "Kind-Bezugsperson",
     "placement": "Platzierungen",
@@ -132,13 +131,34 @@ def _extend_columns(package: WorkbookPackage, title: str, table_name: str, field
     assert left and top and right and bottom
     cols = root.find(tag("cols"))
     assert cols is not None
+    cells = cell_map(root)
+    label_style = cells.get(f"{get_column_letter(left)}{top - 1}")
+    header_style = cells.get(f"{get_column_letter(left)}{top}")
+    date_cell = cells.get("E4") if title == "Zuordnung MA" else None
     for field in fields:
         right += 1
         ET.SubElement(columns, tag("tableColumn"), {"id": str(len(columns) + 1), "name": field})
-        set_cell(root, f"{get_column_letter(right)}{top - 1}", _LABELS[field], "21")
-        set_cell(root, f"{get_column_letter(right)}{top}", field, "5")
-        set_cell(root, f"{get_column_letter(right)}{top + 1}", "")
-        ET.SubElement(cols, tag("col"), {"min": str(right), "max": str(right), "width": "28", "customWidth": "1"})
+        set_cell(
+            root,
+            f"{get_column_letter(right)}{top - 1}",
+            _LABELS[field],
+            label_style.get("s", "21") if label_style is not None else "21",
+        )
+        set_cell(
+            root,
+            f"{get_column_letter(right)}{top}",
+            field,
+            header_style.get("s", "5") if header_style is not None else "5",
+        )
+        style = (
+            (date_cell.get("s", "25") if date_cell is not None else "25")
+            if field in ("valid_from", "valid_to")
+            else "24"
+        )
+        set_cell(root, f"{get_column_letter(right)}{top + 1}", "", style)
+        ET.SubElement(
+            cols, tag("col"), {"min": str(right), "max": str(right), "width": "28", "customWidth": "1", "style": style}
+        )
     columns.set("count", str(len(columns)))
     ref = f"{get_column_letter(left)}{top}:{get_column_letter(right)}{bottom}"
     table.set("ref", ref)
@@ -295,7 +315,6 @@ def _repair(package: WorkbookPackage, title: str, definition: tuple[str, ...], r
 def _add_input_sheets(package: WorkbookPackage, config: Config) -> None:
     """Leere Zusatzlisten mit Eingabeprüfung und lesbaren Namensverweisen."""
     helpers = {
-        "assignment_history": ["index_person_name", "employee_name"],
         "related_person": [],
         "person_related_person": ["person_name", "related_person_name"],
         "placement": ["person_name"],
@@ -336,22 +355,8 @@ def _add_input_sheets(package: WorkbookPackage, config: Config) -> None:
                 hints.append(
                     f'IF(AND({guardian}<>"",COUNTIF(guardian_values,{guardian})=0)," · Sorgeberechtigung: Ja/Nein/Unbekannt","")'
                 )
-            if table == "assignment_history":
-                start, end, role, mandate = (
-                    f"${positions[field]}{number}" for field in ("valid_from", "valid_to", "role", "mandate_id")
-                )
-                problems += [
-                    f'IF(NOT(ISNUMBER({start}))," · Gültig-ab fehlt oder ist kein Datum","")',
-                    f'IF(NOT(OR({role}="P",{role}="S"))," · Rolle P/S fehlt","")',
-                ]
-                hints.append(
-                    f'IF(AND({role}="P",ISNUMBER({start}),COUNTIFS(assignment_history[mandate_id],{mandate},assignment_history[role],"P",assignment_history[valid_from],"<="&IF({end}="",DATE(9999,12,31),{end}),assignment_history[valid_to],">="&{start})+COUNTIFS(assignment_history[mandate_id],{mandate},assignment_history[role],"P",assignment_history[valid_from],"<="&IF({end}="",DATE(9999,12,31),{end}),assignment_history[valid_to],"")>1)," · P-Zeiträume überschneiden sich","")'
-                )
-            if table in ("placement", "assignment_history"):
-                first, last = (
-                    ("valid_from", "valid_to") if table == "assignment_history" else ("start_date", "end_date")
-                )
-                start, end = (f"${positions[field]}{number}" for field in (first, last))
+            if table == "placement":
+                start, end = (f"${positions[field]}{number}" for field in ("start_date", "end_date"))
                 hints += [
                     f'IF(AND(ISNUMBER({start}),ISNUMBER({end}),{end}<{start})," · Ende vor Beginn","")',
                     f'IF(OR(AND({start}<>"",NOT(ISNUMBER({start}))),AND({end}<>"",NOT(ISNUMBER({end}))))," · Datum als Excel-Datum erfassen","")',
@@ -424,7 +429,7 @@ def _add_input_sheets(package: WorkbookPackage, config: Config) -> None:
             if field in positions and field != original[0]:
                 _validation(root, positions[field], name)
         if "role" in positions:
-            _validation(root, positions["role"], '"P,S"' if table == "assignment_history" else "relationship_roles")
+            _validation(root, positions["role"], "relationship_roles")
         if "is_legal_guardian" in positions:
             _validation(root, positions["is_legal_guardian"], "guardian_values")
         package.add_sheet(title, root, table, fields)
@@ -570,6 +575,11 @@ def _catalog(package: WorkbookPackage, config: Config) -> None:
         fields,
         "Kommentare hier bei der festen Prüfung pflegen. Die offene Ansicht zieht diese automatisch nach.",
     )
+    for check in checks:
+        if check.title == "Auftrag ohne primäre Betreuungsperson":
+            check.formula = "SUMPRODUCT((Aufträge!$A$4:$A$1999<>\"\")*(COUNTIF('Zuordnung MA'!$J$4:$J$2000,Aufträge!$A$4:$A$1999)=0))"
+        if check.title == "Mitarbeiterzuordnung auf einen ausgelaufenen Auftrag":
+            check.title = "Beendeter Auftrag oder Zuordnungszeitraum"
     for row, check in enumerate(checks, 4):
         for column, value in enumerate(
             (
@@ -639,22 +649,10 @@ def _catalog(package: WorkbookPackage, config: Config) -> None:
 
 
 def _due_assignment(package: WorkbookPackage) -> None:
-    """Auch die sichtbare Berichtsliste verwendet die Fälligkeit und nicht TODAY."""
-    root = package.read_sheet("Berichte")
-    cells = cell_map(root)
-    old = cells["M6"].findtext(tag("f"), "")
-    for row in range(4, 1991):
-        current = Translator("=" + old, origin="M6").translate_formula(f"M{row}").lstrip("=")
-        count = f'COUNTIFS(assignment_history[mandate_id],$C{row},assignment_history[role],"P",assignment_history[valid_from],"<="&$E{row},assignment_history[valid_to],">="&$E{row})+COUNTIFS(assignment_history[mandate_id],$C{row},assignment_history[role],"P",assignment_history[valid_from],"<="&$E{row},assignment_history[valid_to],"")'
-        formula = f'IF($C{row}="","",IF(COUNTIF(assignment_history[mandate_id],$C{row})=0,{current},IF(AND(ISNUMBER($E{row}),({count})=1),IFERROR(INDEX(assignment_history[employee_id],MATCH(1,INDEX((assignment_history[mandate_id]=$C{row})*(assignment_history[role]="P")*ISNUMBER(assignment_history[valid_from])*(assignment_history[valid_from]<=$E{row})*((assignment_history[valid_to]="")+(assignment_history[valid_to]>=$E{row})),0),0)),""),"")))'
-        set_cell(root, f"M{row}", formula, "26", True)
-    path, table = package.table("report")
-    column = table.findall("m:tableColumns/m:tableColumn", NS)[12]
-    node = column.find(tag("calculatedColumnFormula"))
-    assert node is not None
-    node.text = cell_map(root)["M4"].findtext(tag("f"), "")
-    package.put_table(path, table)
-    package.save_sheet("Berichte", root)
+    """Zuständigkeit aus der gemeinsamen datierten Zuordnung MA."""
+    from data_imports.workbook_assignments import patch_report_formulas
+
+    patch_report_formulas(package)
 
 
 def _findings(package: WorkbookPackage) -> None:
@@ -819,6 +817,10 @@ def prepare_workbook(config: Config, source: Path, destination: Path) -> Upgrade
     )
     _extend_columns(package, "Ansprechpersonen", "masterdata_contact_person", ["phone", "email"])
     _extend_columns(package, "Kostenträger", "masterdata_payer", ["billing_email"])
+    _extend_columns(package, "Zuordnung MA", "relation_mandate_emp", ["valid_from", "valid_to"])
+    from data_imports.workbook_assignments import patch_assignment_formulas
+
+    patch_assignment_formulas(package)
     _add_input_sheets(package, config)
     _catalog(package, config)
     _due_assignment(package)

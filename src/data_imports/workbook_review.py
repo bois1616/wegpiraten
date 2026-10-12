@@ -103,9 +103,12 @@ def review_workbook(config: Config, source: Path) -> WorkbookReview:
                 continue
             actual.append((row, values))
             key = tuple(values.get(field.name, "") for field in fields if field.primary_key)
+            duplicate_key = key
+            if name == "relation_mandate_emp":
+                duplicate_key += tuple(values.get(field, "") for field in ("role", "valid_from", "valid_to"))
             if not all(key):
                 result.issues.append(WorkbookIssue(table=name, row=row, message="Schlüssel fehlt"))
-            elif key in seen:
+            elif duplicate_key in seen:
                 result.issues.append(
                     WorkbookIssue(
                         table=name,
@@ -114,7 +117,7 @@ def review_workbook(config: Config, source: Path) -> WorkbookReview:
                         message="Schlüssel doppelt; Import würde weitere Zeile auslassen",
                     )
                 )
-            seen.add(key)
+            seen.add(duplicate_key)
             for field in fields:
                 if not field.optional and not values.get(field.name):
                     result.issues.append(

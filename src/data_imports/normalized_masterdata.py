@@ -38,7 +38,6 @@ TABLES: dict[str, tuple[str, str]] = {
 
 # Neue Zusatzdaten sind in bisherigen Kundenmappen noch nicht vorhanden.
 OPTIONAL_TABLES: dict[str, tuple[str, str]] = {
-    "assignment_history": ("assignment_history", "assignment_history"),
     "related_person": ("related_person", "related_person"),
     "person_related_person": ("person_related_person", "person_related_person"),
     "placement": ("placement", "placement"),
@@ -51,6 +50,8 @@ OPTIONAL_NEW_COLUMNS = {
     "residence_zip_code",
     "residence_city",
     "residence_phone",
+    "valid_from",
+    "valid_to",
 }
 
 # Fremdverweise werden diagnostiziert, nicht durch DB-Constraints verworfen.
@@ -67,7 +68,6 @@ FOREIGN_KEYS: dict[str, list[tuple[str, str, str, int | None]]] = {
     "mandate_person": [("mandate_id", "mandate", "mandate_id", 4), ("person_id", "person", "person_id", 5)],
     "relation_mandate_emp": [("mandate_id", "mandate", "mandate_id", 12), ("employee_id", "employees", "emp_id", 12)],
     "report": [("mandate_id", "mandate", "mandate_id", 38)],
-    "assignment_history": [("mandate_id", "mandate", "mandate_id", None), ("employee_id", "employees", "emp_id", None)],
     "person_related_person": [
         ("person_id", "person", "person_id", None),
         ("related_person_id", "related_person", "related_person_id", None),
@@ -149,7 +149,9 @@ def import_normalized(config: Config, source: Path) -> int:
                 columns.append("family_key TEXT")
             if target == "mandate":
                 columns.append("needs_review INTEGER NOT NULL DEFAULT 0")
-            conn.execute(f"CREATE TABLE {target} ({', '.join(columns)}, PRIMARY KEY ({', '.join(keys)}))")
+            # Wiederkehrende Paare behalten getrennte Zeiträume; source_row ist nur DB-Herkunft.
+            db_keys = keys + ["source_row"] if target == "relation_mandate_emp" else keys
+            conn.execute(f"CREATE TABLE {target} ({', '.join(columns)}, PRIMARY KEY ({', '.join(db_keys)}))")
             definitions: dict[str, Any] = {f.name: (get_type_from_str(f.type) | None, None) for f in fields}
             row_model = create_model(f"Imported_{entity}", **definitions)
             frame, first_row = frames[excel]
@@ -167,7 +169,10 @@ def import_normalized(config: Config, source: Path) -> int:
                 if not all(key):
                     finding(target, str(key), "Schlüssel fehlt; Zeile ausgelassen", number)
                     continue
-                if key in seen:
+                duplicate_key = key
+                if target == "relation_mandate_emp":
+                    duplicate_key += tuple(record.get(field) or "" for field in ("role", "valid_from", "valid_to"))
+                if duplicate_key in seen:
                     finding(
                         target,
                         str(key),
@@ -176,7 +181,7 @@ def import_normalized(config: Config, source: Path) -> int:
                         {"person": 1, "mandate": 2, "mandate_person": 3, "report": 37}.get(target),
                     )
                     continue
-                seen.add(key)
+                seen.add(duplicate_key)
                 if record.get("mandate_id") == "SA":
                     finding(
                         target, "SA", "Technischer SA-Auftrag darf nicht im Workbook stehen; Zeile ausgelassen", number

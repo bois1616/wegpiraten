@@ -324,13 +324,14 @@ def test_report_history_import_and_due_day_assignment(imported: Config) -> None:
 
     source = create_workbook(Path(imported.structure.prj_root) / "with_history.xlsx")
     workbook = load_workbook(source)
-    sheet = workbook.create_sheet("Zuständigkeitsverlauf")
-    sheet.append(["assignment_id", "mandate_id", "employee_id", "role", "valid_from", "valid_to", "notes"])
-    sheet.append(["Z1", "A26092", "E9001", "P", datetime(2026, 1, 1), datetime(2026, 7, 31), None])
-    sheet.append(["Z2", "A26092", "E9002", "P", datetime(2026, 8, 1), datetime(2026, 12, 31), None])
-    sheet.append(["Z3", "A26092", "E9003", "P", datetime(2027, 1, 1), None, None])
-    sheet.append(["Z4", "A26092", "E9001", "S", datetime(2026, 8, 1), None, None])
-    sheet.add_table(Table(displayName="assignment_history", ref="A1:G5"))
+    del workbook["Zuordnung MA"]
+    sheet = workbook.create_sheet("Zuordnung MA")
+    sheet.append(["mandate_id", "employee_id", "role", "valid_from", "valid_to"])
+    sheet.append(["A26092", "E9001", "P", datetime(2026, 1, 1), datetime(2026, 7, 31)])
+    sheet.append(["A26092", "E9002", "P", datetime(2026, 8, 1), datetime(2026, 12, 31)])
+    sheet.append(["A26092", "E9003", "P", datetime(2027, 1, 1), None])
+    sheet.append(["A26092", "E9001", "S", datetime(2026, 8, 1), None])
+    sheet.add_table(Table(displayName="relation_mandate_emp", ref="A1:E5"))
     workbook.save(source)
     workbook.close()
     # Ausschliesslich die isolierte Test-DB verwerfen, niemals die Kunden-DB.
@@ -372,7 +373,7 @@ def test_report_history_import_and_due_day_assignment(imported: Config) -> None:
     with sqlite3.connect(imported.get_db_path()) as conn:
         assert conn.execute("SELECT count(*) FROM report").fetchone()[0] == count_before
     source_workbook = load_workbook(source)
-    assert source_workbook["Zuständigkeitsverlauf"].max_row == 5
+    assert source_workbook["Zuordnung MA"].max_row == 5
     source_workbook.close()
 
 
@@ -383,13 +384,56 @@ def test_old_contact_columns_and_no_history_remain_importable(imported: Config) 
     sheet = workbook["Ansprechpersonen"]
     sheet.delete_cols(7, 2)
     sheet.tables["masterdata_contact_person"].ref = "A2:F3"
+    assignments = workbook["Zuordnung MA"]
+    assignments.delete_cols(4, 2)
+    assignments.tables["relation_mandate_emp"].ref = assignments.tables["relation_mandate_emp"].ref.replace("E", "C")
     workbook.save(source)
     workbook.close()
     imported.get_db_path().unlink()
     run_import(imported, source)
     with sqlite3.connect(imported.get_db_path()) as conn:
         assert conn.execute("SELECT phone,email FROM masterdata_contact_person").fetchone() == (None, None)
-        assert conn.execute("SELECT count(*) FROM assignment_history").fetchone()[0] == 0
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE name='assignment_history'").fetchone() is None
+
+
+def test_shared_assignment_periods_keep_returning_employee_and_one_monthly_pair(imported: Config) -> None:
+    """Ein Mitarbeiter kann zurückkehren; P/S oder mehrere Perioden verdoppeln keinen Bogen."""
+    from shared_modules.assignment_periods import assigned_employees
+    from time_sheets.modules.client_data import load_active_client_headers
+
+    source = create_workbook(Path(imported.structure.prj_root) / "returning_employee.xlsx")
+    workbook = load_workbook(source)
+    sheet = workbook["Zuordnung MA"]
+    # Zwei Zeiträume desselben Mitarbeiters müssen den Neuimport überleben.
+    for row in range(3, sheet.max_row + 1):
+        if sheet.cell(row, 1).value == "A26092":
+            sheet.cell(row, 4).value = datetime(2026, 1, 1)
+            sheet.cell(row, 5).value = datetime(2026, 7, 31)
+    sheet.append(["A26092", "E9002", "P", datetime(2026, 8, 1), datetime(2026, 12, 31)])
+    sheet.append(["A26092", "E9001", "P", datetime(2027, 1, 1), None])
+    sheet.append(["A26092", "E9002", "S", datetime(2026, 10, 1), datetime(2026, 10, 31)])
+    sheet.tables["relation_mandate_emp"].ref = f"A2:E{sheet.max_row}"
+    workbook.save(source)
+    workbook.close()
+    imported.get_db_path().unlink()
+    run_import(imported, source)
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        assert conn.execute("SELECT count(*) FROM relation_mandate_emp WHERE mandate_id='A26092'").fetchone()[0] == 4
+        assert assigned_employees(conn, "A26092", date(2026, 7, 31), date(2026, 7, 31)) == {"E9001"}
+        assert assigned_employees(conn, "A26092", date(2026, 8, 1), date(2026, 8, 1)) == {"E9002"}
+        assert assigned_employees(conn, "A26092", date(2027, 1, 1), date(2027, 1, 1)) == {"E9001"}
+    headers = [h for h in load_active_client_headers(imported.get_db_path(), "2026-10") if h.client_id == "A26092"]
+    assert [h.employee_id for h in headers] == ["E9002"]
+
+
+def test_legacy_blank_secondary_role_does_not_hide_unique_primary(imported: Config) -> None:
+    """Ein bisher optionales Rollenfeld verhindert keine eindeutige P-Zuordnung."""
+    from reports.report_data import load_report_data
+
+    with sqlite3.connect(imported.get_db_path()) as conn:
+        conn.execute("INSERT INTO relation_mandate_emp(mandate_id,employee_id,source_row) VALUES ('A26092','E9002',101)")
+        _, reports = load_report_data(conn)
+        assert reports[0].employee_id == "E9001"
 
 
 def test_child_specific_contacts_and_optional_placements(imported: Config) -> None:
@@ -500,16 +544,17 @@ def test_report_history_never_falls_back_for_bad_period(imported: Config, proble
     from reports.report_data import assignment_problem, load_report_data
 
     with sqlite3.connect(imported.get_db_path()) as conn:
+        conn.execute("DELETE FROM relation_mandate_emp WHERE mandate_id='A26092'")
         start = "2026-11-01" if problem == "gap" else "bad date" if problem == "invalid" else "2026-01-01"
         employee = "E_MISSING" if problem == "missing_employee" else "E9002"
         conn.execute(
-            "INSERT INTO assignment_history(assignment_id,mandate_id,employee_id,role,valid_from) VALUES ('Z1','A26092',?,'P',?)",
+            "INSERT INTO relation_mandate_emp(mandate_id,employee_id,role,valid_from,source_row) VALUES ('A26092',?,'P',?,100)",
             (employee, start),
         )
         if problem == "overlap":
             # Auch zwei Perioden derselben Person sind eine Überschneidung.
             conn.execute(
-                "INSERT INTO assignment_history(assignment_id,mandate_id,employee_id,role,valid_from) VALUES ('Z2','A26092','E9002','P','2026-10-01')"
+                "INSERT INTO relation_mandate_emp(mandate_id,employee_id,role,valid_from,source_row) VALUES ('A26092','E9002','P','2026-10-01',101)"
             )
         employees, reports = load_report_data(conn)
         assert assignment_problem(reports[0], {e.emp_id for e in employees}) is not None

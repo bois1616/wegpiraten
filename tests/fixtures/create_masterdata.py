@@ -80,7 +80,7 @@ TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
         "Ansprechpersonen",
         ("contact_person_id", "service_requester_id", "gender", "first_name", "last_name", "notes", "phone", "email"),
     ),
-    "relation_mandate_emp": ("Zuordnung MA", ("mandate_id", "employee_id", "role")),
+    "relation_mandate_emp": ("Zuordnung MA", ("mandate_id", "employee_id", "role", "valid_from", "valid_to")),
     "report": (
         "Berichte",
         ("report_id", "mandate_choice", "mandate_id", "report_form", "due_date", "status", "completed_date", "notes"),

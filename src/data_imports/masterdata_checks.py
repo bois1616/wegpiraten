@@ -7,6 +7,7 @@ from datetime import date
 from pydantic import BaseModel
 
 from shared_modules.accordix import FIELD_VALUE_LISTS, parse_db_date, validate_coded_value
+from shared_modules.assignment_periods import assignment_window_sql
 
 
 class CheckFinding(BaseModel):
@@ -34,7 +35,11 @@ def check_masterdata(conn: sqlite3.Connection, payer_ids: list[str], today: date
         ):
             add("mandate", key, row, f"Pflichtverweis {field} fehlt")
     for key, row, count in conn.execute(
-        "SELECT m.mandate_id,m.source_row,(SELECT count(*) FROM relation_mandate_emp r WHERE r.mandate_id=m.mandate_id AND r.role='P') FROM mandate m WHERE m.mandate_id<>'SA'"
+        "SELECT m.mandate_id,m.source_row,(SELECT count(*) FROM relation_mandate_emp r "
+        "WHERE r.mandate_id=m.mandate_id AND r.role='P' AND "
+        + assignment_window_sql()
+        + ") FROM mandate m WHERE m.mandate_id<>'SA'",
+        (current_day.isoformat(), current_day.isoformat()),
     ):
         if count != 1:
             add(
@@ -89,7 +94,7 @@ def check_masterdata(conn: sqlite3.Connection, payer_ids: list[str], today: date
         ("mandate", "mandate_id", ("start_date", "end_date")),
         ("mandate_person", "mandate_id || '/' || person_id", ("start_date", "end_date")),
         ("placement", "placement_id", ("start_date", "end_date")),
-        ("assignment_history", "assignment_id", ("valid_from", "valid_to")),
+        ("relation_mandate_emp", "mandate_id || '/' || employee_id", ("valid_from", "valid_to")),
     ):
         if table not in tables:
             continue
@@ -100,8 +105,6 @@ def check_masterdata(conn: sqlite3.Connection, payer_ids: list[str], today: date
                 add(table, key, row, "Datumsangabe ist ungültig")
             elif first and last and last < first:
                 add(table, key, row, "Enddatum liegt vor dem Beginn")
-            if table == "assignment_history" and not first:
-                add(table, key, row, "Gültig-ab fehlt oder ist ungültig")
     for table, pk, email_field in (
         ("related_person", "related_person_id", "email"),
         ("masterdata_contact_person", "contact_person_id", "email"),
@@ -127,13 +130,17 @@ def check_masterdata(conn: sqlite3.Connection, payer_ids: list[str], today: date
     if "placement" in tables:
         for key, row in conn.execute("SELECT placement_id,source_row FROM placement WHERE COALESCE(person_id,'')=''"):
             add("placement", key, row, "Kindverweis fehlt")
-    if "assignment_history" in tables:
+    if "relation_mandate_emp" in tables:
         for key, row in conn.execute(
-            "SELECT assignment_id,source_row FROM assignment_history WHERE COALESCE(mandate_id,'')='' OR COALESCE(employee_id,'')='' OR COALESCE(role,'') NOT IN ('P','S')"
+            "SELECT mandate_id || '/' || employee_id,source_row FROM relation_mandate_emp WHERE COALESCE(mandate_id,'')='' OR COALESCE(employee_id,'')='' OR COALESCE(role,'') NOT IN ('P','S')"
         ):
-            add("assignment_history", key, row, "Auftrag, Mitarbeiter oder Rolle P/S fehlt bzw. ist ungültig")
+            add("relation_mandate_emp", key, row, "Auftrag, Mitarbeiter oder Rolle P/S fehlt bzw. ist ungültig")
         for first, row, second in conn.execute(
-            "SELECT a.assignment_id,a.source_row,b.assignment_id FROM assignment_history a JOIN assignment_history b ON a.mandate_id=b.mandate_id AND a.assignment_id<b.assignment_id WHERE a.role='P' AND b.role='P' AND date(a.valid_from)<=COALESCE(date(b.valid_to),'9999-12-31') AND date(b.valid_from)<=COALESCE(date(a.valid_to),'9999-12-31')"
+            "SELECT a.mandate_id || '/' || a.employee_id,a.source_row,b.source_row "
+            "FROM relation_mandate_emp a JOIN relation_mandate_emp b ON a.mandate_id=b.mandate_id AND a.rowid<b.rowid "
+            "WHERE a.role='P' AND b.role='P' AND COALESCE(a.is_active,1)=1 AND COALESCE(b.is_active,1)=1 "
+            "AND COALESCE(date(NULLIF(a.valid_from,'')),'0001-01-01')<=COALESCE(date(NULLIF(b.valid_to,'')),'9999-12-31') "
+            "AND COALESCE(date(NULLIF(b.valid_from,'')),'0001-01-01')<=COALESCE(date(NULLIF(a.valid_to,'')),'9999-12-31')"
         ):
-            add("assignment_history", first, row, f"P-Zeitraum überschneidet sich mit {second}")
+            add("relation_mandate_emp", first, row, f"P-Zeitraum überschneidet sich mit Zeile {second}")
     return result

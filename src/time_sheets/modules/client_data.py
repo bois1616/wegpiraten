@@ -21,6 +21,8 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from pydantic_models.data.header_data_model import HeaderDataModel
+from shared_modules.accordix import parse_db_date
+from shared_modules.assignment_periods import assignment_window_sql
 from shared_modules.internal_client import (
     INTERNAL_ALLOWED_DIRECT_EFFORT,
     INTERNAL_ALLOWED_HOURS_PER_MONTH,
@@ -31,9 +33,10 @@ from shared_modules.internal_client import (
     INTERNAL_SERVICE_TYPE_ID,
     INTERNAL_SHORT_CODE,
 )
+from shared_modules.month_period import get_month_period
 
 _ACTIVE_CLIENTS_SQL = f"""
-SELECT
+SELECT DISTINCT
     c.client_id,
     c.short_code,
     (COALESCE(c.allowed_travel_time, 0) + COALESCE(c.allowed_direct_effort, 0) + COALESCE(c.allowed_indirect_effort, 0))
@@ -52,6 +55,7 @@ JOIN v_mandate c ON r.mandate_id = c.mandate_id
 JOIN employees e ON r.employee_id = e.emp_id
 LEFT JOIN service_types st ON c.service_type = st.service_type_id
 WHERE COALESCE(r.is_active, 1) = 1
+  AND {assignment_window_sql()}
   AND (c.end_date IS NULL OR c.end_date >= ?)
   AND date(c.start_date) <= date(?, 'start of month', '+1 month', '-1 day')
   AND COALESCE(c.is_active, 1) = 1
@@ -83,6 +87,8 @@ _ALL_PAIRS_DIAGNOSTIC_SQL = """
 SELECT
     r.mandate_id AS client_id,
     r.employee_id,
+    r.valid_from,
+    r.valid_to,
     COALESCE(r.is_active, 1) AS pair_active,
     c.client_id AS client_found,
     COALESCE(c.is_active, 1) AS client_active,
@@ -128,6 +134,7 @@ def build_pair_diagnostics(db_path: Path, reporting_month: str) -> List[ClientEm
     "Anzahl erzeugter Timesheets" eindeutig klären lassen.
     """
     month_start = f"{reporting_month}-01"
+    period = get_month_period(reporting_month)
 
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql_query(_ALL_PAIRS_DIAGNOSTIC_SQL, conn)
@@ -139,6 +146,15 @@ def build_pair_diagnostics(db_path: Path, reporting_month: str) -> List[ClientEm
 
         if row["pair_active"] != 1:
             reasons.append("Paar in relation_mandate_emp inaktiv")
+        first = str(row["valid_from"]) if pd.notna(row["valid_from"]) else ""
+        last = str(row["valid_to"]) if pd.notna(row["valid_to"]) else ""
+        start, end = parse_db_date(first), parse_db_date(last)
+        if first and not start or last and not end:
+            reasons.append("Zuordnungsdatum ungültig")
+        elif start and end and start > end:
+            reasons.append("Zuordnungsende liegt vor Beginn")
+        elif start and start > period.end.date() or end and end < period.start.date():
+            reasons.append("Zuordnung ausserhalb des Erfassungsmonats")
 
         if pd.isna(row["client_found"]):
             reasons.append("client_id nicht in Stammdaten (clients) gefunden")
@@ -196,10 +212,13 @@ def load_active_client_headers(db_path: Path, reporting_month: str) -> List[Head
     Aufwendungen), auch wenn gültige Paare in relation_mandate_emp bestehen.
     """
     month_start = f"{reporting_month}-01"
+    period = get_month_period(reporting_month)
 
     logger.info(f"Lade aktive Klient-Mitarbeiter-Paare für Monat {reporting_month}.")
     with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql_query(_ACTIVE_CLIENTS_SQL, conn, params=[month_start, month_start])
+        df = pd.read_sql_query(
+            _ACTIVE_CLIENTS_SQL, conn, params=[period.end.isoformat(), month_start, month_start, month_start]
+        )
     logger.info(f"{len(df)} Klient-Mitarbeiter-Paare geladen.")
 
     headers: List[HeaderDataModel] = []

@@ -459,18 +459,22 @@ class TimeSheetsImporter:
             return to_float(row[0])
         return None
 
-    def _resolve_employee_id(self, mandate_id: Optional[str]) -> Optional[str]:
+    def _resolve_employee_id(self, mandate_id: Optional[str], reporting_month: str | None = None) -> Optional[str]:
         """Ermittelt die employee_id über relation_mandate_emp, sofern für den
         Klienten genau ein aktives Klient-MA-Paar hinterlegt ist. Bei mehreren
         (oder keinem) Paaren bleibt die employee_id offen (F5 im Sheet muss
         dann selbst ausgefüllt sein)."""
         if not mandate_id:
             return None
-        sql = "SELECT employee_id FROM relation_mandate_emp WHERE mandate_id = ? AND COALESCE(is_active, 1) = 1"
+        from shared_modules.assignment_periods import assigned_employees
+
+        if not reporting_month:
+            return None
+        period = get_month_period(reporting_month)
         with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(sql, (mandate_id,)).fetchall()
-        if len(rows) == 1 and rows[0][0]:
-            return str(rows[0][0]).strip()
+            employees = assigned_employees(conn, mandate_id, period.start.date(), period.end.date())
+        if len(employees) == 1:
+            return next(iter(employees)).strip()
         return None
 
     def _resolve_budget(self, mandate_id: Optional[str]) -> tuple[Optional[int], Optional[int], Optional[int]]:
@@ -497,14 +501,15 @@ class TimeSheetsImporter:
             return str(row[0]).strip()
         return None
 
-    def _resolve_client_employees(self, mandate_id: Optional[str]) -> set[str]:
+    def _resolve_client_employees(self, mandate_id: Optional[str], reporting_month: str) -> set[str]:
         """Liest die aktiven Klient-MA-Paare des Clients aus relation_mandate_emp."""
         if not mandate_id:
             return set()
-        sql = "SELECT employee_id FROM relation_mandate_emp WHERE mandate_id = ? AND COALESCE(is_active, 1) = 1"
+        from shared_modules.assignment_periods import assigned_employees
+
+        period = get_month_period(reporting_month)
         with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(sql, (mandate_id,)).fetchall()
-        return {str(row[0]).strip() for row in rows if row[0] and str(row[0]).strip()}
+            return assigned_employees(conn, mandate_id, period.start.date(), period.end.date())
 
     def _determine_row_mapping(self, ws: Worksheet) -> Optional[tuple[RowMapping, bool]]:
         mp = self.profile.row_mapping
@@ -614,7 +619,9 @@ class TimeSheetsImporter:
         except (ValueError, OSError):
             pass
         service_type = self._resolve_service_type(mandate_id_str or None)
-        resolved_employee_id = self._resolve_employee_id(mandate_id_str or None)
+        resolved_employee_id = self._resolve_employee_id(
+            mandate_id_str or None, to_year_month_str(ws[cells.reporting_month].value)
+        )
         resolved_tenant_id = self._resolve_tenant_id(mandate_id_str or None)
         resolved_hourly_rate = self._resolve_hourly_rate(mandate_id_str or None)
         if not employee_id:
@@ -761,7 +768,7 @@ class TimeSheetsImporter:
                         row_number=row_idx,
                     )
                 row_header[field] = value
-            employee_id = row_header.get("employee_id") or self._resolve_employee_id(resolved_id)
+            employee_id = row_header.get("employee_id") or self._resolve_employee_id(resolved_id, reporting_month)
             employee_id_str = str(employee_id).strip() if employee_id is not None else ""
             payload = {
                 "mandate_id": str(row_header.get("mandate_id") or "").strip(),
@@ -1128,7 +1135,7 @@ class TimeSheetsImporter:
         # existiert bewusst kein Klient-MA-Paar, das geprüft werden könnte.
         elif header.get("mandate_id") != INTERNAL_CLIENT_ID:
             sheet_employee_id = str(header.get("employee_id"))
-            client_employees = self._resolve_client_employees(header.get("mandate_id"))  # type: ignore[arg-type]
+            client_employees = self._resolve_client_employees(header.get("mandate_id"), reporting_month)  # type: ignore[arg-type]
             if sheet_employee_id not in client_employees:
                 self._record_warning(
                     file_path.name,

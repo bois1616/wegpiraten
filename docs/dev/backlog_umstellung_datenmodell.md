@@ -53,6 +53,16 @@ selection rules and validation.
 
 ### Implementation checkpoint 2026-10-12
 
+**Revised assignment source, Stephan 2026-10-12:** remove the duplicate empty
+Zuständigkeitsverlauf source. Zuordnung MA is the sole relation table, with optional
+valid_from/valid_to in P:Q. Blank bounds are unbounded; old rows continue unchanged.
+A change ends the old row and adds a new row; historical roles and support rows
+must remain. Report assignment uses due_date, monthly timesheets use interval
+overlap and one header per mandate/employee. Distinct periods of a returning
+employee survive import. Customer-edited sheet order and tab colours are retained.
+The maintenance rule is embedded in Anleitung and the runbook. The prior Windows
+automatic pass applies to the previous workbook; rerun it after this change.
+
 Windows automatic check passed on 2026-10-12 at 10:36: no Excel repair or formula
 errors after full rebuild, 22 sheets opened, names present and sampled dropdowns
 valid. Remaining Windows acceptance concerns manual insertion/deletion/sorting,

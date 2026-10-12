@@ -125,6 +125,27 @@ def test_ignorable_namespace_survives_serialization() -> None:
     ET.fromstring(result)
 
 
+def test_remove_empty_history_preserves_remaining_order_colors_and_local_names(tmp_path: Path) -> None:
+    from openpyxl.workbook.defined_name import DefinedName
+
+    source = tmp_path / "source.xlsx"
+    workbook = Workbook()
+    workbook.active.title = "Before"
+    workbook.create_sheet("History")
+    after = workbook.create_sheet("After")
+    after.sheet_properties.tabColor = "008800"
+    workbook.defined_names.add(DefinedName("local_check", attr_text="After!$A$1", localSheetId=2))
+    workbook.save(source)
+    package = WorkbookPackage(source)
+    package.remove_sheet("History")
+    destination = tmp_path / "result.xlsx"
+    package.write(destination)
+    result = WorkbookPackage(destination)
+    assert list(result.sheets) == ["Before", "After"]
+    assert result.workbook.find("m:definedNames/m:definedName", NS).get("localSheetId") == "1"
+    assert result.read_sheet("After").find("m:sheetPr/m:tabColor", NS).get("rgb") == "00008800"
+
+
 def test_review_detects_nonimported_rows_and_duplicate_keys(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from data_imports.workbook_review import review_workbook
     from shared_modules.config import Config

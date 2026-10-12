@@ -35,11 +35,10 @@ Für den aktuellen Spaltenstand gilt:
 | Kinder | A:M und AD:AG (Wohnort/Kontakt Kind) | N:AC, berechnete Anzeigen und Prüfungen |
 | Aufträge | A:Q | R:AP, berechnete Anzeigen, Verweise und Prüfungen |
 | Betreuungen | A:L | M:AD, berechnete Anzeigen und Prüfungen |
-| Zuordnung MA | A:C | D:O, berechnete Anzeigen und Prüfungen |
+| Zuordnung MA | A:C und P:Q (Gültig ab / Gültig bis) | D:O, berechnete Anzeigen und Prüfungen |
 | Ansprechpersonen | A:F und O:P (Telefon/E-Mail) | G:N, berechnete Anzeigen und Prüfungen |
 | Berichte | A:B und D:H | **C** (berechnete Auftrag-Nr) sowie I:T |
 | Kostenträger | B:I, einschliesslich E-Mail Rechnung | Technische Überschriften nicht verändern |
-| Zuständigkeitsverlauf | A:G | H:N, Anzeigen und Prüfungen |
 | Bezugspersonen | A:I | J:N, Prüfungen |
 | Kind-Bezugsperson | A:F | G:M, Anzeigen und Prüfungen |
 | Platzierungen | A:K | L:Q, Prüfungen |
@@ -80,7 +79,7 @@ Die sechs bisherigen Kundenkommentare wurden den festen Prüfungen zugeordnet.
 Die Fehlerliste verlinkt die betroffenen Eingabezeilen. Bei Rückmeldungen immer
 Prüfung-ID und Datensatznummer nennen.
 
-### Bezugspersonen, Wohnorte und Zuständigkeitsverlauf
+### Bezugspersonen, Wohnorte und datierte Zuordnung MA
 
 Eine erwachsene Person einmal in «Bezugspersonen» erfassen, mit eigener eindeutiger
 Nummer, Namen, Wohnadresse, Telefon und E-Mail. In «Kind-Bezugsperson» wird diese
@@ -94,12 +93,20 @@ einer Einrichtung oder Pflegefamilie kann zusätzlich in «Platzierungen» erfas
 werden. Bekannte Zeiträume eintragen; fehlende alte Angaben bleiben leer. Wohnadresse
 der Bezugsperson und Wohnadresse des Kindes sind getrennte Angaben.
 
-In «Zuständigkeitsverlauf» je Auftrag, Mitarbeiter und Zeitraum eine eigene Zeile
-anlegen. Beginn und Ende gelten einschliesslich. Für Berichte zählt die Fälligkeit:
+In «Zuordnung MA» je Auftrag, Mitarbeiter, Rolle und Zeitraum eine eigene Zeile
+anlegen. Datumsgrenzen stehen in P:Q. Beginn und Ende gelten einschliesslich. Für Berichte zählt die Fälligkeit:
 ein am 31.07. endender P-Zeitraum ist für diesen Tag zuständig, der ab 01.08. beginnende
 für spätere Fälligkeiten. P-Zeiträume dürfen sich nicht überschneiden. Ein leeres Ende
-bedeutet fortlaufend. Ohne Verlauf verwendet das Programm die aktuelle P-Zuordnung
-und kennzeichnet die fehlende Historie. Die operative «Zuordnung MA» weiter pflegen.
+bedeutet fortlaufend; ein leerer Beginn bleibt unbekannt und begrenzt den Zeitraum
+nicht nach hinten. Bisherige undatierte Zeilen gelten weiter und sind ausdrücklich
+als historisch unbekannt gekennzeichnet. Beim ersten Wechsel auch die alte Zeile
+mit einem Enddatum begrenzen. Historische Rollen und Zeilen nicht überschreiben
+oder löschen. Die gemeinsame Tabelle dient Betreuung und Reporting.
+
+Erfassungsbögen werden für alle Zuordnungen erzeugt, die den Leistungsmonat berühren,
+je Auftrag und Mitarbeiter einmal. Bei einem Wechsel innerhalb des Monats können
+beide Mitarbeitenden einen Bogen erhalten. Vergangene oder erst künftig beginnende
+Zuordnungen ausserhalb des Monats erzeugen keinen Bogen.
 
 Das Berichtsintervall erzeugt **keine** Berichtseinträge. Fälligkeiten müssen in
 «Berichte» ausdrücklich eingetragen werden. Import und Reporting schreiben weder
@@ -120,7 +127,7 @@ Die Reihenfolge ist absichtlich so gewählt: Fehler zuerst, dann Fachfragen, dan
    yymmddnnn, zum Beispiel 260819008 für den achten Auftrag vom 19.08.2026. Das Datum ist das des Auftrags, nicht der Bewilligung.
    Aktuell weichen 14 Aufträge ab (Text wie «beendet» oder «on hold» statt Nummer), einer hat keine. Ob eine
    Bewilligung abgelaufen ist, sieht man am Feld «Bewilligung bis», nicht in der Geschäftsnummer.
-3. **Rollen in «Zuordnung MA» prüfen.** Sie bestimmen nur, wer die Berichte erstellen muss. Pro Auftrag genau eine Person mit P. Bei Aufträgen mit
+3. **Rollen in «Zuordnung MA» prüfen.** Sie bestimmen, wer die Berichte erstellen muss. Pro Auftrag und Fälligkeitstag genau eine Person mit P. Bei Aufträgen mit
    nur einer Person setzt der Aufbau P selbst. Wer vertritt, wer dauerhaft betreut, entscheidet Wegpiraten.
 4. **Familien erfassen**, wo Geschwister betreut werden. Im Blatt «Kinder» bei jedem der Geschwister
    dasselbe Wort in «Familie» eintragen, zum Beispiel «Muster Interlaken». Das jüngste Kind ist das Indexkind,
@@ -151,7 +158,7 @@ Auftrag, Betreuung, Zuordnung MA, Berichte.
 | Der ganze Auftrag endet                      |                                                    | «Bewilligung bis»                                  | Austritt auf allen Zeilen                           |                                                                                         |
 | Verlängerung                                 |                                                    | neuer Auftrag mit Vorgänger                        | neue Zeile je weiterbetreutem Kind, Eintritt bleibt | Zuordnung MA und Berichte übernehmen                                                    |
 | Neugeborenes in der Familie                  | neue Zeile mit Geburtsdatum, gleicher Familientext | neuer Auftrag mit Vorgänger, für die ganze Familie | neue Zeile für das Neugeborene, falls betreut       | Das Indexkind wechselt von selbst zum jüngsten Kind                                     |
-| Vertretung, Krankheit, Ferien                |                                                    |                                                    |                                                     | Zeile in «Zuordnung MA» ergänzen, danach entfernen                                      |
+| Vertretung, Krankheit, Ferien                |                                                    |                                                    |                                                     | S-Zeile in «Zuordnung MA» mit Beginn/Ende ergänzen und historisch behalten                |
 | Dauerhafter Wechsel der Betreuung            |                                                    |                                                    |                                                     | Zuordnung anpassen, Rolle P neu setzen, damit die richtige Person die Berichte erstellt |
 | Kontingent ändert sich                       |                                                    | neuer Auftrag (Folgeauftrag)                       |                                                     |                                                                                         |
 | Umzug der Familie                            | Wohnort ändern                                     |                                                    |                                                     |                                                                                         |
@@ -184,12 +191,10 @@ Auftrag, Indexkind, Leistungsart, Leistungsbesteller, Berichtsform, Status, Noti
 sortiert nach Fälligkeit und Auftrag. Berichtsformen sind Text; Rhythmen erzeugen keine Termine.
 Auch Berichte nach dem Ende eines Auftrags können fällig sein.
 
-Zuständig ist die Person mit Rolle P am **Fälligkeitstag** aus dem
-«Zuständigkeitsverlauf», sofern für den Auftrag eine Historie gepflegt ist.
-Ohne Historie gilt weiterhin die P-Person aus «Zuordnung MA»; die Ausgabe nennt
-ausdrücklich «Aktuelle Zuordnung; historische Zuständigkeit unbekannt».
-Eine Lücke oder Überschneidung in einer vorhandenen Historie führt zu einem Befund;
-die aktuelle P-Person ersetzt diesen fehlenden eindeutigen Zeitraum nicht.
+Zuständig ist die Person mit Rolle P am **Fälligkeitstag** aus «Zuordnung MA».
+Ohne Datumsgrenzen bleibt die bisherige Zuordnung gültig; die Ausgabe kennzeichnet
+die historische Zuständigkeit als unbekannt. Eine Lücke, Überschneidung oder ungültige
+Datumsangabe führt zu einem Befund; es wird keine andere Person ersatzweise gewählt.
 Fehlt eine zuständige Person, meldet das Log den
 Bericht und Auftrag als Warnung; der Eintrag wird ausgelassen und der Export läuft weiter.
 Dasselbe gilt bei mehreren P, einem fehlenden Auftrag oder einer fehlenden Person in den
@@ -197,15 +202,16 @@ Mitarbeiter-Stammdaten. Solche Befunde im Workbook korrigieren, die Arbeitsdaten
 aufsetzen und die Listen erneut erzeugen. Ein erneuter Lauf überschreibt die Dateien dieser
 Mitarbeitenden für denselben Monat.
 
-### Zuständigkeitsverlauf pflegen
+### Zuordnung MA mit Zeiträumen pflegen
 
-Das zusätzliche Blatt wird als Excel-Tabelle mit dem **Tabellennamen
-`assignment_history`** angelegt. Der Blattname allein genügt nicht. Die Spalten
-heissen `assignment_id`, `mandate_id`, `employee_id`, `role`, `valid_from`,
-`valid_to`, `notes`. Jede Zeile braucht eine eigene eindeutige `assignment_id`.
-Datumsfelder als echte Excel-Daten erfassen; `valid_to` darf bei einem laufenden
-Zeitraum leer bleiben. Beide Grenzen zählen mit. P bezeichnet die Berichtszuständigkeit,
-S eine Unterstützung. Zwei P-Zeiträume dürfen sich nicht überschneiden.
+Die bestehende Excel-Tabelle **`relation_mandate_emp`** im Blatt «Zuordnung MA»
+bleibt die einzige Zuordnungsquelle. Eingaben stehen in A:C und P:Q: Auftrag,
+Mitarbeiter, Rolle, `valid_from` und `valid_to`. Datumsfelder als echte Excel-Daten
+erfassen. Offene Grenzen dürfen leer bleiben. Beide Grenzen zählen mit. P bezeichnet
+die Berichtszuständigkeit, S eine Unterstützung. Zwei P-Zeiträume desselben Auftrags
+dürfen sich nicht überschneiden. Wiederkehrende Mitarbeiter erhalten weitere Zeilen
+mit den jeweiligen Zeiträumen. Für einen Wechsel die alte Zeile beenden und eine
+neue anlegen; die alte Rolle nicht nachträglich auf S ändern.
 
 Beispiel: M0567 ist für A26123 vom 01.01.2026 bis 31.07.2026 zuständig, M0123 vom
 01.08.2026 bis 31.12.2026, M0789 ab 01.01.2027. Der im Oktober fällige Bericht
@@ -215,9 +221,9 @@ Bei einem Folgeauftrag dessen eigene A-Nummer in den neuen Zeiträumen verwenden
 Abgeschlossene Zeiträume in der Mappe behalten. Nach jedem DB-Neuaufbau liest der
 Import sie erneut ein; Terminlisten und Klientenübersicht berechnen daraus die
 Zuständigkeit. Sie schreiben diese weder in die Kundenmappe zurück noch erzeugen
-sie zusätzliche Berichtstermine. Ohne das Zusatzblatt bleibt die bisherige Mappe
-importierbar. Die operative «Zuordnung MA» für Erfassungsbögen weiterhin separat
-pflegen; der Zuständigkeitsverlauf ersetzt sie derzeit nicht.
+sie zusätzliche Berichtstermine. Alte Mappen ohne die neuen Datumsspalten bleiben
+importierbar; ihre Zuordnungen gelten ohne Datumsgrenzen. Ein separates Blatt
+«Zuständigkeitsverlauf» wird nicht mehr verwendet.
 
 ### Klientenübersicht neu erzeugen
 
@@ -281,7 +287,7 @@ die «Fehlerliste» schauen.
 3. Blatt «Betreuungen»: Auftrag-Nr, Kind-Nr und Eintritt, das ist der Beginn der Betreuung
    dieses Kindes. Bei Geschwistern eine Zeile je betreutem Kind.
 4. Blatt «Zuordnung MA»: eine Zeile je Mitarbeitende. Die Person, die die Berichte erstellt,
-   bekommt die Rolle P.
+   bekommt die Rolle P. Bekannten Beginn in P eintragen, Ende in Q, falls bekannt.
 5. Blatt «Berichte»: die fälligen Berichte eintragen (Auftrag, Berichtsform, Fällig am).
    Bei regelmässigen Berichten den Rhythmus am Auftrag ergänzen.
 
@@ -298,7 +304,8 @@ die «Fehlerliste» schauen.
    der bisherigen Betreuungen als Werte übernehmen. Auftrag-Nr ändern, Eintritt
    beibehalten und Austritt leeren. Die Formelspalten bleiben erhalten.
 4. Im Blatt «Zuordnung MA» neue Tabellenzeilen anlegen, nur A:C als Werte übernehmen
-   und die Auftrag-Nr ändern. Die Rollen bleiben.
+   und die Auftrag-Nr ändern. Die Rollen bleiben; P:Q für den neuen Auftrag neu
+   festlegen und keine alten Enddaten blind kopieren.
 5. Im Blatt «Berichte» die Berichte des neuen Auftrags eintragen.
 6. Beim alten Auftrag bleibt der Hinweis «Bewilligung abgelaufen, Betreuung noch offen» stehen,
    solange seine Betreuung keinen Austritt trägt. Bei einer Verlängerung ist das kein Fehler.
@@ -319,15 +326,14 @@ die «Fehlerliste» schauen.
    Der Auftrag bleibt, solange andere Kinder weiterlaufen.
 2. Endet der ganze Auftrag, in «Aufträge» «Bewilligung bis» setzen und bei allen Betreuungen den
    Austritt eintragen.
-3. Die Zuordnungen in «Zuordnung MA» prüfen und bei Bedarf entfernen. Bis zur
-   Formelreparatur die Entfernung wie oben beschrieben mit Stephan abstimmen.
+3. Die Zuordnungen in «Zuordnung MA» prüfen und mit «Gültig bis» beenden. Die Zeilen
+   bleiben zur historischen Zuordnung erhalten.
    Abgelaufene Bewilligungen werden bei der Bogenerzeugung bereits berücksichtigt.
 
 **Vertretung**
 
-Tabellenzeile in «Zuordnung MA» mit Rolle S ergänzen, nach dem Einsatz wieder
-entfernen. Bis zur Formelreparatur die Entfernung mit Stephan abstimmen; keine
-ganze Blattzeile löschen.
+Tabellenzeile in «Zuordnung MA» mit Rolle S und Beginn/Ende in P:Q ergänzen.
+Nach dem Einsatz das Ende vervollständigen und die Zeile behalten.
 
 ### Regeln, die man sich merken muss
 

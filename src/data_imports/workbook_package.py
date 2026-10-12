@@ -67,6 +67,44 @@ class WorkbookPackage:
         path = self.sheets[title]
         self.parts[path] = serialize(root, self.parts.get(path, b""))
 
+    def remove_sheet(self, title: str) -> None:
+        """Entfernt Blatt und Tabellenbeziehungen; behält lokale Namen der übrigen Blätter."""
+        import posixpath
+
+        sheets = self.workbook.find(tag("sheets"))
+        assert sheets is not None
+        index = list(self.sheets).index(title)
+        sheet = list(sheets)[index]
+        relationship_id = sheet.get(f"{{{REL}}}id")
+        path = self.sheets.pop(title)
+        removed = {path}
+        rel_path = posixpath.dirname(path) + "/_rels/" + posixpath.basename(path) + ".rels"
+        if rel_path in self.parts:
+            removed.add(rel_path)
+            for rel in ET.fromstring(self.parts[rel_path]):
+                target = rel.get("Target", "")
+                if rel.get("TargetMode") != "External":
+                    removed.add(target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(path), target)))
+        sheets.remove(sheet)
+        for rel in list(self.rels):
+            if rel.get("Id") == relationship_id:
+                self.rels.remove(rel)
+        names = self.workbook.find(tag("definedNames"))
+        if names is not None:
+            for name in list(names):
+                local = name.get("localSheetId")
+                if local is not None and int(local) == index:
+                    names.remove(name)
+                elif local is not None and int(local) > index:
+                    name.set("localSheetId", str(int(local) - 1))
+        content = ET.fromstring(self.parts["[Content_Types].xml"])
+        for node in list(content):
+            if node.get("PartName", "").lstrip("/") in removed:
+                content.remove(node)
+        self.parts["[Content_Types].xml"] = serialize(content, self.parts["[Content_Types].xml"])
+        for removed_path in removed:
+            self.parts.pop(removed_path, None)
+
     def value(self, cell: ET.Element | None) -> str:
         """Liest einen gespeicherten Wert ohne Formelauswertung."""
         if cell is None:
