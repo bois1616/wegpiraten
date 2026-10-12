@@ -5,7 +5,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from data_imports.workbook_layout import describe_sheets, group_input_columns
+from data_imports.workbook_layout import describe_sheets, finish_input_presentation, group_input_columns
 from data_imports.workbook_package import WorkbookPackage
 from data_imports.workbook_upgrade import _findings, _inputs
 from shared_modules.config import Config
@@ -25,6 +25,7 @@ def main() -> None:
     mappings = group_input_columns(package)
     describe_sheets(package)
     _findings(package)
+    finish_input_presentation(package)
     assert _inputs(package, config) == inputs
     package.write(args.destination)
     logger.info("Eingaben erhalten: {}; neu geordnete Blätter: {}", len(inputs), list(mappings))

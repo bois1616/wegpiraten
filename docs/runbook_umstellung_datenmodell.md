@@ -28,6 +28,9 @@ leeren oder mit Daten aus anderen Dateien füllen. Auch «Nur Werte einfügen» 
 eine Formel, wenn der Zielbereich eine Formelzelle enthält. Die Blätter «Prüfungen»
 und «Fehlerliste» sind berechnete Ansichten; dort keine Stammdaten eintragen.
 
+Eingabezellen haben keine Füllung, berechnete Anzeigen sind grau hinterlegt.
+Beide haben einen dünnen Rahmen. Die Kopfzeilen und Warnfarben folgen eigenen Regeln.
+
 Für den aktuellen Spaltenstand gilt:
 
 | Blatt | Hier dürfen Daten eingegeben oder als Werte eingefügt werden | Nicht bearbeiten / nicht hineinkopieren |
@@ -78,6 +81,8 @@ bei der festen Prüfung-ID gepflegt. Spalte H nimmt Bearbeitungsnotizen auf.
 Die sechs bisherigen Kundenkommentare wurden den festen Prüfungen zugeordnet.
 Die Fehlerliste verlinkt die betroffenen Eingabezeilen. Bei Rückmeldungen immer
 Prüfung-ID und Datensatznummer nennen.
+Die Links in «Prüfungen» F öffnen jeweils die gesamte Fehlerliste, ohne Filter
+auf die angeklickte Prüfung. H:M ist ein ausgeblendeter technischer Hilfsbereich.
 
 ### Bezugspersonen, Wohnorte und datierte Zuordnung MA
 
@@ -87,6 +92,13 @@ Nummer mit einem Kind verknüpft. Rolle und Sorgeberechtigung gelten je Verknüp
 dieselbe Person kann für mehrere Kinder unterschiedliche Rollen haben. Unbekannte
 Sorgeberechtigung als «Unbekannt» erfassen. Das Feld «Familie» in «Kinder» bleibt
 die bisherige Geschwisterkennung; eine gemeinsame Bezugsperson erzeugt keine Familie.
+
+Für neue Kennungen gilt: **BP0001** für Bezugspersonen, **KB0001** für
+Kind-Bezugsperson-Zuordnungen und **PL0001** für Platzierungen. Je Liste fortlaufend
+nummerieren, mindestens vier Ziffern verwenden und Nummern weder ändern noch
+wiederverwenden. Keine Namen, Rollen oder Jahreszahlen in die Kennung aufnehmen.
+Dieselbe Bezugsperson behält ihre BP-Nummer bei mehreren Kindern; jede Zuordnung
+erhält eine eigene KB-Nummer. Bestehende Kennungen bleiben gültig.
 
 Die aktuelle Wohnadresse des Kindes steht in «Kinder», N:Q. Ein Aufenthalt in
 einer Einrichtung oder Pflegefamilie kann zusätzlich in «Platzierungen» erfasst

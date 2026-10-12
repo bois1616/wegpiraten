@@ -7,7 +7,15 @@ from xml.etree import ElementTree as ET
 from openpyxl.formula.tokenizer import Tokenizer
 from openpyxl.utils.cell import column_index_from_string, get_column_letter, range_boundaries
 
-from data_imports.workbook_package import NS, WorkbookPackage, cell_map, expand_shared_formulas, set_cell, tag
+from data_imports.workbook_package import (
+    NS,
+    WorkbookPackage,
+    cell_map,
+    expand_shared_formulas,
+    serialize,
+    set_cell,
+    tag,
+)
 
 _TABLES = {
     "Kinder": "person",
@@ -201,3 +209,105 @@ def describe_sheets(package: WorkbookPackage) -> None:
             selection.set("activeCell", "A5")
             selection.set("sqref", "A5")
     package.save_sheet("Fehlerliste", root)
+
+
+def finish_input_presentation(package: WorkbookPackage) -> None:
+    """Kennzeichnet Eingaben und Anzeigen einheitlich; Zahlenformate bleiben erhalten."""
+    styles = ET.fromstring(package.parts["xl/styles.xml"])
+    formats = styles.find(tag("cellXfs"))
+    assert formats is not None
+    variants: dict[tuple[int, bool], str] = {}
+
+    def style_index(original: str, calculated: bool) -> str:
+        key = int(original), calculated
+        if key not in variants:
+            style = deepcopy(formats[key[0]])
+            style.set("fillId", "8" if calculated else "0")
+            style.set("borderId", "3")
+            style.set("fontId", "2" if calculated else "6")
+            for attribute in ("applyFill", "applyBorder", "applyFont"):
+                style.set(attribute, "1")
+            variants[key] = str(len(formats))
+            formats.append(style)
+        return variants[key]
+
+    roots = {title: package.read_sheet(title) for title in package.sheets}
+    for title, root in roots.items():
+        if title in ("Hilfsdaten", "Klienten (alt)"):
+            continue
+        path = package.sheets[title]
+        rel_path = path.replace("/worksheets/", "/worksheets/_rels/") + ".rels"
+        if rel_path not in package.parts:
+            continue
+        for rel in ET.fromstring(package.parts[rel_path]):
+            target = rel.get("Target", "")
+            if "/tables/" not in target:
+                continue
+            table = ET.fromstring(package.parts["xl/tables/" + target.rsplit("/", 1)[-1]])
+            left, top, right, bottom = range_boundaries(table.get("ref", ""))
+            assert left and top and right and bottom
+            columns = table.findall("m:tableColumns/m:tableColumn", NS)
+            cells = cell_map(root)
+            for number in range(left, right + 1):
+                field = columns[number - left].get("name", "")
+                first = cells.get(f"{get_column_letter(number)}{top + 1}")
+                calculated_column = (
+                    columns[number - left].find(tag("calculatedColumnFormula")) is not None
+                    or first is not None
+                    and first.find(tag("f")) is not None
+                    or title == "Prüfkatalog"
+                    and field not in ("Kundenkommentar", "Bearbeitung")
+                    or title == "Fehlerliste"
+                )
+                default = style_index(first.get("s", "25") if first is not None else "25", calculated_column)
+                cols = root.find(tag("cols"))
+                if cols is not None:
+                    for col in cols:
+                        if int(col.get("min", "0")) == number == int(col.get("max", "0")):
+                            col.set("style", default)
+                for row in range(top + 1, bottom + 1):
+                    ref = f"{get_column_letter(number)}{row}"
+                    cell = cells.get(ref)
+                    if cell is None:
+                        cell = set_cell(root, ref, "", default)
+                    calculated = calculated_column or cell.find(tag("f")) is not None
+                    cell.set("s", style_index(cell.get("s", "25"), calculated))
+        package.save_sheet(title, root)
+
+    root = package.read_sheet("Prüfungen")
+    set_cell(root, "F6", "Fehlerliste", "21")
+    for row in range(7, 66):
+        ref = f"F{row}"
+        cells = cell_map(root)
+        cell = cells.get(ref)
+        if cell is not None and cell.find(tag("f")) is not None:
+            formula = cell.find(tag("f"))
+            assert formula is not None
+            formula.text = cell.findtext(tag("f"), "").replace("Datensätze öffnen", "Fehlerliste öffnen")
+        for column in "ABCDEFG":
+            cell = cells.get(f"{column}{row}")
+            if cell is not None:
+                cell.set("s", style_index(cell.get("s", "25"), True))
+    for col in root.findall("m:cols/m:col", NS):
+        if int(col.get("min", "0")) >= 8:
+            col.set("hidden", "1")
+    cols = root.find(tag("cols"))
+    assert cols is not None
+    if not any(col.get("min") == "6" for col in cols):
+        ET.SubElement(cols, tag("col"), {"min": "6", "max": "6", "width": "24", "customWidth": "1"})
+        cols[:] = sorted(cols, key=lambda col: int(col.get("min", "0")))
+    package.save_sheet("Prüfungen", root)
+
+    for title, prefix in (("Bezugspersonen", "BP"), ("Kind-Bezugsperson", "KB"), ("Platzierungen", "PL")):
+        root = package.read_sheet(title)
+        cells = cell_map(root)
+        text = package.value(cells.get("A1"))
+        convention = f" Kennungen: {prefix}0001, {prefix}0002 usw.; eindeutig, dauerhaft, nicht wiederverwenden. Bestehende Kennungen behalten."
+        if convention not in text:
+            set_cell(root, "A1", text + convention, cells["A1"].get("s", "100"))
+        row = root.find('m:sheetData/m:row[@r="1"]', NS)
+        assert row is not None
+        row.set("ht", "76")
+        package.save_sheet(title, root)
+    formats.set("count", str(len(formats)))
+    package.parts["xl/styles.xml"] = serialize(styles, package.parts["xl/styles.xml"])
