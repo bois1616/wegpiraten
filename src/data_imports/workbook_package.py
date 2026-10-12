@@ -6,6 +6,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from openpyxl.formula.translate import Translator
 from openpyxl.utils.cell import column_index_from_string, get_column_letter
 
 MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -17,6 +18,29 @@ NS = {"m": MAIN}
 def tag(name: str) -> str:
     """Qualifiziert ein SpreadsheetML-Element."""
     return f"{{{MAIN}}}{name}"
+
+
+def expand_shared_formulas(root: ET.Element) -> None:
+    """Löst Sammelformeln vor Teiländerungen auf, damit keine Basis verloren geht."""
+    cells = root.findall(".//m:c", NS)
+    anchors = {
+        formula.get("si"): (cell.get("r", ""), formula.text)
+        for cell in cells
+        if (formula := cell.find(tag("f"))) is not None and formula.get("t") == "shared" and formula.text
+    }
+    for cell in cells:
+        formula = cell.find(tag("f"))
+        if formula is None or formula.get("t") != "shared":
+            continue
+        index = formula.get("si")
+        if index not in anchors:
+            raise ValueError(f"Sammelformel ohne Basis: {cell.get('r')} / {index}")
+        origin, expression = anchors[index]
+        formula.text = (
+            Translator("=" + (expression or ""), origin=origin).translate_formula(cell.get("r", "")).lstrip("=")
+        )
+        for attribute in ("t", "si", "ref"):
+            formula.attrib.pop(attribute, None)
 
 
 def serialize(root: ET.Element, original: bytes = b"") -> bytes:
@@ -84,7 +108,11 @@ class WorkbookPackage:
             for rel in ET.fromstring(self.parts[rel_path]):
                 target = rel.get("Target", "")
                 if rel.get("TargetMode") != "External":
-                    removed.add(target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(path), target)))
+                    removed.add(
+                        target.lstrip("/")
+                        if target.startswith("/")
+                        else posixpath.normpath(posixpath.join(posixpath.dirname(path), target))
+                    )
         sheets.remove(sheet)
         for rel in list(self.rels):
             if rel.get("Id") == relationship_id:

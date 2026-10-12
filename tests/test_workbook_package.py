@@ -12,6 +12,7 @@ from data_imports.workbook_package import (
     NS,
     WorkbookPackage,
     cell_map,
+    expand_shared_formulas,
     merge_calculated_values,
     serialize,
     set_cell,
@@ -123,6 +124,36 @@ def test_ignorable_namespace_survives_serialization() -> None:
     result = serialize(ET.fromstring(original), b'<?xml version="1.0"?>' + original)
     assert b'xmlns:xr="urn:synthetic:unused"' in result
     ET.fromstring(result)
+
+
+def test_shared_formula_survives_replacement_of_its_anchor() -> None:
+    root = ET.fromstring(
+        f'<worksheet xmlns="{NS["m"]}"><sheetData><row r="2"><c r="M2"><f t="shared" si="0" ref="M2:M10">M1+L1</f><v>2</v></c></row><row r="10"><c r="M10"><f t="shared" si="0"/><v>10</v></c></row></sheetData></worksheet>'
+    )
+    expand_shared_formulas(root)
+    set_cell(root, "M2", "1", formula=True)
+    follower = cell_map(root)["M10"].find(tag("f"))
+    assert follower.text == "M9+L9"
+    assert follower.get("t") is None
+
+
+def test_review_rejects_orphan_shared_formula(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from data_imports.workbook_review import review_workbook
+    from shared_modules.config import Config
+    from tests.fixtures.create_masterdata import create_workbook
+
+    monkeypatch.setattr(Config, "_instance", None)
+    config = Config(Path(__file__).resolve().parents[1] / ".config/wegpiraten_config.yaml")
+    source = create_workbook(tmp_path / "fixture.xlsx")
+    package = WorkbookPackage(source)
+    root = package.read_sheet("Berichte")
+    cell = set_cell(root, "J4", "", formula=True)
+    cell.find(tag("f")).attrib.update(t="shared", si="99")
+    ET.SubElement(cell, tag("v")).text = "0"
+    package.save_sheet("Berichte", root)
+    package.write(source)
+    result = review_workbook(config, source)
+    assert any(issue.technical and issue.field == "J4" and "Sammelformel" in issue.message for issue in result.issues)
 
 
 def test_remove_empty_history_preserves_remaining_order_colors_and_local_names(tmp_path: Path) -> None:

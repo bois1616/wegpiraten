@@ -41,6 +41,11 @@ def review_workbook(config: Config, source: Path) -> WorkbookReview:
     sheet_for_table: dict[str, str] = {}
     roots = {title: package.read_sheet(title) for title in package.sheets}
     for title, path in package.sheets.items():
+        shared_anchors = {
+            formula.get("si")
+            for cell in roots[title].findall(".//m:c", NS)
+            if (formula := cell.find(tag("f"))) is not None and formula.get("t") == "shared" and formula.text
+        }
         rel_path = path.replace("/worksheets/", "/worksheets/_rels/") + ".rels"
         if rel_path in package.parts:
             from xml.etree import ElementTree as ET
@@ -52,6 +57,17 @@ def review_workbook(config: Config, source: Path) -> WorkbookReview:
                     sheet_for_table[ET.fromstring(package.parts[table_path]).get("displayName", "")] = title
         for cell in roots[title].findall(".//m:c", NS):
             if cell.find(tag("f")) is not None:
+                formula_node = cell.find(tag("f"))
+                assert formula_node is not None
+                if formula_node.get("t") == "shared" and formula_node.get("si") not in shared_anchors:
+                    result.issues.append(
+                        WorkbookIssue(
+                            table=title,
+                            field=cell.get("r"),
+                            message="Excel-Sammelformel ohne Basisformel",
+                            technical=True,
+                        )
+                    )
                 result.formula_count += 1
                 formula = cell.findtext(tag("f"), "")
                 if "#REF!" in formula or cell.get("t") == "e":

@@ -11,7 +11,15 @@ from openpyxl.utils.cell import column_index_from_string, get_column_letter, ran
 from pydantic import BaseModel
 
 from data_imports.normalized_masterdata import TABLES
-from data_imports.workbook_package import NS, WorkbookPackage, cell_map, serialize, set_cell, tag
+from data_imports.workbook_package import (
+    NS,
+    WorkbookPackage,
+    cell_map,
+    expand_shared_formulas,
+    serialize,
+    set_cell,
+    tag,
+)
 from shared_modules.config import Config
 
 _DIAGNOSTICS = {
@@ -670,6 +678,7 @@ def _findings(package: WorkbookPackage) -> None:
             )
         )
     root = package.read_sheet("Fehlerliste")
+    expand_shared_formulas(root)
     for index, (title, _, run, _) in enumerate(source, 1):
         end = (
             203

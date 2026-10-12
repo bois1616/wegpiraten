@@ -18,6 +18,7 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Customer-workbook checkpoint:** same delivery path under ignored `output/uebergabe_stammdaten_2026-10-11/wegpiraten_datenbank.xlsx`, now 21 sheets and unified assignments. All 3,981 non-empty input cells, customer-edited sheet order and register colours preserved. Snapshot of the edited pre-consolidation source under backup/kundenstand_reihenfolge_farben_vor_vereinigung.xlsx; - Kopie remains unchanged. LibreOffice recalculation has 0 formula errors, including a disposable three-switch boundary example. General review: 0 technical defects, 13 customer-data findings. Isolated import/report regeneration succeeded: 637 records, 144/146 reports, eleven employee lists, 72 unique monthly timesheet pairs. Original import/live DB unchanged.
 - **Next independent work:** remaining Windows Excel acceptance for DM-80/82 and customer corrections DM-81. DM-83 and the authorised DM-85 contact/residence/placement fields are implemented in source copy and importer. Before the next customer-workbook import, perform and document a fresh general review of the edited source; unresolved data may still make import fail. Synthetic tests are independent; no fake customer data required. Other open work: DM-16/61, DM-41, DM-50.
 - **Windows automatic check 2026-10-12:** the 10:36 pass belongs to the previous workbook version (22 sheets). Repeat after the assignment consolidation (21 sheets). Manual insert/delete/sort, new-row autofill, new dropdown and link/comment checks remain outstanding; DM-06 is not fully closed.
+- **Excel opening failure at 14:34:** inspection found an orphan shared formula in Fehlerliste M10: the consolidation overwrote its shared anchor M2 when reducing the helper-source list. LibreOffice did not reject it and the former general review missed it. Restored the formula from the preserved source, expanded shared formulas before future finding-list edits, and added a technical orphan check. Two regression tests added (57 total). The defect is corrected locally; Windows reopening is still required to confirm it caused the COM Open failure.
 - **Waiting for Stephan:** DM-06 real Windows Excel, acceptance DM-34, operator rehearsal DM-51, customer test feedback, final customer handover DM-52 and merge DM-53. DM-60 test handover is complete. Stephan’s own tests have no findings so far; their exact scope does not establish formal DM-06/51 completion. Q1–Q4 answered. October test sheets use a test password and must not be distributed.
 - **Model attribution:** Codex / GPT-6, exact variant not exposed. No independent Opus/Astra review is claimed. Stephan explicitly authorized implementation.
 - **DM-70 validation:** 38 active tests passed; nox lint/typecheck passed with 0 errors and 0 warnings. Includes month/status selection, P versus S assignment, non-blocking missing/ambiguous references, empty employee files, literal free text, reruns and CLI invocation.
@@ -43,6 +44,21 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-12
+
+- **Orphan Excel shared formula corrected** `[Codex / GPT-6]`
+  (Status: locally corrected; Windows opening confirmation pending): Stephan's
+  14:34 COM check failed in Workbooks.Open before any inspection. Native package
+  comparison found one shared-formula follower in Fehlerliste M10 with no anchor.
+  Shrinking the helper-source list overwrote M2:M9, including the M2 anchor, and
+  left M10 behind. This is a structural defect introduced by the consolidation;
+  LibreOffice's successful recalculation and the previous review did not establish
+  Excel validity. Restored M10 = M9+L9 from the saved source. _findings now expands
+  shared formulas before partial edits; general review rejects orphan followers.
+  Regression tests cover anchor replacement and rejection of an orphan with a
+  valid-looking cache. Validation: 57 tests passed; nox lint/typecheck passed;
+  native package relationships valid, no missing shared anchors, LibreOffice
+  recalculation without formula errors. Customer inputs/order/colours retained.
+  COM failure causality is not claimed until the corrected file opens in Windows.
 
 - **One assignment source instead of duplicate history** `[Codex / GPT-6]`
   (Status: implemented; new Windows acceptance required): Stephan identified the

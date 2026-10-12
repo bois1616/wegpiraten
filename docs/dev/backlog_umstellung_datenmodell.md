@@ -53,6 +53,13 @@ selection rules and validation.
 
 ### Implementation checkpoint 2026-10-12
 
+Excel opening at 14:34 failed after consolidation. Inspection found an orphan
+shared formula in Fehlerliste M10 caused by overwriting its M2 anchor. Restored
+from the preserved source; future partial edits expand shared formulas first.
+General review now rejects missing shared anchors; two regression tests added.
+Local recalculation/import checks pass, but Windows opening must be confirmed
+again before DM-80/06 acceptance or customer delivery.
+
 **Revised assignment source, Stephan 2026-10-12:** remove the duplicate empty
 Zuständigkeitsverlauf source. Zuordnung MA is the sole relation table, with optional
 valid_from/valid_to in P:Q. Blank bounds are unbounded; old rows continue unchanged.
