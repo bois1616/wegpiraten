@@ -665,8 +665,9 @@ def _due_assignment(package: WorkbookPackage) -> None:
 
 def _findings(package: WorkbookPackage) -> None:
     """Erweitert die vorhandene Liste um neue Blätter und direkte Zeilenlinks."""
-    source = [(title, definition[4], definition[5], definition[3]) for title, definition in _DIAGNOSTICS.items()]
-    for table, title in _TITLES.items():
+    source = []
+    diagnostics = [(definition[0], title) for title, definition in _DIAGNOSTICS.items()] + list(_TITLES.items())
+    for table, title in diagnostics:
         _, definition = package.table(table)
         fields = [column.get("name", "") for column in definition.findall("m:tableColumns/m:tableColumn", NS)]
         source.append(
@@ -766,7 +767,8 @@ def finish_presentation(package: WorkbookPackage) -> None:
     wrap_style.set("applyAlignment", "1")
     alignment = wrap_style.find(tag("alignment"))
     if alignment is None:
-        alignment = ET.SubElement(wrap_style, tag("alignment"))
+        alignment = ET.Element(tag("alignment"))
+        wrap_style.insert(0, alignment)
     alignment.set("wrapText", "1")
     alignment.set("vertical", "top")
     wrap_index = str(len(formats))

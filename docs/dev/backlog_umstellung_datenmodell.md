@@ -66,7 +66,8 @@ still requires the manual editing checks below.
 
 **Revised assignment source, Stephan 2026-10-12:** remove the duplicate empty
 Zuständigkeitsverlauf source. Zuordnung MA is the sole relation table, with optional
-valid_from/valid_to in P:Q. Blank bounds are unbounded; old rows continue unchanged.
+valid_from/valid_to in D:E after the input-column grouping on 2026-10-12.
+Blank bounds are unbounded; old rows continue unchanged.
 A change ends the old row and adds a new row; historical roles and support rows
 must remain. Report assignment uses due_date, monthly timesheets use interval
 overlap and one header per mandate/employee. Distinct periods of a returning
@@ -281,6 +282,22 @@ row and an internal hyperlink. Row numbers are navigation aids, not identities.
 | G14 | korrekt | Treat as acknowledgement, not permission to invent an Accordix mapping. The three flagged types are ST00/UNBEKANNT, ST02_alt/BBT and ST09/KOB. Separate known inactive/unused placeholders from actual P1000 reporting gaps; retain explicit warnings for unmapped reportable care. |
 
 ### Proposed implementation tasks
+
+- [ ] [P1] [Report] **DM-87** Produce a complete client data report grouped by
+  the employee assigned with role P in Zuordnung MA. Requested by Stephan on
+  2026-10-12. Include all clients, including those without report appointments;
+  the existing DM-86 appointment overview does not cover this requirement.
+  Show child and sibling/index-child information, residence, related people
+  with child-specific relationship and guardianship, known placements, mandates,
+  care periods, quotas, requester/contact details, payer and relevant report
+  appointments. Resolve P against an explicit report reference date; expose
+  missing or ambiguous assignments in a separate unassigned section instead of
+  selecting an arbitrary employee or omitting clients. Keep separate child,
+  relationship, placement and mandate records visible without multiplying quota
+  totals through joins. Name the date and output scope in the report. Do not
+  infer family membership from shared adults, surnames or addresses. Acceptance:
+  clients without appointments, several related people, several placements,
+  siblings and missing/overlapping P assignments remain complete and traceable.
 
 - [ ] [P0] [Workbook] **DM-80** Repair diagnostics on a backed-up copy of the
   customer revision. `[Sonnet]`. Replace predecessor-dependent `issue_run`

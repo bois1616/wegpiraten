@@ -14,8 +14,10 @@ The handover continues in English from 2026-10-10; historical entries below keep
 - **Deadline:** workbook handover by late October; October invoices with the new schema in early November.
 - **Completed:** common schema and consumer switch DM-10–15, DM-20–23, DM-30–33, DM-40/42/43. `v_mandate`, SA sentinel, per-row legacy mapping, new timesheets, invoices and reports implemented. Specification: `dm12_dm15_dm22_implementierung.md`.
 - **September evidence:** DM-34 financial comparison completed, 167 identical service rows, 53 invoices, all 53 archived amounts match, CHF 60,385.93 rounded total. Evidence remains ignored under `output/test_datamodel_2026-09_20261010`. Details: `dm34_september_2026.md`. Nine invoices flagged. Two salutation differences and one budget difference documented.
-- **Reports and assignments:** DM-84/86 implemented; Stephan's 2026-10-12 correction merges responsibility history into Zuordnung MA / relation_mandate_emp. Optional valid_from/valid_to in P:Q; no separate assignment_history source. Reports use due_date, timesheets use month overlap and one header per pair, distinct returning-employee periods survive import. Historical roles/rows stay unchanged; a change closes the old row and adds a new one. Maintenance instructions are in Anleitung rows 91–99 and the runbook.
+- **Reports and assignments:** DM-84/86 implemented; Stephan's 2026-10-12 correction merges responsibility history into Zuordnung MA / relation_mandate_emp. Optional valid_from/valid_to now in D:E after input-column grouping; no separate assignment_history source. Reports use due_date, timesheets use month overlap and one header per pair, distinct returning-employee periods survive import. Historical roles/rows stay unchanged; a change closes the old row and adds a new one. Maintenance instructions are in Anleitung rows 91–99 and the runbook. DM-87 records the newly requested complete client report grouped by P, including clients without appointments; it is not implemented yet.
 - **Customer-workbook checkpoint:** same delivery path under ignored `output/uebergabe_stammdaten_2026-10-11/wegpiraten_datenbank.xlsx`, now 21 sheets and unified assignments. All 3,981 non-empty input cells, customer-edited sheet order and register colours preserved. Snapshot of the edited pre-consolidation source under backup/kundenstand_reihenfolge_farben_vor_vereinigung.xlsx; - Kopie remains unchanged. LibreOffice recalculation has 0 formula errors, including a disposable three-switch boundary example. General review: 0 technical defects, 13 customer-data findings. Isolated import/report regeneration succeeded: 637 records, 144/146 reports, eleven employee lists, 72 unique monthly timesheet pairs. Original import/live DB unchanged.
+- **Input-column grouping 2026-10-12:** Kinder A:Q, Ansprechpersonen A:H, Zuordnung MA A:E, Berichte A:G; displays follow each input block. Report mandate_id moved to H. Reordered cells, table columns, formulas (including dynamic range endpoints), dropdowns, names, conditional formatting/extensions and column properties together. New-sheet descriptions explain their distinct purposes; stale instructions in Anleitung/runbook corrected, Word regenerated. All 15,344 compared table values unchanged after LibreOffice recalculation, 0 formula errors, 0 technical review issues, 13 unchanged data findings, 72 finding-list rows. Style part/comments, sheet order and colours preserved. Backup: backup/kundenstand_vor_spaltengruppierung_20261012.xlsx; evidence: wegpiraten_datenbank.spaltengruppierung.json. All 64 tests and nox pass. Windows check must be repeated for this layout; the 14:52 report applies to the previous layout.
+- **Finding-list visibility:** Stephan confirmed the list works in LibreOffice and Excel; the view was scrolled to row 137, below the findings. No selection-logic defect. Saved viewport/selection reset to A5. No data correction or schema simplification applied to family/contact/placement relationships.
 - **Next independent work:** remaining Windows Excel acceptance for DM-80/82 and customer corrections DM-81. DM-83 and the authorised DM-85 contact/residence/placement fields are implemented in source copy and importer. Before the next customer-workbook import, perform and document a fresh general review of the edited source; unresolved data may still make import fail. Synthetic tests are independent; no fake customer data required. Other open work: DM-16/61, DM-41, DM-50.
 - **Windows automatic check 2026-10-12 at 14:52:** passed for the consolidated 21-sheet workbook after the style correction. Excel opened without repair, found 34 runtime names and no formula errors after full rebuild; five sampled dropdown formulas are present. Diagnostics show five open error checks and 72 records with findings. Evidence: ignored delivery directory, wegpiraten_datenbank.pruefung.txt (replaces the earlier report). Manual insert/delete/sort, new-row autofill and link/comment checks remain outstanding; DM-06 is not fully closed.
 - **Excel opening failure at 14:34:** inspection found an orphan shared formula in Fehlerliste M10: the consolidation overwrote its shared anchor M2 when reducing the helper-source list. LibreOffice did not reject it and the former general review missed it. Restored the formula from the preserved source, expanded shared formulas before future finding-list edits, and added a technical orphan check. Two regression tests added (57 total). The defect is corrected locally; Windows reopening is still required to confirm it caused the COM Open failure.
@@ -45,6 +47,27 @@ Regeln:
   sie schon als Beispiel führt.
 
 ## 2026-10-12
+
+- **Group workbook inputs and explain related data** `[Codex / GPT-6]`
+  (Status: implemented locally; Windows layout acceptance pending): Stephan
+  requested contiguous input blocks followed by calculated information. Added
+  workbook_layout and tools/group_workbook_inputs.py for the four interleaved
+  sheets. Remapped cells, formulas, table column order, calculated column formulas,
+  named ranges, dropdowns, conditional-formatting extensions and column properties.
+  A first recalculation exposed unshifted dynamic range endpoints after INDEX;
+  corrected the tokenizer handling and added two regression cases. Final
+  recalculation: 0 formula errors; all 15,344 table values match the source. All
+  3,981 non-empty inputs, styles, comments, tab order and colours retained. General
+  review: 0 technical / 13 customer-data findings. Descriptions explain the new
+  contact, relationship, placement and catalogue sheets. Anleitung and both
+  runbook formats now use the new columns. Rendering reviewed. Stephan clarified
+  that the apparently empty finding list was scrolled below its 72 entries;
+  restored its opening view to A5 without changing selection logic. DM-87 captures
+  the requested complete client report grouped by P; current appointment reports
+  are insufficient. No schema merge inferred from the simplification question:
+  sibling grouping, adult contact data, child-specific guardianship and placements
+  carry different facts. Validation: 64 tests passed, nox lint/typecheck passed.
+  The earlier Windows pass is not reused for the changed column layout.
 
 - **Consolidated workbook passes automatic Windows Excel check** `[Codex / GPT-6]`
   (Status: automatic acceptance passed; manual editing checks open): Stephan

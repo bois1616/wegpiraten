@@ -32,28 +32,28 @@ Für den aktuellen Spaltenstand gilt:
 
 | Blatt | Hier dürfen Daten eingegeben oder als Werte eingefügt werden | Nicht bearbeiten / nicht hineinkopieren |
 | --- | --- | --- |
-| Kinder | A:M und AD:AG (Wohnort/Kontakt Kind) | N:AC, berechnete Anzeigen und Prüfungen |
+| Kinder | A:Q, einschliesslich Wohnort/Kontakt Kind | R:AG, berechnete Anzeigen und Prüfungen |
 | Aufträge | A:Q | R:AP, berechnete Anzeigen, Verweise und Prüfungen |
 | Betreuungen | A:L | M:AD, berechnete Anzeigen und Prüfungen |
-| Zuordnung MA | A:C und P:Q (Gültig ab / Gültig bis) | D:O, berechnete Anzeigen und Prüfungen |
-| Ansprechpersonen | A:F und O:P (Telefon/E-Mail) | G:N, berechnete Anzeigen und Prüfungen |
-| Berichte | A:B und D:H | **C** (berechnete Auftrag-Nr) sowie I:T |
+| Zuordnung MA | A:E, einschliesslich Gültig ab / Gültig bis | F:Q, berechnete Anzeigen und Prüfungen |
+| Ansprechpersonen | A:H, einschliesslich Telefon/E-Mail | I:P, berechnete Anzeigen und Prüfungen |
+| Berichte | A:G | **H** (berechnete Auftrag-Nr) sowie I:T |
 | Kostenträger | B:I, einschliesslich E-Mail Rechnung | Technische Überschriften nicht verändern |
 | Bezugspersonen | A:I | J:N, Prüfungen |
 | Kind-Bezugsperson | A:F | G:M, Anzeigen und Prüfungen |
 | Platzierungen | A:K | L:Q, Prüfungen |
 | Prüfkatalog | G:H (Kommentar/Bearbeitung) | A:F und I:J, fester Katalog und Berechnungen |
 
-Bei «Berichte» wird der Auftrag in **B** ausgewählt. **C muss seine Formel behalten**;
-der Import liest die berechnete Nummer aus C. Ein sichtbarer Auftrag in B genügt
-nicht, wenn die Formel in C fehlt. Nach dem Anlegen einer Zeile kontrollieren, dass
+Bei «Berichte» wird der Auftrag in **B** ausgewählt. **H muss seine Formel behalten**;
+der Import liest die berechnete Nummer aus H. Ein sichtbarer Auftrag in B genügt
+nicht, wenn die Formel in H fehlt. Nach dem Anlegen einer Zeile kontrollieren, dass
 Auftrag und berechnete Anzeigen erscheinen. Fehlt etwas, die Datei zur technischen
 Prüfung an Stephan geben; keine Ersatzwerte in die Formelspalten schreiben.
 
 Neue Datensätze innerhalb der jeweiligen Excel-Tabelle anlegen und nur die
 Eingabefelder füllen. Beim Übernehmen eines bestehenden Datensatzes nur die oben
 genannten Eingabefelder als Werte kopieren, keine ganze Zeile und keinen ganzen
-Blattbereich. In «Berichte» A:B und D:H getrennt kopieren, damit C erhalten bleibt.
+Blattbereich. In «Berichte» nur A:G kopieren, damit H erhalten bleibt.
 Neue Nummern selbst vergeben und auf Eindeutigkeit prüfen.
 
 **Keine ganzen Blattzeilen ausschneiden oder verschieben.** Einen Auftrag oder eine Betreuung fachlich über die vorgesehenen
@@ -88,13 +88,13 @@ dieselbe Person kann für mehrere Kinder unterschiedliche Rollen haben. Unbekann
 Sorgeberechtigung als «Unbekannt» erfassen. Das Feld «Familie» in «Kinder» bleibt
 die bisherige Geschwisterkennung; eine gemeinsame Bezugsperson erzeugt keine Familie.
 
-Die aktuelle Wohnadresse des Kindes steht in «Kinder», AD:AG. Ein Aufenthalt in
+Die aktuelle Wohnadresse des Kindes steht in «Kinder», N:Q. Ein Aufenthalt in
 einer Einrichtung oder Pflegefamilie kann zusätzlich in «Platzierungen» erfasst
 werden. Bekannte Zeiträume eintragen; fehlende alte Angaben bleiben leer. Wohnadresse
 der Bezugsperson und Wohnadresse des Kindes sind getrennte Angaben.
 
 In «Zuordnung MA» je Auftrag, Mitarbeiter, Rolle und Zeitraum eine eigene Zeile
-anlegen. Datumsgrenzen stehen in P:Q. Beginn und Ende gelten einschliesslich. Für Berichte zählt die Fälligkeit:
+anlegen. Datumsgrenzen stehen in D:E. Beginn und Ende gelten einschliesslich. Für Berichte zählt die Fälligkeit:
 ein am 31.07. endender P-Zeitraum ist für diesen Tag zuständig, der ab 01.08. beginnende
 für spätere Fälligkeiten. P-Zeiträume dürfen sich nicht überschneiden. Ein leeres Ende
 bedeutet fortlaufend; ein leerer Beginn bleibt unbekannt und begrenzt den Zeitraum
@@ -205,7 +205,7 @@ Mitarbeitenden für denselben Monat.
 ### Zuordnung MA mit Zeiträumen pflegen
 
 Die bestehende Excel-Tabelle **`relation_mandate_emp`** im Blatt «Zuordnung MA»
-bleibt die einzige Zuordnungsquelle. Eingaben stehen in A:C und P:Q: Auftrag,
+bleibt die einzige Zuordnungsquelle. Eingaben stehen in A:E: Auftrag,
 Mitarbeiter, Rolle, `valid_from` und `valid_to`. Datumsfelder als echte Excel-Daten
 erfassen. Offene Grenzen dürfen leer bleiben. Beide Grenzen zählen mit. P bezeichnet
 die Berichtszuständigkeit, S eine Unterstützung. Zwei P-Zeiträume desselben Auftrags
@@ -304,7 +304,7 @@ die «Fehlerliste» schauen.
    der bisherigen Betreuungen als Werte übernehmen. Auftrag-Nr ändern, Eintritt
    beibehalten und Austritt leeren. Die Formelspalten bleiben erhalten.
 4. Im Blatt «Zuordnung MA» neue Tabellenzeilen anlegen, nur A:C als Werte übernehmen
-   und die Auftrag-Nr ändern. Die Rollen bleiben; P:Q für den neuen Auftrag neu
+   und die Auftrag-Nr ändern. Die Rollen bleiben; D:E für den neuen Auftrag neu
    festlegen und keine alten Enddaten blind kopieren.
 5. Im Blatt «Berichte» die Berichte des neuen Auftrags eintragen.
 6. Beim alten Auftrag bleibt der Hinweis «Bewilligung abgelaufen, Betreuung noch offen» stehen,
@@ -332,7 +332,7 @@ die «Fehlerliste» schauen.
 
 **Vertretung**
 
-Tabellenzeile in «Zuordnung MA» mit Rolle S und Beginn/Ende in P:Q ergänzen.
+Tabellenzeile in «Zuordnung MA» mit Rolle S und Beginn/Ende in D:E ergänzen.
 Nach dem Einsatz das Ende vervollständigen und die Zeile behalten.
 
 ### Regeln, die man sich merken muss
