@@ -53,6 +53,12 @@ selection rules and validation.
 
 ### Implementation checkpoint 2026-10-12
 
+Windows automatic check passed on 2026-10-12 at 10:36: no Excel repair or formula
+errors after full rebuild, 22 sheets opened, names present and sampled dropdowns
+valid. Remaining Windows acceptance concerns manual insertion/deletion/sorting,
+new-row autofill and the new input/comment/link interactions. DM-06 stays open
+until those checks are confirmed; customer data correction is a separate task.
+
 DM-80/82 are implemented locally: repaired native formulas, zero errors after
 LibreOffice recalculation, stable Prüfkatalog with all six customer comments and
 linked findings. Windows Excel acceptance (including table insertion/deletion/sort)
